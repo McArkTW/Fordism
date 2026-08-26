@@ -1,0 +1,46 @@
+// @ts-check
+const eslint = require('@eslint/js');
+const { defineConfig } = require('eslint/config');
+const tseslint = require('typescript-eslint');
+const angular = require('angular-eslint');
+
+module.exports = defineConfig([
+  {
+    files: ['**/*.ts'],
+    extends: [
+      eslint.configs.recommended,
+      tseslint.configs.recommended,
+      tseslint.configs.stylistic,
+      angular.configs.tsRecommended,
+    ],
+    processor: angular.processInlineTemplates,
+    rules: {
+      '@angular-eslint/directive-selector': [
+        'error',
+        {
+          type: 'attribute',
+          prefix: 'app',
+          style: 'camelCase',
+        },
+      ],
+      '@angular-eslint/component-selector': [
+        'error',
+        {
+          type: 'element',
+          // 'app' is the norm; the two shared widgets keep their descriptive tags.
+          prefix: ['app', 'yaml', 'confirm'],
+          style: 'kebab-case',
+        },
+      ],
+      // The codebase models wire DTOs as type aliases throughout.
+      '@typescript-eslint/consistent-type-definitions': ['error', 'type'],
+      // `error: () => {}` is how an intentionally-ignored HTTP failure reads.
+      '@typescript-eslint/no-empty-function': ['error', { allow: ['arrowFunctions'] }],
+    },
+  },
+  {
+    files: ['**/*.html'],
+    extends: [angular.configs.templateRecommended, angular.configs.templateAccessibility],
+    rules: {},
+  },
+]);

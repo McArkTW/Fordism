@@ -20,7 +20,7 @@ import { Toasts } from '../../core/toast';
  * something other than what the workflow says.
  */
 @Component({
-  selector: 'workflow-run',
+  selector: 'app-workflow-run',
   imports: [RouterLink, Icon, DatePipe, MatButtonModule, MatFormFieldModule, MatInputModule],
   host: { class: 'block' },
   templateUrl: './workflow-run.html',

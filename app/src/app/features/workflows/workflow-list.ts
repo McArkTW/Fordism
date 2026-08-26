@@ -9,7 +9,7 @@ import { Toasts } from '../../core/toast';
 
 /** Browse the workflows: what the agents run, and how their steps are ordered. */
 @Component({
-  selector: 'workflow-list',
+  selector: 'app-workflow-list',
   imports: [RouterLink, Icon, MatButtonModule],
   host: { class: 'block' },
   template: `

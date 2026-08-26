@@ -37,7 +37,7 @@ steps:
  * Unsaved edits only feed the header hint; a route guard against navigating away is out of scope.
  */
 @Component({
-  selector: 'workflow-edit',
+  selector: 'app-workflow-edit',
   imports: [RouterLink, Icon, YamlEditor, MatButtonModule],
   host: { class: 'block' },
   templateUrl: './workflow-edit.html',

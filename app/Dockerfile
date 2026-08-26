@@ -5,7 +5,9 @@ WORKDIR /src
 COPY package*.json ./
 RUN npm ci
 COPY . .
-# The gate: `ng build` type-checks, but only the specs prove a template still renders.
+# The gates: lint for style, specs because `ng build` type-checks but only they
+# prove a template still renders.
+RUN npm run lint
 RUN npm run test
 RUN npm run build
 
