@@ -19,9 +19,9 @@ type TreeNode = {
 };
 
 /**
- * Skills — a read-only browse of the tds-skills library (synced, pinned). List every skill,
+ * Skills — a read-only browse of the skills library (synced, pinned). List every skill,
  * read its SKILL.md rendered, browse its files as a tree, and disable a skill to keep it out
- * of future runs. Editing happens upstream in the tds-skills repo, not here.
+ * of future runs. Editing happens upstream in an external skills repo, not here.
  */
 @Component({
   selector: 'skills',

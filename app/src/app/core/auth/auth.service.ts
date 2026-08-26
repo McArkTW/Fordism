@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 
-const HEIMDALL = 'https://heimdall.local';
+const ISSUER = 'https://auth.example.invalid'; // placeholder — dies with the Phase-3 frontend rewrite
 const TOKEN_KEY = 'fordism_id_token';
 const VERIFIER_KEY = 'fordism_pkce_verifier';
 
@@ -14,8 +14,8 @@ export type UserProfile = {
 };
 
 /**
- * OAuth (PKCE) client for TDS Heimdall. The browser gets an identity token from
- * Heimdall and sends it as a Bearer; Fordism's backend verifies it. No secret in
+ * OAuth (PKCE) client for the OIDC identity provider. The browser gets an identity token from
+ * the IdP and sends it as a Bearer; Fordism's backend verifies it. No secret in
  * the browser — the PKCE code_verifier proves this is the same browser.
  */
 @Injectable({ providedIn: 'root' })
@@ -23,7 +23,7 @@ export class AuthService {
   private http = inject(HttpClient);
 
   /**
-   * Heimdall registers one service per environment, each pinned to one exact callback URL that
+   * the IdP registers one service per environment, each pinned to one exact callback URL that
    * it string-matches, so the name has to follow the host we are served from. A dev server
    * matches no registration at all and gets a 400 — log in on the real host.
    */
@@ -40,8 +40,8 @@ export class AuthService {
 
   /**
    * Ask the backend who this token belongs to. A 401 means the token no longer verifies, so
-   * drop it — the next page load bounces to Heimdall. Deliberately no immediate redirect: a
-   * token Heimdall keeps issuing but the backend keeps rejecting would loop forever.
+   * drop it — the next page load bounces to the IdP. Deliberately no immediate redirect: a
+   * token the IdP keeps issuing but the backend keeps rejecting would loop forever.
    */
   loadUser(): void {
     if (!this.token()) {
@@ -71,7 +71,7 @@ export class AuthService {
       .replace(/=+$/, '');
   }
 
-  /** Kick off login: make a PKCE pair, then bounce to Heimdall. */
+  /** Kick off login: make a PKCE pair, then bounce to the IdP. */
   async login(returnTo: string): Promise<void> {
     const verifier = this.b64url(crypto.getRandomValues(new Uint8Array(32)).buffer);
     sessionStorage.setItem(VERIFIER_KEY, verifier);
@@ -80,18 +80,18 @@ export class AuthService {
     );
     const redirect = `${location.origin}/auth/callback`;
     const url =
-      `${HEIMDALL}/authorize?service=${this.service()}` +
+      `${ISSUER}/authorize?service=${this.service()}` +
       `&redirect_uri=${encodeURIComponent(redirect)}` +
       `&state=${encodeURIComponent(returnTo)}` +
       `&code_challenge=${challenge}`;
     location.href = url;
   }
 
-  /** Handle the Heimdall redirect back: swap code + verifier for a token. */
+  /** Handle the the IdP redirect back: swap code + verifier for a token. */
   async handleCallback(code: string, state: string): Promise<void> {
     const verifier = sessionStorage.getItem(VERIFIER_KEY) || '';
     try {
-      const res = await fetch(`${HEIMDALL}/api/pkce/token`, {
+      const res = await fetch(`${ISSUER}/api/pkce/token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code, code_verifier: verifier }),

@@ -22,10 +22,13 @@ public final class ModelRegistry {
 
     /**
      * Resolves an Agent Profile (by name) to the backend that serves it. The profile's own model
-     * wins; with no or unknown profile it falls back to the config default backend + claude-code.
+     * wins. With no profile named: the sole existing profile, if there is exactly one — so a fresh
+     * install works the moment its first profile is created — else the config default backend
+     * + claude-code.
      */
     public AgentBackend backend(String profileName, String model) {
         return profiles.getByName(profileName)
+                .or(profiles::sole)
                 .filter(profile -> profile.baseUrl() != null && !profile.baseUrl().isBlank())
                 .map(profile -> new AgentBackend(
                         profile.baseUrl(),

@@ -1,11 +1,9 @@
 package tw.mcark.tony.fordism.agentprofile;
 
 import com.google.gson.Gson;
-import tw.mcark.tony.fordism.config.FordismConfiguration;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -23,14 +21,14 @@ import java.util.Optional;
  */
 public final class AgentProfileStore {
     private static final Gson GSON = new Gson();
-    private final FordismConfiguration configuration;
+    private final Path directory;
 
-    public AgentProfileStore(FordismConfiguration configuration) {
-        this.configuration = configuration;
+    public AgentProfileStore(Path directory) {
+        this.directory = directory;
     }
 
     private Path root() {
-        return Paths.get(configuration.agentProfilesDir);
+        return directory;
     }
 
     private Path file(String id) {
@@ -73,6 +71,16 @@ public final class AgentProfileStore {
             Logger.warn("unreadable agent-profile {}: {}", path, e.getMessage());
             return Optional.empty();
         }
+    }
+
+    /**
+     * The one profile, when exactly one exists. A template (or step) with no profile of its own
+     * resolves to it, so a fresh install works the moment its first profile is created — with
+     * several profiles the choice is ambiguous and must be explicit.
+     */
+    public Optional<AgentProfile> sole() {
+        List<AgentProfile> all = all();
+        return all.size() == 1 ? Optional.of(all.get(0)) : Optional.empty();
     }
 
     /** Full record incl. key by display name — how a template references one. */

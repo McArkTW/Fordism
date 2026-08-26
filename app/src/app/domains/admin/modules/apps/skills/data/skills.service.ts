@@ -19,7 +19,7 @@ export type SkillDetail = {
 /** The mirror's source: repo + pinned tag. */
 export type SkillSource = { repo?: string; tag?: string; syncedAt?: string };
 
-/** Skills library (read-only mirror of tds-skills): list / preview / enable-disable. */
+/** Skills library (read-only mirror of your skills repo): list / preview / enable-disable. */
 @Injectable({ providedIn: 'root' })
 export class SkillsService {
   private http = inject(HttpClient);

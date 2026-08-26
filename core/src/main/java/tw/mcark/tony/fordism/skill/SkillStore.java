@@ -20,9 +20,9 @@ import com.google.gson.Gson;
 import org.tinylog.Logger;
 
 /**
- * The skills library: each skill is a folder addressed by a namespaced name (tds-skills style,
+ * The skills library: each skill is a folder addressed by a namespaced name (namespaced,
  * e.g. {@code access/github}) containing a {@code SKILL.md} plus optional files. Content is a
- * read-only mirror of the tds-skills repo; per-skill enable/disable is Fordism-local ({@link SkillState}).
+ * read-only mirror of an external skills repo; per-skill enable/disable is Fordism-local ({@link SkillState}).
  */
 public final class SkillStore {
     private static final Gson GSON = new Gson();

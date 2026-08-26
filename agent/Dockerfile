@@ -53,7 +53,7 @@ COPY skills/        /doctrine/skills/
 RUN chmod +x /usr/local/bin/fordism-agent
 
 # Claude Code refuses --dangerously-skip-permissions as root, so run as a non-root user.
-# Pin that user to uid/gid 1001 so workspace files on the host are owned by `lab` (uid 1001),
+# Pin that user to uid/gid 1001 so workspace files on the host are owned by a stable non-root uid,
 # not uid 1000. HOME points at the mounted workspace so sessions/transcripts persist and resume.
 RUN groupmod -g 1001 node && usermod -u 1001 -g 1001 node
 USER node

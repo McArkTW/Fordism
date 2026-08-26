@@ -8,7 +8,7 @@ import { Scheme, Theming } from '@/app/core/theming';
 /**
  * The sidebar's bottom control — who is signed in, plus the colour scheme and sign-out.
  *
- * The identity comes from `/api/auth/me`, which verifies the Heimdall token server-side; the
+ * The identity comes from `/api/auth/me`, which verifies the the IdP token server-side; the
  * browser never decodes the token itself, so what is shown is what the backend accepted.
  */
 @Component({

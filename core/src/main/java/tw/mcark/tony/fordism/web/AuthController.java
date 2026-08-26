@@ -6,16 +6,16 @@ import io.javalin.http.Context;
 /** /api/auth/me — verify the Bearer identity token and return the user's profile. */
 public final class AuthController {
     private static final Gson GSON = new Gson();
-    private final HeimdallAuth auth;
+    private final IdentityTokenAuth auth;
     private final UserStore users;
 
-    public AuthController(HeimdallAuth auth, UserStore users) {
+    public AuthController(IdentityTokenAuth auth, UserStore users) {
         this.auth = auth;
         this.users = users;
     }
 
     public void me(Context ctx) {
-        String email = auth.verify(HeimdallAuth.bearer(ctx));
+        String email = auth.verify(IdentityTokenAuth.bearer(ctx));
         if (email == null) {
             ctx.status(401).contentType("application/json").result("{\"error\":\"not logged in\"}");
             return;

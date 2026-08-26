@@ -1,6 +1,6 @@
 package tw.mcark.tony.fordism.config;
 
-/** All runtime configuration, read from the environment (compose/Jenkins provide it). */
+/** All runtime configuration, read from the environment (compose provides it). */
 public final class FordismConfiguration {
     public final int port = (int) envLong("FORDISM_PORT", 8080);
     public final long reconcileIntervalMillis = envLong("FORDISM_RECONCILE_MS", 2000);
@@ -35,10 +35,15 @@ public final class FordismConfiguration {
     public final String llmBaseUrl = env("LLM_BASE_URL", "http://localhost:11434");
     public final String agentModel = env("AGENT_MODEL", "qwen3");
 
-    // Build identity (stamped by CI) surfaced at /api/version
-    // Heimdall RS256 public key (PEM) used to verify identity tokens. Empty = auth off.
-    public final String heimdallPubKey = env("HEIMDALL_PUBKEY", "");
+    // Identity provider: RS256 public key (PEM) used to verify Bearer identity tokens.
+    // Empty = auth off (network-gate the deployment instead). Issuer must match the token's
+    // `iss`; audience, when set, must match `aud` — leave it blank only if the issuer mints
+    // tokens for this service alone.
+    public final String authPubKey = env("FORDISM_AUTH_PUBKEY", "");
+    public final String authIssuer = env("FORDISM_AUTH_ISSUER", "");
+    public final String authAudience = env("FORDISM_AUTH_AUDIENCE", "");
 
+    // Build identity (stamped by CI) surfaced at /api/version
     public final String version = env("FORDISM_VERSION", "dev");
     public final String gitSha = env("FORDISM_GIT_SHA", "unknown");
     public final String builtAt = env("FORDISM_BUILT_AT", "unknown");

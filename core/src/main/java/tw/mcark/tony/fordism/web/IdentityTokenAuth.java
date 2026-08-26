@@ -11,28 +11,39 @@ import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 
 /**
- * Verifies a Heimdall identity token (RS256) with Heimdall's public key — no
- * dependency, no call back to Heimdall. The browser gets the token via PKCE and
- * sends it as a Bearer; this proves who the user is.
+ * Verifies an RS256 identity token (JWT) with the identity provider's public key — no dependency,
+ * no callback to the issuer. The browser obtains the token (e.g. via PKCE) and sends it as a
+ * Bearer; this proves who the user is.
+ *
+ * <p>The issuer claim must equal the configured issuer. The audience claim is checked only when an
+ * audience is configured — without it, a token minted for any other service at the same issuer
+ * would be accepted here as a valid identity.
  */
-public final class HeimdallAuth {
+public final class IdentityTokenAuth {
     private static final Gson GSON = new Gson();
     private final RSAPublicKey key;
+    private final String issuer;
+    private final String audience;
 
-    public HeimdallAuth(String pem) {
+    public IdentityTokenAuth(AuthSettings settings) {
         try {
-            String b64 = pem.replace("-----BEGIN PUBLIC KEY-----", "")
+            String b64 = settings.pem().replace("-----BEGIN PUBLIC KEY-----", "")
                             .replace("-----END PUBLIC KEY-----", "")
                             .replaceAll("\\s", "");
             byte[] der = Base64.getDecoder().decode(b64);
             this.key = (RSAPublicKey) KeyFactory.getInstance("RSA")
                     .generatePublic(new X509EncodedKeySpec(der));
         } catch (Exception e) {
-            throw new IllegalArgumentException("bad Heimdall public key (HEIMDALL_PUBKEY)", e);
+            throw new IllegalArgumentException("bad identity-provider public key (FORDISM_AUTH_PUBKEY)", e);
         }
+        this.issuer = settings.issuer();
+        this.audience = settings.audience();
     }
 
-    /** The email if the token is a valid, unexpired Heimdall identity token; else null. */
+    /** What the environment provides: PEM public key, expected issuer, optional audience. */
+    public record AuthSettings(String pem, String issuer, String audience) {}
+
+    /** The email if the token is a valid, unexpired identity token from our issuer; else null. */
     public String verify(String token) {
         if (token == null) {
             return null;
@@ -55,7 +66,11 @@ public final class HeimdallAuth {
             if (exp < System.currentTimeMillis() / 1000) {
                 return null;
             }
-            if (!claims.has("iss") || !"heimdall.local".equals(claims.get("iss").getAsString())) {
+            if (!claims.has("iss") || !issuer.equals(claims.get("iss").getAsString())) {
+                return null;
+            }
+            if (!audience.isBlank()
+                    && (!claims.has("aud") || !audience.equals(claims.get("aud").getAsString()))) {
                 return null;
             }
             return claims.has("email") ? claims.get("email").getAsString() : null;

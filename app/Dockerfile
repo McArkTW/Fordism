@@ -1,5 +1,5 @@
 # fordism-app — Angular (Fuse) static SPA served by nginx, which also proxies /api to
-# fordism-core. The browser holds the Heimdall identity token and sends it as a Bearer;
+# fordism-core. The browser holds the the IdP identity token and sends it as a Bearer;
 # nginx passes it through untouched.
 FROM node:22-alpine AS build
 WORKDIR /src

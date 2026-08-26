@@ -16,11 +16,14 @@ services:
   fordism-core:
     image: ${REGISTRY:-ghcr.io/mcark/fordism}/fordism-core:${TAG:-latest}
     environment:
-      # Build identity — stamped by CI at deploy (Jenkinsfile); surfaced at /api/version.
+      # Build identity — stamped by CI at deploy; surfaced at /api/version.
       FORDISM_VERSION: ${FORDISM_VERSION:-dev}
       FORDISM_GIT_SHA: ${FORDISM_GIT_SHA:-unknown}
       FORDISM_BUILT_AT: ${FORDISM_BUILT_AT:-unknown}
-      HEIMDALL_PUBKEY: ${HEIMDALL_PUBKEY:-}
+      # Identity provider (optional — empty means auth off; network-gate the deployment).
+      FORDISM_AUTH_PUBKEY: ${FORDISM_AUTH_PUBKEY:-}
+      FORDISM_AUTH_ISSUER: ${FORDISM_AUTH_ISSUER:-}
+      FORDISM_AUTH_AUDIENCE: ${FORDISM_AUTH_AUDIENCE:-}
       # Launcher. FORDISM_LAUNCHER_NETWORK must name a network the agent can reach core on —
       # the env files point it at this project's `internal` (e.g. uat_internal).
       FORDISM_LAUNCHER_NETWORK: ${FORDISM_LAUNCHER_NETWORK:-}

@@ -13,7 +13,7 @@ import org.tinylog.Logger;
 
 /**
  * Fordism-local skill state: which skills are DISABLED (excluded from future runs). Kept separate
- * from the skill content, which is a read-only mirror of the tds-skills repo. Persisted to
+ * from the skill content, which is a read-only mirror of an external skills repo. Persisted to
  * {@code <stateDir>/skills-state.json} so it survives redeploy.
  */
 public final class SkillState {

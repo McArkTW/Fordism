@@ -66,7 +66,15 @@ public final class WorkflowController {
         }
         String profile = template.agentProfile();
         if (profile == null || profile.isBlank()) {
-            return "template \"" + templateName + "\" has no Agent Profile — create an Agent Profile and set it on the template before running this workflow";
+            // A blank profile resolves to the sole existing one — fine on a fresh install with
+            // exactly one profile; ambiguous (or impossible) otherwise.
+            if (profiles.sole().isPresent()) {
+                return null;
+            }
+            if (profiles.list().isEmpty()) {
+                return "template \"" + templateName + "\" has no Agent Profile and none exist yet — create one on the Agent Profiles page and it will be used automatically";
+            }
+            return "template \"" + templateName + "\" has no Agent Profile — several profiles exist, so set one on the template";
         }
         if (profiles.getByName(profile).isEmpty()) {
             return "template \"" + templateName + "\" references Agent Profile \"" + profile + "\" which does not exist";

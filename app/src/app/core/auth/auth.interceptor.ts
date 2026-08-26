@@ -2,7 +2,7 @@ import { HttpInterceptorFn } from '@angular/common/http';
 
 const TOKEN_KEY = 'fordism_id_token';
 
-/** Attach the Heimdall identity token to Fordism's own /api calls. */
+/** Attach the the IdP identity token to Fordism's own /api calls. */
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   if (typeof localStorage === 'undefined') {
     return next(req); // server-side render: no token

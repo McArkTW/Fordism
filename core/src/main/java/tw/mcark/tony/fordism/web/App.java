@@ -50,10 +50,12 @@ public final class App {
         Javalin app = Javalin.create();
         app.get("/api/health", ctx -> ctx.contentType("application/json").result("{\"status\":\"ok\"}"));
 
-        // Who-am-I: verify the Heimdall identity token, return the user's profile.
-        if (!configuration.heimdallPubKey.isBlank()) {
+        // Who-am-I: verify the Bearer identity token, return the user's profile.
+        if (!configuration.authPubKey.isBlank()) {
+            IdentityTokenAuth.AuthSettings settings = new IdentityTokenAuth.AuthSettings(
+                    configuration.authPubKey, configuration.authIssuer, configuration.authAudience);
             AuthController authApi = new AuthController(
-                    new HeimdallAuth(configuration.heimdallPubKey), new UserStore(configuration.stateDir));
+                    new IdentityTokenAuth(settings), new UserStore(configuration.stateDir));
             app.get("/api/auth/me", authApi::me);
         }
         app.get("/api/version", this::version);

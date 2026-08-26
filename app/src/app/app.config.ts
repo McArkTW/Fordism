@@ -32,8 +32,8 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideHttpClient(withFetch(), withInterceptors([authInterceptor])),
 
-    // Heimdall login: on first load, if there's no identity token, bounce to
-    // Heimdall; handle the redirect back at /auth/callback. Browser-only (SSR skips).
+    // the IdP login: on first load, if there's no identity token, bounce to
+    // the IdP; handle the redirect back at /auth/callback. Browser-only (SSR skips).
     provideAppInitializer(() => {
       if (!isPlatformBrowser(inject(PLATFORM_ID))) {
         return;

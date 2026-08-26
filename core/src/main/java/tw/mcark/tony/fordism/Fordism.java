@@ -47,7 +47,7 @@ public final class Fordism {
         TaskRepository tasks = new InMemoryTaskRepository();
         WorkflowRunRepository runs = new InMemoryWorkflowRunRepository();
         SessionIdentifierFactory sessions = new SessionIdentifierFactory();
-        AgentProfileStore profiles = new AgentProfileStore(configuration);
+        AgentProfileStore profiles = new AgentProfileStore(Paths.get(configuration.agentProfilesDir));
         ModelRegistry models = new ModelRegistry(configuration, profiles);
         WorkspaceStager workspaces = new WorkspaceStager(configuration);
         TaskResults results = new TaskResults();
