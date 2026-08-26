@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/logo.svg" width="96" alt="Fordism — the F is the line; the violet square is the unit that shipped"></p>
+
 # Fordism
 
 **A workflow engine that runs AI agents as disposable containers.** You define a
