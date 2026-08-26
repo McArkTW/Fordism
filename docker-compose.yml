@@ -1,0 +1,74 @@
+# The Foundry — full stack. `docker compose up -d` on any Docker host (GPU-free).
+# Images are PULLED from the registry here; docker-compose.override.yml adds
+# `build:` for local development.
+#
+# Ollama is EXTERNAL (not managed here) — set OLLAMA_BASE_URL to a GPU host.
+# No gateway: each Agent Profile carries its own baseUrl and agents call the provider
+# DIRECTLY (Claude → api.anthropic.com, qwen → Ollama's OpenAI endpoint).
+#
+# Two services run: core and app. There is no database — core keeps run/task state in
+# memory behind the `store` port and snapshots it to disk, so a Postgres container was
+# running with nothing ever connecting to it (core ships no JDBC driver). Add it back
+# alongside a real store implementation, not before.
+name: foundry
+
+services:
+  foundry-core:
+    image: ${REGISTRY:-ghcr.io/hpi-secret/tds-foundry}/foundry-core:${TAG:-latest}
+    environment:
+      # Build identity — stamped by CI at deploy (Jenkinsfile); surfaced at /api/version.
+      FOUNDRY_VERSION: ${FOUNDRY_VERSION:-dev}
+      FOUNDRY_GIT_SHA: ${FOUNDRY_GIT_SHA:-unknown}
+      FOUNDRY_BUILT_AT: ${FOUNDRY_BUILT_AT:-unknown}
+      HEIMDALL_PUBKEY: ${HEIMDALL_PUBKEY:-}
+      # Launcher. FOUNDRY_LAUNCHER_NETWORK must name a network the agent can reach core on —
+      # the env files point it at this project's `internal` (e.g. uat_internal).
+      FOUNDRY_LAUNCHER_NETWORK: ${FOUNDRY_LAUNCHER_NETWORK:-}
+      FOUNDRY_AGENT_IMAGE: ${FOUNDRY_AGENT_IMAGE:-}
+      FOUNDRY_LAUNCHER_MAX: ${FOUNDRY_LAUNCHER_MAX:-4}
+      # The gid the agent image runs as; a staged workspace is handed to this group.
+      FOUNDRY_AGENT_GID: ${FOUNDRY_AGENT_GID:-1001}
+      # No gateway — the default backend when a task resolves no Agent Profile.
+      LLM_BASE_URL: ${OLLAMA_BASE_URL:-http://localhost:11434}
+      AGENT_MODEL: ${AGENT_MODEL:-qwen3}
+      # Clean per-env root mounted at /foundry, with flat siblings:
+      #   /foundry/{workspaces, workflows, state, templates, skills, agent-profiles}
+      FOUNDRY_WORKSPACES_DIR: /foundry/workspaces
+      FOUNDRY_WORKSPACES_HOST: ${FOUNDRY_ROOT:-/var/lib/foundry}/workspaces
+      FOUNDRY_STATE_DIR: /foundry/state
+      FOUNDRY_USER_WORKFLOWS_DIR: /foundry/workflows
+      FOUNDRY_SKILLS_DIR: /foundry/skills
+      FOUNDRY_AGENT_PROFILES_DIR: /foundry/agent-profiles
+      AGENT_TEMPLATES: /foundry/templates
+    # The launcher shells the docker CLI against this host socket to spawn agents; the whole
+    # per-env foundry root is mounted so state/workflows/templates/workspaces all persist.
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${FOUNDRY_ROOT:-/var/lib/foundry}:/foundry
+    networks: [internal, edge]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # Static Angular SPA served by nginx; also the edge (proxies /api → core).
+  foundry-app:
+    image: ${REGISTRY:-ghcr.io/hpi-secret/tds-foundry}/foundry-app:${TAG:-latest}
+    ports:
+      - "${WEB_PORT:-80}:80"
+    depends_on: [foundry-core]
+    networks: [edge]
+    restart: unless-stopped
+
+  # Not a service — the recipe for the agent image, so `compose build` produces it under the
+  # same REGISTRY/TAG as the others. The launcher runs one of these per task; nothing
+  # long-lived. Behind a profile so `up` never starts it.
+  foundry-agent:
+    image: ${REGISTRY:-ghcr.io/hpi-secret/tds-foundry}/foundry-agent:${TAG:-latest}
+    profiles: ["build-only"]
+
+networks:
+  edge:      # nginx ↔ app ↔ core (public-facing)
+  internal:  # core ↔ the agent containers the launcher spawns

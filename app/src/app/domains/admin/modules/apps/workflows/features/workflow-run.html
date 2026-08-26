@@ -1,0 +1,208 @@
+<div
+  class="mx-auto flex w-full max-w-[64rem] flex-auto flex-col p-6 lg:px-10 lg:py-8"
+>
+  <div class="flex flex-wrap items-center gap-3">
+    <a
+      mat-button
+      routerLink="/workflows"
+      ><mat-icon svgIcon="arrow-left" />Workflows</a
+    >
+    <h1 class="text-xl font-semibold tracking-tight">Run {{ name() }}</h1>
+    <span class="flex-auto"></span>
+    <a
+      mat-button
+      [routerLink]="['/workflows', name(), 'edit']"
+      ><mat-icon svgIcon="pencil" />Edit</a
+    >
+  </div>
+
+  @if (detail(); as w) {
+    @if (w.description) {
+      <p class="text-secondary mt-1 text-sm">{{ w.description }}</p>
+    }
+
+    @if (preflight(); as p) {
+      @if (!p.ready) {
+        <div
+          class="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/[0.07] px-3 py-2 text-sm text-amber-200"
+        >
+          <span class="font-medium">Cannot start:</span> {{ p.problem }}
+        </div>
+      }
+    }
+
+    <!-- Parameters -->
+    <section class="mt-5 rounded-xl border border-white/5 bg-white/[0.02] p-4">
+      <div
+        class="text-secondary text-[10px] font-semibold tracking-wide uppercase"
+      >
+        Parameters
+      </div>
+      @if (w.parameters.length === 0) {
+        <p class="text-secondary mt-2 text-sm">This workflow takes none.</p>
+      }
+      @for (p of w.parameters; track p.name) {
+        <div class="mt-3">
+          <label
+            class="block text-sm font-medium"
+            [for]="'param-' + p.name"
+          >
+            {{ p.label }}
+            @if (p.required) {
+              <span class="text-amber-300">*</span>
+            }
+            <span class="text-secondary ml-1 font-mono text-xs">{{
+              p.name
+            }}</span>
+          </label>
+          @if (p.help) {
+            <p class="text-secondary mt-0.5 text-xs">{{ p.help }}</p>
+          }
+          @if (p.type === 'textarea') {
+            <textarea
+              [id]="'param-' + p.name"
+              rows="5"
+              spellcheck="false"
+              class="focus:border-primary mt-1.5 w-full resize-y rounded-lg border border-white/10 bg-white/[0.03] p-2.5 font-mono text-[13px] text-current focus:outline-none"
+              [value]="value(p.name)"
+              (input)="set(p.name, $any($event.target).value)"
+            ></textarea>
+          } @else {
+            <input
+              [id]="'param-' + p.name"
+              [type]="p.type === 'number' ? 'number' : 'text'"
+              class="focus:border-primary mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 text-sm text-current focus:outline-none"
+              [value]="value(p.name)"
+              (input)="set(p.name, $any($event.target).value)"
+            />
+          }
+        </div>
+      }
+    </section>
+
+    <!-- Files -->
+    <section class="mt-4 rounded-xl border border-white/5 bg-white/[0.02] p-4">
+      <div
+        class="text-secondary text-[10px] font-semibold tracking-wide uppercase"
+      >
+        Input files
+      </div>
+      <p class="text-secondary mt-1 text-xs">
+        Dropped files land in <span class="font-mono">task/</span> for the first
+        step. The task itself comes from the workflow — refer to a file by name
+        in its <span class="font-mono">task:</span> text.
+      </p>
+      <div
+        class="mt-3 rounded-lg border border-dashed border-white/15 px-4 py-6 text-center transition-colors"
+        [class.border-primary]="dragging()"
+        (dragover)="$event.preventDefault(); dragging.set(true)"
+        (dragleave)="dragging.set(false)"
+        (drop)="drop($event)"
+      >
+        <mat-icon
+          svgIcon="upload"
+          class="text-secondary icon-size-6"
+        />
+        <div class="text-secondary mt-1 text-sm">Drop files here</div>
+        <button
+          mat-button
+          type="button"
+          class="mt-1"
+          (click)="picker.click()"
+        >
+          Browse…
+        </button>
+        <input
+          #picker
+          type="file"
+          multiple
+          hidden
+          (change)="pick($event)"
+        />
+      </div>
+      @for (f of files(); track f.name; let i = $index) {
+        <div class="mt-2 flex flex-wrap items-center gap-2">
+          <input
+            [value]="f.name"
+            (input)="rename(i, $any($event.target).value)"
+            class="focus:border-primary h-9 min-w-0 flex-auto rounded-md border border-white/10 bg-white/[0.03] px-2 font-mono text-xs text-current focus:outline-none"
+          />
+          <span class="text-secondary text-xs">{{ size(f.file.size) }}</span>
+          <button
+            mat-button
+            (click)="removeFile(i)"
+          >
+            <mat-icon svgIcon="x" />
+          </button>
+        </div>
+        @if (isTaskMd(f.name)) {
+          <div class="mt-1 text-xs text-red-400">
+            Rename this — the workflow defines the task, so task.md cannot be
+            uploaded.
+          </div>
+        }
+      }
+    </section>
+
+    <div class="mt-5 flex items-center gap-3">
+      <button
+        mat-flat-button
+        color="primary"
+        [disabled]="busy() || !canRun()"
+        (click)="start()"
+      >
+        <mat-icon svgIcon="play" />Run
+      </button>
+      @if (missing().length) {
+        <span class="text-secondary text-xs"
+          >needs {{ missing().join(', ') }}</span
+        >
+      }
+      @if (error()) {
+        <span class="text-sm text-red-400">{{ error() }}</span>
+      }
+    </div>
+
+    <!-- History -->
+    <section class="mt-8">
+      <div
+        class="text-secondary text-[10px] font-semibold tracking-wide uppercase"
+      >
+        Past runs
+      </div>
+      @if (runs().length === 0) {
+        <p class="text-secondary mt-2 text-sm">None yet.</p>
+      } @else {
+        <div
+          class="mt-2 divide-y divide-white/5 rounded-xl border border-white/5 bg-white/[0.02]"
+        >
+          @for (r of runs(); track r.id) {
+            <a
+              class="flex flex-wrap items-center gap-3 px-3 py-2 text-sm hover:bg-white/[0.03]"
+              [routerLink]="['/runs']"
+              [queryParams]="{ run: r.id }"
+            >
+              <span
+                class="rounded px-1.5 py-0.5 text-[10px]"
+                [class]="stateStyle(r.state)"
+                >{{ r.state }}</span
+              >
+              <span class="text-secondary font-mono text-xs">{{
+                r.id.slice(0, 8)
+              }}</span>
+              <span class="flex-auto"></span>
+              @if (r.durationMs) {
+                <span class="text-secondary text-xs">{{
+                  duration(r.durationMs)
+                }}</span>
+              }
+              <span class="text-secondary text-xs">{{
+                when(r.createdAt)
+              }}</span>
+            </a>
+          }
+        </div>
+      }
+    </section>
+  }
+</div>

@@ -1,0 +1,231 @@
+<div
+  class="mx-auto flex w-full max-w-[100rem] flex-auto flex-col p-6 lg:px-10 lg:py-8"
+>
+  <div class="flex flex-wrap items-center justify-between gap-4">
+    <div class="flex items-center gap-x-3.5">
+      <div
+        class="flex size-10 shrink-0 items-center justify-center rounded-lg border border-white/5 bg-white/[0.03]"
+      >
+        <mat-icon
+          svgIcon="server"
+          class="text-primary icon-size-6"
+        />
+      </div>
+      <div>
+        <h1 class="leading-tight text-2xl font-semibold tracking-tight">
+          Agent Profiles
+        </h1>
+        <p class="text-secondary text-sm">
+          A backend + the agent tool that drives it. Templates pick a profile.
+        </p>
+      </div>
+    </div>
+    <button
+      mat-flat-button
+      color="primary"
+      (click)="newSource()"
+    >
+      <mat-icon svgIcon="plus" />
+      New profile
+    </button>
+  </div>
+
+  <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
+    <div
+      class="overflow-hidden rounded-xl border border-white/5 bg-white/[0.02] lg:col-span-4"
+    >
+      @if (sources().length === 0) {
+        <div class="text-secondary px-4 py-16 text-center text-sm">
+          No agent profiles yet.
+        </div>
+      } @else {
+        <div class="divide-y divide-white/5">
+          @for (s of sources(); track s.id) {
+            <button
+              type="button"
+              class="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.03]"
+              [class]="s.id === selected() ? 'bg-white/[0.05]' : ''"
+              (click)="select(s.id)"
+            >
+              <div class="min-w-0 flex-auto">
+                <div class="truncate text-sm font-medium">{{ s.name }}</div>
+                <div class="text-secondary truncate font-mono text-xs">
+                  {{ s.baseUrl }}
+                </div>
+              </div>
+              <div class="flex shrink-0 flex-col items-end gap-1">
+                <span
+                  class="bg-primary/15 text-primary rounded-full px-2 py-0.5 font-mono text-[10px]"
+                  >{{ s.tool || 'claude-code' }}</span
+                >
+                <span
+                  class="text-secondary rounded-full bg-white/10 px-2 py-0.5 font-mono text-[10px]"
+                  >{{ s.model || '—' }}</span
+                >
+              </div>
+            </button>
+          }
+        </div>
+      }
+    </div>
+
+    <div class="lg:col-span-8">
+      <div class="rounded-xl border border-white/5 bg-white/[0.02] p-5">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label
+              class="text-secondary block text-sm font-medium"
+              for="profile-name"
+              >Profile name</label
+            >
+            <mat-form-field
+              class="mt-1 w-full"
+              subscriptSizing="dynamic"
+            >
+              <input
+                id="profile-name"
+                matInput
+                [value]="name()"
+                (input)="name.set($any($event.target).value)"
+                placeholder="e.g. claude-prod"
+              />
+            </mat-form-field>
+          </div>
+          <div>
+            <label
+              class="text-secondary block text-sm font-medium"
+              for="profile-model"
+              >Model</label
+            >
+            <mat-form-field
+              class="mt-1 w-full"
+              subscriptSizing="dynamic"
+            >
+              <input
+                id="profile-model"
+                matInput
+                [value]="model()"
+                (input)="model.set($any($event.target).value)"
+                placeholder="e.g. qwen3:32b"
+              />
+            </mat-form-field>
+          </div>
+        </div>
+
+        <div class="mt-4">
+          <label
+            class="text-secondary block text-sm font-medium"
+            for="profile-tool"
+            >Agent tool</label
+          >
+          <mat-form-field
+            class="mt-1 w-full"
+            subscriptSizing="dynamic"
+          >
+            <mat-select
+              id="profile-tool"
+              [value]="tool()"
+              (selectionChange)="tool.set($event.value)"
+            >
+              <mat-option value="claude-code"
+                >Claude Code — Anthropic API</mat-option
+              >
+              <mat-option value="qwen-code"
+                >Qwen Code — OpenAI-compatible API</mat-option
+              >
+            </mat-select>
+          </mat-form-field>
+        </div>
+
+        <div class="mt-4">
+          <label
+            class="text-secondary block text-sm font-medium"
+            for="profile-base-url"
+            >Base URL</label
+          >
+          <mat-form-field
+            class="mt-1 w-full"
+            subscriptSizing="dynamic"
+          >
+            <input
+              id="profile-base-url"
+              matInput
+              [value]="baseUrl()"
+              (input)="baseUrl.set($any($event.target).value)"
+              placeholder="https://api.anthropic.com  ·  http://gpu-host:11434/v1"
+            />
+          </mat-form-field>
+        </div>
+
+        <div class="mt-4">
+          <label
+            class="text-secondary block text-sm font-medium"
+            for="profile-api-key"
+          >
+            API key
+            {{
+              selected() && hasKey()
+                ? '(stored — leave blank to keep)'
+                : '(optional)'
+            }}
+          </label>
+          <mat-form-field
+            class="mt-1 w-full"
+            subscriptSizing="dynamic"
+          >
+            <input
+              id="profile-api-key"
+              matInput
+              type="password"
+              autocomplete="new-password"
+              [value]="apiKey()"
+              (input)="apiKey.set($any($event.target).value)"
+              [placeholder]="
+                selected() && hasKey() ? '••••••• (unchanged)' : 'sk-…'
+              "
+            />
+          </mat-form-field>
+        </div>
+
+        <div class="mt-6 flex flex-wrap items-center gap-3">
+          <button
+            mat-flat-button
+            color="primary"
+            [disabled]="busy()"
+            (click)="save()"
+          >
+            <mat-icon svgIcon="save" />
+            Save
+          </button>
+          @if (selected()) {
+            <button
+              mat-stroked-button
+              color="warn"
+              [disabled]="busy()"
+              (click)="remove()"
+            >
+              <mat-icon svgIcon="trash-2" />
+              Delete
+            </button>
+          }
+          @if (error()) {
+            <span class="flex items-center gap-1.5 text-sm text-red-400"
+              ><mat-icon
+                svgIcon="circle-alert"
+                class="icon-size-4"
+              />{{ error() }}</span
+            >
+          }
+          @if (message()) {
+            <span class="flex items-center gap-1.5 text-sm text-emerald-400"
+              ><mat-icon
+                svgIcon="circle-check"
+                class="icon-size-4"
+              />{{ message() }}</span
+            >
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

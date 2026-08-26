@@ -1,0 +1,33 @@
+# secrets & runtime state
+.env
+*.env
+!*.env.example
+/data/
+/workspaces/     # per-run agent workspaces (created at spawn, kept on host for diagnosis)
+# local-run scratch dirs (created by core when run outside a container)
+core/tmpws/
+core/tmpsk/
+deploy/nginx/certs/*
+!deploy/nginx/certs/.gitkeep
+
+# java build output
+core/target/
+.gradle/
+build/
+*.class
+
+# node / angular
+node_modules/
+dist/
+.angular/
+*.tsbuildinfo
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# os cruft
+.DS_Store
+Thumbs.db
+workspaces/

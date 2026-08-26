@@ -1,0 +1,109 @@
+package com.hp.vcosmos.foundry.web;
+
+import com.hp.vcosmos.foundry.agentprofile.AgentProfileStore;
+import com.hp.vcosmos.foundry.config.FoundryConfiguration;
+import com.hp.vcosmos.foundry.credential.CredentialStore;
+import com.hp.vcosmos.foundry.orchestrate.Engine;
+import com.hp.vcosmos.foundry.secret.SecretVault;
+import com.hp.vcosmos.foundry.skill.SkillStore;
+import com.hp.vcosmos.foundry.workspace.TemplateStore;
+import com.hp.vcosmos.foundry.workspace.TaskResults;
+import com.hp.vcosmos.foundry.workspace.WorkspaceArchive;
+import io.javalin.Javalin;
+import io.javalin.http.Context;
+import org.tinylog.Logger;
+
+/** The Javalin HTTP application: health/version + workflow + template + skill + run endpoints. */
+public final class App {
+    private final Engine engine;
+    private final FoundryConfiguration configuration;
+    private final TemplateStore templates;
+    private final TaskResults results;
+    private final WorkspaceArchive archive;
+    private final SkillStore skills;
+    private final AgentProfileStore profiles;
+    private final SecretVault secrets;
+    private final CredentialStore credentials;
+
+    public App(Engine engine, FoundryConfiguration configuration, TemplateStore templates, TaskResults results,
+            WorkspaceArchive archive,
+            SkillStore skills, AgentProfileStore profiles, SecretVault secrets, CredentialStore credentials) {
+        this.engine = engine;
+        this.configuration = configuration;
+        this.templates = templates;
+        this.results = results;
+        this.archive = archive;
+        this.skills = skills;
+        this.profiles = profiles;
+        this.secrets = secrets;
+        this.credentials = credentials;
+    }
+
+    public Javalin start() {
+        WorkflowController workflows = new WorkflowController(engine, configuration, templates, profiles, credentials);
+        RunController runs = new RunController(engine, results, archive, secrets);
+        TemplateController templateApi = new TemplateController(templates);
+        SkillController skillApi = new SkillController(skills);
+        AgentProfileController profileApi = new AgentProfileController(profiles, templates);
+        CredentialController credentialApi = new CredentialController(credentials, templates);
+
+        Javalin app = Javalin.create();
+        app.get("/api/health", ctx -> ctx.contentType("application/json").result("{\"status\":\"ok\"}"));
+
+        // Who-am-I: verify the Heimdall identity token, return the user's profile.
+        if (!configuration.heimdallPubKey.isBlank()) {
+            AuthController authApi = new AuthController(
+                    new HeimdallAuth(configuration.heimdallPubKey), new UserStore(configuration.stateDir));
+            app.get("/api/auth/me", authApi::me);
+        }
+        app.get("/api/version", this::version);
+        app.get("/api/workflows", workflows::list);
+        app.get("/api/workflows/{name}", workflows::get);
+        app.post("/api/workflows", workflows::save);
+        app.post("/api/workflows/validate", workflows::validate);
+        app.put("/api/workflows/{name}", workflows::save);
+        app.delete("/api/workflows/{name}", workflows::delete);
+        app.post("/api/workflows/{name}/run", workflows::run);
+        app.get("/api/workflows/{name}/preflight", workflows::preflight);
+        app.get("/api/templates", templateApi::list);
+        app.post("/api/templates", templateApi::create);
+        app.get("/api/templates/{id}", templateApi::get);
+        app.put("/api/templates/{id}", templateApi::update);
+        app.delete("/api/templates/{id}", templateApi::delete);
+        app.get("/api/skills", skillApi::list);
+        app.get("/api/skills-source", skillApi::source);
+        app.post("/api/skills-state", skillApi::setEnabled);
+        app.post("/api/skills", skillApi::save);
+        app.post("/api/skills/upload", skillApi::upload);
+        app.get("/api/skills/<name>", skillApi::get);
+        app.delete("/api/skills/<name>", skillApi::delete);
+        app.get("/api/agent-profiles", profileApi::list);
+        app.post("/api/agent-profiles", profileApi::create);
+        app.get("/api/agent-profiles/{id}", profileApi::get);
+        app.put("/api/agent-profiles/{id}", profileApi::update);
+        app.delete("/api/agent-profiles/{id}", profileApi::delete);
+        app.get("/api/credentials", credentialApi::list);
+        app.get("/api/credentials/{key}", credentialApi::get);
+        app.put("/api/credentials/{key}", credentialApi::save);
+        app.delete("/api/credentials/{key}", credentialApi::delete);
+        app.get("/api/runs", runs::list);
+        app.get("/api/runs/{id}", runs::get);
+        app.post("/api/runs/{id}/abandon", runs::abandon);
+        app.get("/api/tasks/{id}/result", runs::result);
+        app.get("/api/tasks/{id}/result.zip", runs::resultZip);
+        app.get("/api/tasks/{id}/workspace.zip", runs::workspaceZip);
+        app.get("/api/tasks/{id}/transcript", runs::transcript);
+        app.post("/api/tasks/{id}/answer", runs::answer);
+        app.get("/api/questions", runs::questions);
+        app.start(configuration.port);
+
+        Logger.info("Javalin listening on :{}", configuration.port);
+        return app;
+    }
+
+    private void version(Context ctx) {
+        ctx.contentType("application/json").result(
+                "{\"service\":\"foundry-core\",\"version\":\"" + configuration.version
+                + "\",\"gitSha\":\"" + configuration.gitSha + "\",\"builtAt\":\"" + configuration.builtAt + "\"}");
+    }
+}

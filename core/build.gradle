@@ -1,0 +1,135 @@
+plugins {
+    id 'application'
+    id 'com.gradleup.shadow' version '9.0.0'
+}
+
+group = 'com.hp.vcosmos'
+version = '1.0.0'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+ext {
+    javalinVersion = '6.3.0'
+    gsonVersion = '2.11.0'
+    tinylogVersion = '2.7.0'
+    snakeyamlVersion = '2.2'
+    junitVersion = '5.11.3'
+}
+
+dependencies {
+    implementation "io.javalin:javalin:${javalinVersion}"
+    implementation "com.google.code.gson:gson:${gsonVersion}"
+    implementation "org.yaml:snakeyaml:${snakeyamlVersion}"
+    // Logging: tinylog, plus its slf4j binding so Javalin/Jetty logs route to it too.
+    implementation "org.tinylog:tinylog-api:${tinylogVersion}"
+    implementation "org.tinylog:tinylog-impl:${tinylogVersion}"
+    implementation "org.tinylog:slf4j-tinylog:${tinylogVersion}"
+
+    testImplementation platform("org.junit:junit-bom:${junitVersion}")
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+    testLogging { events 'failed'; exceptionFormat 'full' }
+}
+
+application {
+    mainClass = 'com.hp.vcosmos.foundry.Foundry'
+}
+
+// Fat jar -> build/libs/foundry-core.jar
+shadowJar {
+    archiveBaseName = 'foundry-core'
+    archiveClassifier = ''
+    archiveVersion = ''
+    mergeServiceFiles()
+}
+build.dependsOn shadowJar
+
+// Style gate: `var` is banned — explicit types only. Enforced by the build, not documentation.
+tasks.register('banVar') {
+    group = 'verification'
+    description = 'Fail the build if the banned `var` keyword is used.'
+    doLast {
+        List<String> offenders = []
+        fileTree('src/main/java').matching { include '**/*.java' }.each { file ->
+            file.eachLine { String line, int number ->
+                String trimmed = line.trim()
+                boolean comment = trimmed.startsWith('//') || trimmed.startsWith('*')
+                if (!comment && (line =~ /\bvar\s+\p{Alpha}/)) {
+                    offenders << "${file}:${number}: ${trimmed}".toString()
+                }
+            }
+        }
+        if (!offenders.isEmpty()) {
+            throw new GradleException("`var` is banned — use explicit types:\n  " + offenders.join('\n  '))
+        }
+    }
+}
+tasks.named('build') { dependsOn 'banVar' }
+
+/*
+ * The rest of the style bar, enforced the same way.
+ *
+ * These three kept being "fixed" and then quietly reappearing, because nothing but a reviewer's
+ * memory was checking them. A rule the build does not enforce is a suggestion — that is the whole
+ * argument banVar already makes; this extends it to the rules that had teeth only in prose.
+ */
+tasks.register('banStyle') {
+    group = 'verification'
+    description = 'Fail the build on abbreviated config fields, stringly-typed state, or >3 arguments.'
+    doLast {
+        List<String> offenders = []
+
+        // A closed set compared as a string. These are enums now; a new .equals("running") is a
+        // regression, not a style preference.
+        List<String> closedSetTokens = [
+            'work', 'resume', 'finished', 'failed', 'asked',
+            'claude-code', 'qwen-code',
+            'linear', 'graph', 'map-reduce', 'conditional', 'rework', 'reconciler',
+        ]
+
+        fileTree('src/main/java').matching { include '**/*.java' }.each { File file ->
+            file.eachLine { String line, int number ->
+                String trimmed = line.trim()
+                if (trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*')) {
+                    return
+                }
+                if (line =~ /\bcfg\b/) {
+                    offenders << "${file}:${number}: `cfg` — spell it `configuration`: ${trimmed}".toString()
+                }
+                closedSetTokens.each { String token ->
+                    if (line.contains("\"${token}\".equals(") || line.contains(".equals(\"${token}\")")) {
+                        offenders << "${file}:${number}: \"${token}\" compared as a string — use the enum: ${trimmed}".toString()
+                    }
+                }
+                // A METHOD with more than three parameters. Records are exempt: the style doc
+                // allows a plain data carrier at a boundary, and a record's components are a data
+                // definition, not a call site anyone can transpose.
+                java.util.regex.Matcher signature =
+                    (line =~ /^\s*(?:public|protected|private)\s+(?:static\s+)?[\w<>,\[\]\.\? ]+\s+\w+\(([^)]*)\)/)
+                if (!trimmed.contains(' record ') && signature.find()) {
+                    String params = signature.group(1)
+                    if (params.trim() && params.replaceAll(/<[^>]*>/, '').count(',') >= 3) {
+                        offenders << "${file}:${number}: more than three arguments — pass an object: ${trimmed}".toString()
+                    }
+                }
+            }
+        }
+        if (!offenders.isEmpty()) {
+            throw new GradleException("style gate:\n  " + offenders.join('\n  '))
+        }
+    }
+}
+tasks.named('build') { dependsOn 'banStyle' }
+tasks.named('shadowJar') { dependsOn 'banVar' }

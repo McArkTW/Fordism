@@ -1,0 +1,13 @@
+name: reconciler-example
+description: Run the generator each iteration, feeding the prior workspace forward, until it reports "done" or maxIterations is reached (then NEEDS_RESCUE).
+strategy: reconciler
+parameters: [goal]
+maxIterations: 5
+generator:
+  template: generic
+  task: |
+    Work toward this goal, continuing from any prior progress in the
+    mounted workspace:
+    ${goal}
+    When the goal is fully met, include the word "done" in your answer.
+    Otherwise describe the next step you took and stop.

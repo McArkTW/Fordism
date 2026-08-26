@@ -1,0 +1,303 @@
+<div class="ml-[4.25rem] space-y-4 pt-3 pb-1">
+  <!-- meta strip: state · duration · tokens · attempt -->
+  <div
+    class="text-secondary flex flex-wrap items-center gap-x-4 gap-y-1 text-xs"
+  >
+    <span class="inline-flex items-center gap-1.5">
+      <mat-icon
+        [svgIcon]="status().icon"
+        class="icon-size-4"
+      />{{ status().label }}
+    </span>
+    <span class="inline-flex items-center gap-1.5">
+      <mat-icon
+        svgIcon="clock"
+        class="icon-size-4"
+      />{{ duration() }}
+    </span>
+    <span class="inline-flex items-center gap-1.5">
+      <mat-icon
+        svgIcon="coins"
+        class="icon-size-4"
+      />{{ tokens() }} tokens
+    </span>
+    @if (task().attempt > 1) {
+      <span>attempt {{ task().attempt }}</span>
+    }
+  </div>
+
+  @if (task().state === 'ASKED') {
+    <section
+      class="rounded-lg border border-amber-500/30 bg-amber-500/[0.06] p-3"
+    >
+      <div class="flex items-center gap-2 text-sm font-medium text-amber-300">
+        <mat-icon
+          svgIcon="message-circle-question-mark"
+          class="icon-size-5"
+        />The agent stopped to ask you something.
+      </div>
+      @if (task().question) {
+        <div class="mt-2 rounded-md bg-black/20 p-2.5 text-sm text-amber-100">
+          <span class="text-[10px] tracking-wide text-amber-400/80 uppercase"
+            >Agent asks</span
+          >
+          <div class="mt-0.5 whitespace-pre-wrap">
+            {{ task().question }}
+          </div>
+        </div>
+      }
+      @if (requestedSecrets().length > 0) {
+        <div class="mt-2 rounded-md border border-white/10 bg-black/20 p-2.5">
+          <span class="text-[10px] tracking-wide text-amber-400/80 uppercase"
+            >Credentials requested</span
+          >
+          <p class="text-secondary mt-1 text-xs">
+            Injected as environment variables into this run's containers, held
+            in core's memory only — they never reach the transcript, the
+            workspace, or the state snapshot.
+          </p>
+          @for (name of requestedSecrets(); track name) {
+            <div class="mt-2 flex flex-wrap items-center gap-2">
+              <label
+                [for]="'sec-' + name"
+                class="w-72 shrink-0 font-mono text-xs break-all"
+                >{{ name }}</label
+              >
+              <input
+                type="password"
+                autocomplete="off"
+                spellcheck="false"
+                [id]="'sec-' + name"
+                [value]="secret(name)"
+                (input)="setSecret(name, $any($event.target).value)"
+                [placeholder]="
+                  heldSecret(name)
+                    ? 'already supplied — type to replace'
+                    : 'paste value'
+                "
+                class="min-w-0 flex-auto rounded-md border border-white/10 bg-white/[0.03] p-2 font-mono text-sm outline-none focus:border-amber-500/50"
+              />
+            </div>
+          }
+        </div>
+      }
+      <p class="text-secondary mt-2 text-xs">
+        Reply, then Answer — the agent continues the
+        <em>same session</em> with your message.
+      </p>
+      <textarea
+        rows="2"
+        [value]="reply()"
+        (input)="reply.set($any($event.target).value)"
+        placeholder="Your reply to the agent…"
+        class="mt-2 w-full rounded-md border border-white/10 bg-white/[0.03] p-2 text-sm outline-none focus:border-amber-500/50"
+      ></textarea>
+      <div class="mt-2 flex items-center gap-2">
+        <button
+          mat-flat-button
+          color="primary"
+          [disabled]="answering() || !canAnswer()"
+          (click)="doAnswer()"
+        >
+          <mat-icon svgIcon="send" />Answer
+        </button>
+        @if (answerMsg()) {
+          <span class="text-xs text-emerald-400">{{ answerMsg() }}</span>
+        }
+        @if (answerErr()) {
+          <span class="text-xs text-red-400">{{ answerErr() }}</span>
+        }
+      </div>
+    </section>
+  }
+  @if (task().error) {
+    <div
+      class="rounded-lg border border-red-500/25 bg-red-500/[0.06] px-3 py-2 text-sm text-red-300"
+    >
+      <span class="font-medium">Error:</span> {{ task().error }}
+    </div>
+  }
+
+  <!-- Result -->
+  <section>
+    <div
+      class="text-secondary mb-1.5 text-xs font-semibold tracking-wide uppercase"
+    >
+      Result
+    </div>
+    @if (task().summary) {
+      <div
+        class="md-body rounded-lg border border-white/5 bg-white/[0.02] p-3"
+        [innerHTML]="summaryHtml()"
+      ></div>
+    } @else {
+      <div class="text-secondary text-sm italic">No summary reported.</div>
+    }
+  </section>
+
+  <!-- Artifacts -->
+  <section>
+    <div
+      class="text-secondary mb-1.5 text-xs font-semibold tracking-wide uppercase"
+    >
+      Artifacts <span class="text-current">· {{ artifacts().length }}</span>
+    </div>
+    @if (loading()) {
+      <div class="text-secondary text-sm">Loading files…</div>
+    } @else if (resultError()) {
+      <div class="text-sm text-red-400">{{ resultError() }}</div>
+    } @else if (artifacts().length === 0) {
+      <div class="text-secondary text-sm italic">No artifact files.</div>
+    } @else {
+      <div class="space-y-2">
+        @for (f of artifacts(); track f.name) {
+          <div class="rounded-lg border border-white/5 bg-white/[0.02]">
+            <div class="flex items-center gap-2 px-3 py-2">
+              <mat-icon
+                svgIcon="file-text"
+                class="text-secondary icon-size-4 shrink-0"
+              />
+              <span class="min-w-0 flex-auto truncate font-mono text-xs">{{
+                f.name
+              }}</span>
+              <span class="text-secondary shrink-0 text-[11px]">{{
+                sizeOf(f.size)
+              }}</span>
+            </div>
+            @if (f.kind === 'binary') {
+              <div
+                class="text-secondary border-t border-white/5 px-3 py-2 text-xs"
+              >
+                Binary file —
+                <a
+                  [href]="resultZip()"
+                  download
+                  class="text-primary hover:underline"
+                  >download the result bundle</a
+                >.
+              </div>
+            } @else if (f.kind === 'md') {
+              <div
+                class="md-body border-t border-white/5 p-3"
+                [innerHTML]="f.html"
+              ></div>
+            } @else {
+              <pre
+                class="max-h-80 overflow-auto border-t border-white/5 p-3 font-mono text-xs break-words whitespace-pre-wrap"
+                >{{ f.content }}</pre
+              >
+            }
+          </div>
+        }
+      </div>
+    }
+  </section>
+
+  <!-- Logs -->
+  @if (logs().length) {
+    <section>
+      <button
+        type="button"
+        class="text-secondary flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase hover:text-current"
+        (click)="showLogs.set(!showLogs())"
+      >
+        <mat-icon
+          [svgIcon]="showLogs() ? 'chevron-down' : 'chevron-right'"
+          class="icon-size-4"
+        />
+        Logs <span class="text-current">· {{ logs().length }}</span>
+      </button>
+      @if (showLogs()) {
+        <div class="mt-2 space-y-2">
+          @for (f of logs(); track f.name) {
+            <div class="rounded-lg border border-white/5 bg-white/[0.02]">
+              <div
+                class="text-secondary border-b border-white/5 px-3 py-1.5 font-mono text-[11px]"
+              >
+                {{ f.name }}
+              </div>
+              @if (f.content.trim()) {
+                <pre
+                  class="max-h-72 overflow-auto p-3 font-mono text-xs break-words whitespace-pre-wrap"
+                  >{{ f.content }}</pre
+                >
+              } @else {
+                <div class="px-3 py-2 text-xs text-emerald-400">clean</div>
+              }
+            </div>
+          }
+        </div>
+      }
+    </section>
+  }
+
+  <!-- Transcript + downloads -->
+  <div class="flex flex-wrap items-center gap-2 border-t border-white/5 pt-3">
+    <button
+      mat-stroked-button
+      (click)="toggleTranscript()"
+    >
+      <mat-icon svgIcon="scroll-text" />{{ showTranscript() ? 'Hide' : 'View' }}
+      transcript
+    </button>
+    <a
+      mat-stroked-button
+      [href]="resultZip()"
+      download
+    >
+      <mat-icon svgIcon="download" />Download result
+    </a>
+    <a
+      mat-stroked-button
+      [href]="workspaceZip()"
+      download
+    >
+      <mat-icon svgIcon="folder-archive" />Download workspace
+    </a>
+  </div>
+
+  @if (showTranscript()) {
+    <section class="rounded-lg border border-white/5 bg-white/[0.02] p-1">
+      @if (transcript() === null) {
+        <div class="text-secondary p-3 text-sm">Loading transcript…</div>
+      } @else if (transcriptError()) {
+        <div class="text-secondary p-3 text-sm italic">
+          {{ transcriptError() }}
+        </div>
+      } @else if (transcript()!.length === 0) {
+        <div class="text-secondary p-3 text-sm italic">Empty transcript.</div>
+      } @else {
+        <div class="max-h-[28rem] space-y-1.5 overflow-y-auto p-2">
+          @for (e of transcript()!; track $index) {
+            <div class="rounded-md bg-white/[0.02] px-3 py-2">
+              <div class="mb-0.5 flex items-center gap-2">
+                <span
+                  class="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase"
+                  [class]="roleBadge(e.role)"
+                  >{{ e.role }}</span
+                >
+                @for (t of e.tools; track $index) {
+                  <span
+                    class="text-secondary inline-flex items-center gap-1 font-mono text-[11px]"
+                  >
+                    <mat-icon
+                      svgIcon="terminal"
+                      class="icon-size-3"
+                    />{{ t }}
+                  </span>
+                }
+              </div>
+              @if (e.text) {
+                <div
+                  class="font-mono text-xs break-words whitespace-pre-wrap text-neutral-300"
+                >
+                  {{ clip(e.text) }}
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+    </section>
+  }
+</div>

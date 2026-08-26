@@ -1,0 +1,286 @@
+<div
+  class="mx-auto flex w-full max-w-[64rem] flex-auto flex-col p-6 lg:px-10 lg:py-8"
+>
+  <div class="flex flex-wrap items-center gap-3">
+    <a
+      mat-button
+      routerLink="/templates"
+      ><mat-icon svgIcon="arrow-left" />Agent templates</a
+    >
+    <h1 class="text-xl font-semibold tracking-tight">
+      {{ isNew() ? 'New template' : name() }}
+    </h1>
+    <span class="flex-auto"></span>
+    @if (dirty()) {
+      <span class="text-secondary text-xs">unsaved changes</span>
+    }
+  </div>
+
+  <div class="rounded-xl border border-white/5 bg-white/[0.02] p-5">
+    <div>
+      <label
+        class="text-secondary block text-sm font-medium"
+        for="template-name"
+        >Template name</label
+      >
+      <mat-form-field
+        class="mt-1 w-full"
+        subscriptSizing="dynamic"
+      >
+        <input
+          id="template-name"
+          matInput
+          [value]="name()"
+          (input)="name.set($any($event.target).value)"
+          placeholder="e.g. worker"
+        />
+      </mat-form-field>
+    </div>
+
+    <div class="mt-4">
+      <label
+        class="text-secondary block text-sm font-medium"
+        for="template-agent-profile"
+        >Agent profile</label
+      >
+      <mat-form-field
+        class="mt-1 w-full"
+        subscriptSizing="dynamic"
+      >
+        <mat-select
+          id="template-agent-profile"
+          [value]="agentProfile()"
+          (selectionChange)="onSourceChange($event.value)"
+          placeholder="Select a source"
+        >
+          @for (s of sources(); track s.name) {
+            <mat-option [value]="s.name"
+              >{{ s.name }} · {{ s.model || 'no model' }}</mat-option
+            >
+          }
+        </mat-select>
+      </mat-form-field>
+      <p class="text-secondary mt-1 text-xs">
+        @if (agentProfile()) {
+          model:
+          <span class="font-mono">{{ model() || '—' }}</span> (from the source)
+        } @else if (sources().length === 0) {
+          No profiles yet — add one on the
+          <span class="font-mono">Agent Profiles</span> page.
+        } @else {
+          Pick the model backend this template's agent runs on.
+        }
+      </p>
+    </div>
+
+    <div class="mt-5">
+      <div class="flex items-center justify-between">
+        <div class="text-secondary text-sm font-medium">
+          Skills the agent may use
+          <span class="text-current">· {{ skills().length }} selected</span>
+        </div>
+        @if (skills().length) {
+          <button
+            type="button"
+            (click)="skills.set([])"
+            class="text-secondary text-xs hover:text-current"
+          >
+            Clear all
+          </button>
+        }
+      </div>
+      @if (skillOptions().length === 0) {
+        <p class="text-secondary mt-2 text-xs">
+          No skills in the library yet — sync them on the Skills page.
+        </p>
+      } @else {
+        <div class="relative mt-2">
+          <mat-icon
+            svgIcon="search"
+            class="text-secondary icon-size-4 pointer-events-none absolute top-1/2 left-3 -translate-y-1/2"
+          />
+          <input
+            [value]="skillFilter()"
+            (input)="skillFilter.set($any($event.target).value)"
+            placeholder="Filter skills…"
+            class="focus:border-primary h-10 w-full rounded-lg border border-white/10 bg-white/[0.03] pr-3 pl-9 text-sm text-current focus:outline-none"
+          />
+        </div>
+        <div
+          class="mt-2 max-h-72 overflow-y-auto rounded-lg border border-white/10 bg-white/[0.02]"
+        >
+          @for (group of filteredGroups(); track group.prefix) {
+            <div class="relative">
+              <div
+                class="text-secondary sticky top-0 z-10 border-b border-white/5 bg-neutral-900 px-3 py-1 text-[10px] font-semibold tracking-wide uppercase"
+              >
+                {{ group.prefix }}
+              </div>
+              @for (s of group.skills; track s.name) {
+                <div
+                  class="px-3 py-1.5 transition-colors hover:bg-white/[0.03]"
+                >
+                  <div class="flex items-center gap-2">
+                    <mat-checkbox
+                      [checked]="skills().includes(s.name)"
+                      (change)="toggleSkill(s.name)"
+                    >
+                      <span
+                        class="font-mono text-[13px]"
+                        [class]="s.enabled ? '' : 'text-secondary line-through'"
+                        >{{ s.name }}</span
+                      >
+                    </mat-checkbox>
+                    @if (!s.enabled) {
+                      <span
+                        class="text-secondary rounded-full bg-white/10 px-1.5 py-0.5 text-[9px]"
+                        >disabled</span
+                      >
+                    }
+                  </div>
+                  @if (s.description) {
+                    <div
+                      class="text-secondary -mt-0.5 ml-9 line-clamp-1 text-xs"
+                    >
+                      {{ s.description }}
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
+          @if (filteredGroups().length === 0) {
+            <div class="text-secondary px-3 py-6 text-center text-sm">
+              No skills match “{{ skillFilter() }}”.
+            </div>
+          }
+        </div>
+        <p class="text-secondary mt-1 text-xs">
+          Only checked skills are copied into the agent's workspace.
+          Globally-disabled skills are skipped even if checked.
+        </p>
+      }
+    </div>
+
+    <div class="mt-5">
+      <div class="flex items-center justify-between">
+        <div class="text-secondary text-sm font-medium">
+          Credentials the agent receives
+          <span class="text-current">· {{ credentials().length }} granted</span>
+        </div>
+        @if (credentials().length) {
+          <button
+            type="button"
+            (click)="credentials.set([])"
+            class="text-secondary text-xs hover:text-current"
+          >
+            Clear all
+          </button>
+        }
+      </div>
+      @if (credentialOptions().length === 0) {
+        <p class="text-secondary mt-2 text-xs">
+          No credentials stored — add one on the Credentials page.
+        </p>
+      } @else {
+        <div class="relative mt-2">
+          <mat-icon
+            svgIcon="search"
+            class="text-secondary icon-size-4 pointer-events-none absolute top-1/2 left-3 -translate-y-1/2"
+          />
+          <input
+            [value]="credentialFilter()"
+            (input)="credentialFilter.set($any($event.target).value)"
+            placeholder="Filter credentials…"
+            class="focus:border-primary h-10 w-full rounded-lg border border-white/10 bg-white/[0.03] pr-3 pl-9 text-sm text-current focus:outline-none"
+          />
+        </div>
+        <div
+          class="mt-2 max-h-72 overflow-y-auto rounded-lg border border-white/10 bg-white/[0.02]"
+        >
+          @for (c of filteredCredentials(); track c.key) {
+            <div class="px-3 py-1.5 transition-colors hover:bg-white/[0.03]">
+              <mat-checkbox
+                [checked]="credentials().includes(c.key)"
+                (change)="toggleCredential(c.key)"
+              >
+                <span class="font-mono text-[13px]">{{ c.key }}</span>
+              </mat-checkbox>
+              @if (c.note) {
+                <div class="text-secondary -mt-0.5 ml-9 text-xs">
+                  {{ c.note }}
+                </div>
+              }
+            </div>
+          }
+          @if (filteredCredentials().length === 0) {
+            <div class="text-secondary px-3 py-6 text-center text-sm">
+              No credentials match “{{ credentialFilter() }}”.
+            </div>
+          }
+        </div>
+        <p class="text-secondary mt-1 text-xs">
+          Every task run from this template gets exactly these environment
+          variables. Grant only what it needs.
+        </p>
+      }
+    </div>
+
+    <div class="mt-5">
+      <label
+        class="text-secondary block text-sm font-medium"
+        for="template-instructions"
+        >Instructions</label
+      >
+      <p class="text-secondary mt-1 text-xs">
+        Standing guidance prepended to every task this template runs.
+      </p>
+      <textarea
+        id="template-instructions"
+        spellcheck="false"
+        class="focus:border-primary leading-relaxed mt-2 h-40 w-full resize-y rounded-lg border border-white/10 bg-white/[0.03] p-3 font-mono text-[13px] text-current focus:outline-none"
+        [value]="instructions()"
+        (input)="instructions.set($any($event.target).value)"
+      ></textarea>
+    </div>
+
+    <div class="mt-6 flex flex-wrap items-center gap-3">
+      <button
+        mat-flat-button
+        color="primary"
+        [disabled]="busy()"
+        (click)="save()"
+      >
+        <mat-icon svgIcon="save" />
+        Save
+      </button>
+      @if (!isNew()) {
+        <button
+          mat-stroked-button
+          color="warn"
+          [disabled]="busy()"
+          (click)="remove()"
+        >
+          <mat-icon svgIcon="trash-2" />
+          Delete
+        </button>
+      }
+      @if (error()) {
+        <span class="flex items-center gap-1.5 text-sm text-red-400"
+          ><mat-icon
+            svgIcon="circle-alert"
+            class="icon-size-4"
+          />{{ error() }}</span
+        >
+      }
+      @if (message()) {
+        <span class="flex items-center gap-1.5 text-sm text-emerald-400"
+          ><mat-icon
+            svgIcon="circle-check"
+            class="icon-size-4"
+          />{{ message() }}</span
+        >
+      }
+    </div>
+  </div>
+</div>
