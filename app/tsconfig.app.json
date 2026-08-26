@@ -4,12 +4,12 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "./out-tsc/app",
-    "types": ["node"]
+    "types": []
   },
-  "include": ["src/**/*.ts"],
+  "include": [
+    "src/**/*.ts"
+  ],
   "exclude": [
-    "src/**/*.spec.ts",
-    "src/test-setup.ts",
-    "src/**/apps/_archive/**"
+    "src/**/*.spec.ts"
   ]
 }

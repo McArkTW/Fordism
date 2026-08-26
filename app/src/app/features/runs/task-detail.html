@@ -1,0 +1,232 @@
+<div class="mx-auto w-full max-w-5xl">
+  @if (error()) {
+    <div class="card mb-4 border-red-500/40 px-3 py-2 text-sm text-red-500">{{ error() }}</div>
+  }
+
+  @if (task(); as t) {
+    @let v = view(t.state);
+    <div class="flex flex-wrap items-center gap-3">
+      <a matButton="outlined" [routerLink]="['/runs', id()]">
+        <app-icon name="arrow-left" />
+        Back to run
+      </a>
+      <span [class]="v.badge">
+        <app-icon [name]="v.icon" [class.spin]="v.icon === 'loader'" />
+        {{ v.label }}
+      </span>
+      <h1 class="page-h font-mono">{{ t.template }}</h1>
+      <span class="text-xs text-muted">
+        step {{ t.step }} · attempt {{ t.attempt }} · {{ dur(t.durationMs) }} ·
+        {{ t.createdAt | date: 'MMM d, HH:mm:ss' }}
+      </span>
+    </div>
+
+    <div class="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
+      <span class="flex items-center gap-1.5 font-mono text-[11px]">
+        task id: {{ t.taskId }}
+        <button matIconButton type="button" title="Copy task id" (click)="copy(t.taskId)">
+          <app-icon name="copy" />
+        </button>
+      </span>
+      @if (t.usage; as u) {
+        <span class="inline-flex items-center gap-1.5">
+          <app-icon name="cpu" />
+          {{ u.input_tokens }} in · {{ u.output_tokens }} out · {{ u.total }} total · {{ u.turns }} turns
+        </span>
+      }
+    </div>
+
+    <!-- Answer form: the whole reason this page gets urgent visits. -->
+    @if (t.state === 'ASKED') {
+      <section class="mt-5 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
+        <div class="flex items-center gap-2 text-sm font-medium text-amber-500">
+          <app-icon name="message-circle-question-mark" />
+          The agent stopped to ask you something.
+        </div>
+        @if (t.question) {
+          <div class="card mt-3 p-3">
+            <app-markdown [source]="t.question" />
+          </div>
+        }
+        @if (t.secretsRequested.length) {
+          <div class="card mt-3 p-3">
+            <div class="flex items-center gap-1.5 text-xs font-medium text-muted">
+              <app-icon name="key" />
+              Credentials requested
+            </div>
+            <p class="mt-1 text-xs text-muted">
+              Injected as environment variables into this run's containers, held in core's memory
+              only — they never reach the transcript, the workspace, or the state snapshot.
+            </p>
+            @if (heldSecrets().length) {
+              <p class="mt-2 text-xs text-muted">
+                Already held from an earlier answer:
+                @for (name of heldSecrets(); track name) {
+                  <span class="ml-1 rounded bg-ink/10 px-1.5 py-0.5 font-mono text-[11px]">{{ name }}</span>
+                }
+              </p>
+            }
+            @for (name of neededSecrets(); track name) {
+              <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mt-2 w-full">
+                <mat-label class="font-mono">{{ name }}</mat-label>
+                <input
+                  matInput
+                  type="password"
+                  autocomplete="off"
+                  spellcheck="false"
+                  class="font-mono"
+                  [value]="secret(name)"
+                  (input)="setSecret(name, $any($event.target).value)"
+                  placeholder="paste value"
+                />
+              </mat-form-field>
+            }
+          </div>
+        }
+        <p class="mt-3 text-xs text-muted">
+          Reply, then Answer — the agent continues the <em>same session</em> with your message.
+        </p>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="mt-2 w-full">
+          <mat-label>Reply</mat-label>
+          <textarea
+            matInput
+            rows="4"
+            [value]="reply()"
+            (input)="reply.set($any($event.target).value)"
+            placeholder="Your reply to the agent…"
+          ></textarea>
+        </mat-form-field>
+        <button matButton="filled" class="mt-2" type="button" [disabled]="answering() || !canSend()" (click)="send()">
+          <app-icon name="play" />
+          Answer
+        </button>
+      </section>
+    }
+
+    @if (t.error) {
+      <div class="card mt-5 border-red-500/40 px-3 py-2 text-sm text-red-500">
+        <span class="font-medium">Error:</span> {{ t.error }}
+      </div>
+    }
+
+    <!-- Summary -->
+    <section class="mt-6">
+      <div class="mb-1.5 text-xs font-semibold tracking-wide text-muted uppercase">Summary</div>
+      @if (t.summary) {
+        <div class="card p-3">
+          <app-markdown [source]="t.summary" />
+        </div>
+      } @else {
+        <div class="text-sm text-muted italic">No summary reported.</div>
+      }
+    </section>
+
+    <!-- Result files -->
+    <section class="mt-6">
+      <div class="mb-1.5 text-xs font-semibold tracking-wide text-muted uppercase">
+        Result files @if (files(); as fs) { · {{ fs.length }} }
+      </div>
+      @if (files(); as fs) {
+        @if (resultError()) {
+          <div class="text-sm text-red-500">{{ resultError() }}</div>
+        } @else if (!fs.length) {
+          <div class="text-sm text-muted italic">No result files.</div>
+        } @else {
+          <div class="space-y-2">
+            @for (f of fs; track f.name) {
+              <div class="card">
+                <button
+                  type="button"
+                  class="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left"
+                  (click)="toggleFile(f.name)"
+                >
+                  <app-icon [name]="openFiles().has(f.name) ? 'chevron-down' : 'chevron-right'" class="shrink-0 text-muted" />
+                  <app-icon name="file" class="shrink-0 text-muted" />
+                  <span class="min-w-0 flex-auto truncate font-mono text-xs">{{ f.name }}</span>
+                  @if (f.binary) {
+                    <span class="shrink-0 text-[11px] text-muted">(binary)</span>
+                  }
+                  <span class="shrink-0 text-[11px] text-muted">{{ sizeOf(f.size) }}</span>
+                </button>
+                @if (openFiles().has(f.name)) {
+                  @if (f.binary) {
+                    <div class="border-t border-edge px-3 py-2 text-xs text-muted">
+                      Binary file — download the result bundle below to get it.
+                    </div>
+                  } @else if (f.markdown) {
+                    <div class="border-t border-edge p-3">
+                      <app-markdown [source]="f.content" />
+                    </div>
+                  } @else {
+                    <pre class="max-h-80 overflow-x-auto border-t border-edge p-3 text-xs whitespace-pre-wrap">{{ f.content }}</pre>
+                  }
+                }
+              </div>
+            }
+          </div>
+        }
+      } @else {
+        <div class="text-sm text-muted">Loading files…</div>
+      }
+    </section>
+
+    <!-- Transcript -->
+    <section class="mt-6">
+      <button
+        matButton
+        type="button"
+        class="text-xs font-semibold tracking-wide uppercase"
+        (click)="showTranscript.set(!showTranscript())"
+      >
+        <app-icon [name]="showTranscript() ? 'chevron-down' : 'chevron-right'" />
+        Transcript @if (transcript(); as tx) { · {{ tx.length }} events }
+      </button>
+      @if (showTranscript()) {
+        @if (transcript(); as tx) {
+          @if (tx.length) {
+            <div class="card mt-2 max-h-[28rem] space-y-1.5 overflow-y-auto p-2">
+              @for (e of tx; track $index) {
+                <div class="rounded-md bg-ink/5 px-3 py-2">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span [class]="roleBadge(e.role)">{{ e.role }}</span>
+                    @for (tool of e.tools; track $index) {
+                      <span class="font-mono text-[11px] text-muted">{{ tool }}</span>
+                    }
+                  </div>
+                  @if (e.text) {
+                    <div class="mt-1 font-mono text-xs break-words whitespace-pre-wrap">{{ clip(e.text) }}</div>
+                  }
+                </div>
+              }
+            </div>
+          } @else {
+            <div class="mt-2 text-sm text-muted italic">Empty transcript.</div>
+          }
+        } @else if (transcriptPending()) {
+          <div class="mt-2 text-sm text-muted">Loading transcript…</div>
+        } @else {
+          <div class="mt-2 text-sm text-muted italic">No transcript for this task.</div>
+        }
+      }
+    </section>
+
+    <!-- Downloads -->
+    <div class="mt-6 flex flex-wrap items-center gap-2 border-t border-edge pt-4">
+      <a matButton="outlined" [href]="resultZip()" download>
+        <app-icon name="download" />
+        Download result
+      </a>
+      <a matButton="outlined" [href]="workspaceZip()" download>
+        <app-icon name="folder" />
+        Download workspace
+      </a>
+    </div>
+  } @else if (run()) {
+    <div class="py-16 text-center text-sm text-muted">
+      Task {{ taskId() }} is not part of this run.
+      <a class="text-accent underline" [routerLink]="['/runs', id()]">Back to the run</a>
+    </div>
+  } @else if (!error()) {
+    <div class="py-16 text-center text-sm text-muted">Loading task…</div>
+  }
+</div>

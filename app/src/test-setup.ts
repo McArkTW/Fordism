@@ -1,18 +1,17 @@
-/**
- * The jsdom `matchMedia` returns a MediaQueryList without the listener API, and `Media.match`
- * subscribes to `change` on construction — so without this stub every component that reaches
- * Theming (i.e. most of them) fails to instantiate under test.
- */
-const noop = (): void => undefined;
-
+// Vitest runs in jsdom, which implements neither matchMedia nor scrollIntoView. Theming reads
+// matchMedia at construction, so without this stub nothing that touches Theme can instantiate.
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
   value: (query: string) => ({
     matches: false,
     media: query,
     onchange: null,
-    addEventListener: noop,
-    removeEventListener: noop,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    addListener: () => undefined,
+    removeListener: () => undefined,
     dispatchEvent: () => false,
   }),
 });
+
+Element.prototype.scrollIntoView = Element.prototype.scrollIntoView ?? (() => undefined);

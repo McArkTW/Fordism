@@ -1,12 +1,16 @@
-/**
- * The message to show for a failed API call.
- *
- * Core answers an error as `{"error": "..."}`, so that is the first thing to look for; the
- * transport's own message is the fallback, and a generic line is the last resort. Every board had
- * its own private copy of this, which is how they drifted into reporting the same failure
- * differently.
- */
-export function errorMessage(error: unknown): string {
-  const response = error as { error?: { error?: string }; message?: string };
-  return response?.error?.error ?? response?.message ?? 'request failed';
+import { HttpErrorResponse } from '@angular/common/http';
+
+/** The human-readable reason out of a core error response ({"error": "..."}), or a fallback. */
+export function apiError(error: unknown, fallback: string): string {
+  if (error instanceof HttpErrorResponse) {
+    const body = error.error;
+    if (body && typeof body === 'object' && typeof body.error === 'string') {
+      return body.error;
+    }
+    if (typeof body === 'string' && body.length > 0 && body.length < 300) {
+      return body;
+    }
+    return `${fallback} (HTTP ${error.status})`;
+  }
+  return fallback;
 }

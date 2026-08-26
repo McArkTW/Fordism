@@ -1,5 +1,6 @@
 # fordism-app edge.
-#   /api  → fordism-core (no token gate — access is network-gated)
+#   /api  → fordism-core (no token gate here — run Fordism on a network you trust,
+#           or configure core's FORDISM_AUTH_* token verification)
 #   /     → the static Angular SPA (client-side routing → index.html fallback)
 server {
     listen 80;

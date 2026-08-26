@@ -2,9 +2,7 @@
   "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
   "version": 1,
   "cli": {
-    "schematicCollections": [
-      "angular-eslint"
-    ]
+    "packageManager": "npm"
   },
   "newProjectRoot": "projects",
   "projects": {
@@ -27,7 +25,8 @@
               }
             ],
             "styles": [
-              "src/styles/styles.css"
+              "src/material-theme.scss",
+              "src/styles.css"
             ]
           },
           "configurations": {
@@ -35,11 +34,13 @@
               "budgets": [
                 {
                   "type": "initial",
-                  "maximumWarning": "1Mb"
+                  "maximumWarning": "800kB",
+                  "maximumError": "1.5MB"
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "4kB"
+                  "maximumWarning": "4kB",
+                  "maximumError": "8kB"
                 }
               ],
               "outputHashing": "all"
@@ -54,6 +55,9 @@
         },
         "serve": {
           "builder": "@angular/build:dev-server",
+          "options": {
+            "proxyConfig": "proxy.conf.json"
+          },
           "configurations": {
             "production": {
               "buildTarget": "fordism-app:build:production"
@@ -67,18 +71,7 @@
         "test": {
           "builder": "@angular/build:unit-test",
           "options": {
-            "setupFiles": [
-              "src/test-setup.ts"
-            ]
-          }
-        },
-        "lint": {
-          "builder": "@angular-eslint/builder:lint",
-          "options": {
-            "lintFilePatterns": [
-              "src/**/*.ts",
-              "src/**/*.html"
-            ]
+            "setupFiles": ["src/test-setup.ts"]
           }
         }
       }

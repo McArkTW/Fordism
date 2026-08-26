@@ -9,5 +9,4 @@ This product includes software developed at the above project
 Version 2.0.
 
 Bundled third-party assets:
-- Geist and Geist Mono fonts (Vercel) — SIL Open Font License 1.1
-- Lucide icons — ISC License
+- Lucide icons (embedded SVG sprite generated from lucide-static) — ISC License

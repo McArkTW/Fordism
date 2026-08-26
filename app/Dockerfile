@@ -1,7 +1,6 @@
-# fordism-app — Angular (Fuse) static SPA served by nginx, which also proxies /api to
-# fordism-core. The browser holds the the IdP identity token and sends it as a Bearer;
-# nginx passes it through untouched.
-FROM node:22-alpine AS build
+# fordism-app — Angular static SPA served by nginx, which also proxies /api to
+# fordism-core. Node 24 for the build (the workspace pins Node >= 24).
+FROM node:24-alpine AS build
 WORKDIR /src
 COPY package*.json ./
 RUN npm ci

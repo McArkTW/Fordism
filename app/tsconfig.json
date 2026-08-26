@@ -13,10 +13,7 @@
     "experimentalDecorators": true,
     "importHelpers": true,
     "target": "ES2022",
-    "module": "preserve",
-    "paths": {
-      "@/*": ["./src/*"]
-    }
+    "module": "preserve"
   },
   "angularCompilerOptions": {
     "enableI18nLegacyMessageIdFormat": false,
@@ -24,7 +21,6 @@
     "strictInputAccessModifiers": true,
     "strictTemplates": true
   },
-  "include": ["*.config.ts"],
   "files": [],
   "references": [
     {

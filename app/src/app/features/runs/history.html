@@ -1,0 +1,138 @@
+<div class="mx-auto w-full max-w-6xl">
+  <div class="flex flex-wrap items-center justify-between gap-4">
+    <div>
+      <h1 class="page-h flex items-center gap-2">
+        <app-icon name="history" class="text-accent" />
+        History
+      </h1>
+      <p class="mt-0.5 text-sm text-muted">Every run there has ever been. Holds still while you read it.</p>
+    </div>
+    @if (filterActive()) {
+      <button matButton="outlined" type="button" (click)="clear()">
+        <app-icon name="x" />
+        Clear filters
+      </button>
+    }
+  </div>
+
+  <!-- search -->
+  <div class="relative mt-5">
+    <app-icon name="search" class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted" />
+    <input
+      class="input pl-9"
+      [value]="search()"
+      (input)="onSearch($any($event.target).value)"
+      (keydown.enter)="flushSearch()"
+      placeholder="Search run id or workflow name"
+    />
+  </div>
+
+  <div class="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2">
+    <!-- state -->
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="text-xs text-muted">State</span>
+      @for (s of states; track s) {
+        <button
+          type="button"
+          (click)="toggleState(s)"
+          class="cursor-pointer rounded-full border px-2.5 py-1 text-xs transition"
+          [class]="hasState(s) ? 'border-accent bg-accent/10 text-accent' : 'border-edge bg-panel hover:border-muted'"
+        >
+          {{ view(s).label }}
+        </button>
+      }
+    </div>
+
+    <!-- sort -->
+    <div class="flex items-center gap-2">
+      <span class="text-xs text-muted">Sort</span>
+      <button
+        type="button"
+        (click)="setSort('newest')"
+        class="cursor-pointer rounded-full border px-2.5 py-1 text-xs transition"
+        [class]="filter().sort !== 'oldest' ? 'border-accent bg-accent/10 text-accent' : 'border-edge bg-panel hover:border-muted'"
+      >
+        Newest
+      </button>
+      <button
+        type="button"
+        (click)="setSort('oldest')"
+        class="cursor-pointer rounded-full border px-2.5 py-1 text-xs transition"
+        [class]="filter().sort === 'oldest' ? 'border-accent bg-accent/10 text-accent' : 'border-edge bg-panel hover:border-muted'"
+      >
+        Oldest
+      </button>
+    </div>
+
+    <!-- workflow -->
+    @if (workflows().length) {
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="min-w-52">
+        <mat-label>Workflow</mat-label>
+        <mat-select [value]="filter().workflow ?? ''" (selectionChange)="setWorkflow($event.value)">
+          <mat-option value="">All workflows</mat-option>
+          @for (name of workflows(); track name) {
+            <mat-option [value]="name">{{ name }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    }
+  </div>
+
+  @if (error()) {
+    <div class="card mt-4 border-red-500/40 px-3 py-2 text-sm text-red-500">{{ error() }}</div>
+  }
+
+  <div class="mt-4 text-xs text-muted">{{ runs().length }} shown{{ nextCursor() ? ', more available' : '' }}</div>
+
+  <div class="card mt-2 overflow-x-auto">
+    <table class="w-full">
+      <thead>
+        <tr>
+          <th class="th">State</th>
+          <th class="th">Workflow</th>
+          <th class="th">Run</th>
+          <th class="th">Duration</th>
+          <th class="th">Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (r of runs(); track r.id) {
+          @let v = view(r.state);
+          <tr [routerLink]="['/runs', r.id]" class="cursor-pointer transition hover:bg-ink/5">
+            <td class="td">
+              <span [class]="v.badge">
+                <app-icon [name]="v.icon" [class.spin]="v.icon === 'loader'" />
+                {{ v.label }}
+              </span>
+            </td>
+            <td class="td font-medium">{{ r.workflow }}</td>
+            <td class="td font-mono text-xs text-muted">{{ r.id }}</td>
+            <td class="td whitespace-nowrap text-muted">{{ dur(r.durationMs) }}</td>
+            <td class="td whitespace-nowrap text-muted">{{ r.createdAt | date: 'MMM d, HH:mm:ss' }}</td>
+          </tr>
+        } @empty {
+          @if (!loading()) {
+            <tr>
+              <td class="td py-12 text-center text-muted" colspan="5">
+                @if (filterActive()) {
+                  Nothing matches those filters.
+                } @else {
+                  No runs yet — start one from Workflows.
+                }
+              </td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (nextCursor()) {
+    <div class="mt-4 text-center">
+      <button matButton="outlined" type="button" [disabled]="loading()" (click)="more()">
+        <app-icon name="chevron-down" />
+        Load more
+      </button>
+    </div>
+  }
+</div>
