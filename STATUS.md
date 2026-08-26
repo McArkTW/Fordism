@@ -17,31 +17,31 @@ rot (run faa9cb01 on UAT: PR opened, dev task mid-run, report never written). Th
 resumes the same session in the same container every 60 s until a terminal state or the step's
 `timeoutSeconds` budget is spent — same container so the processes and `/tmp` files the agent left
 behind survive. qwen-code is excluded (no session resume). The doctrine (`agent/CLAUDE.md`) and the
-`foundry-agent` skill now also state the rule: background tasks never notify a headless agent —
+`fordism-agent` skill now also state the rule: background tasks never notify a headless agent —
 poll synchronously.
 
 ## Overview
-The Foundry — a container-first **workflow engine that runs AI agents as disposable
+The Fordism — a container-first **workflow engine that runs AI agents as disposable
 containers**. A Workflow (YAML) fans its steps through a strategy **orchestrator** to
 one-shot **agent containers** (Claude Code or Qwen Code) that do the task in a mounted
-workspace and report a result. Built from a clean repo (`hpi-secret/tds-foundry`); the
+workspace and report a result. Built from a clean repo (`mcark/fordism`); the
 full stack runs locally end-to-end and is **deployed + CI/CD-live on tds-lab** (UAT + PRD, Jenkins).
 
 ## Stack & decisions (locked)
 | Area | Decision |
 |---|---|
-| Backend | **foundry-core** — **Java 25** / Javalin, **no DI, plain OOP**, hand-wired in `App.main()` |
-| Frontend | **foundry-app** — Angular 21 / Fuse, **static SPA served by nginx** (also the edge: proxies `/api` → core) |
-| Agent | **foundry-agent** — a **disposable Claude Code / Qwen Code container** (`node:22-slim`, **both CLIs baked in**, no Java). Its whole world is a host-mounted `/workspace` (`task/` · `skills/` · `memory/` · `result/` · `config.json`). The Agent Profile's `tool` picks the runtime at launch (`AGENT_TYPE`: `claude-code` → `claude -p` \| `qwen-code` → `qwen --yolo -p`); it does the task, writes `result/result.json`, and exits. **Ephemeral** — core (launcher) `docker run`s one per task; no valid `result.json` ⇒ rotten ⇒ FAILED. |
+| Backend | **fordism-core** — **Java 25** / Javalin, **no DI, plain OOP**, hand-wired in `App.main()` |
+| Frontend | **fordism-app** — Angular 21 / Fuse, **static SPA served by nginx** (also the edge: proxies `/api` → core) |
+| Agent | **fordism-agent** — a **disposable Claude Code / Qwen Code container** (`node:22-slim`, **both CLIs baked in**, no Java). Its whole world is a host-mounted `/workspace` (`task/` · `skills/` · `memory/` · `result/` · `config.json`). The Agent Profile's `tool` picks the runtime at launch (`AGENT_TYPE`: `claude-code` → `claude -p` \| `qwen-code` → `qwen --yolo -p`); it does the task, writes `result/result.json`, and exits. **Ephemeral** — core (launcher) `docker run`s one per task; no valid `result.json` ⇒ rotten ⇒ FAILED. |
 | JSON / logging | **Gson** + **tinylog** across both Java services |
 | Build | **Gradle 9.6.1** (wrapper) + Shadow 9.0.0 → fat jar. Shipping builds run **in Docker**; local `./gradlew` verification uses the host **JDK 25** (`~/.jdks/ms-25.0.3`) |
 | State | **in-memory** task/run repos (a `store` port) + a disk **`JsonStateStore`** snapshot restored on boot. **Postgres was removed 2026-08-08** — core shipped no JDBC driver and never opened a connection, so three environments ran a database for nothing. It is still the intended swap; bring the container back alongside a real store implementation, not before. `RunQuery` is already shaped like the SQL it will become (WHERE, ORDER BY, keyset cursor) |
 | LLM | **no gateway (LiteLLM removed)** — each **Agent Profile** carries its own `baseUrl`, write-only API key, and a `tool` (`claude-code` \| `qwen-code`). One agent image bakes **both** CLIs; the launcher points the agent's env **straight at the provider** per tool — `claude-code` → `ANTHROPIC_BASE_URL`/`ANTHROPIC_AUTH_TOKEN` (Claude → `https://api.anthropic.com`), `qwen-code` → `OPENAI_BASE_URL`/`OPENAI_API_KEY`/`OPENAI_MODEL` (a qwen profile → Ollama's `/v1` on a GPU host). `LLM_BASE_URL` (from `OLLAMA_BASE_URL`) is the default backend when no profile is set |
 | Packaging | containerized & **GPU-free**; `docker compose up` = **core · app** (the launcher spawns agent containers on demand); Ollama is external. No database, no LLM-gateway service. The agent image sits behind a `build-only` profile — built, never run |
-| Access | **network-gated** — the `FOUNDRY_ACCESS_TOKEN` gate was dropped; no login |
-| CI/CD | **Jenkins** (native, on tds-lab — `jenkins.local`) — multibranch `tds-foundry`, `Jenkinsfile` in repo. `main` → **UAT** (auto) · tag `vX.Y.Z` → **PRD** (auto — cutting the tag *is* the deploy decision; tags auto-build). GitHub Actions removed; GitHub is the code/PR home only. |
-| Images | built **on the box** by Jenkins (`foundry/foundry-*:local`); the *same* artifact is promoted UAT→PRD, differing only by env file (db/port/ADO-tag scope) |
-| Live | both environments run on **tds-lab**: UAT `foundry-uat.local` (`foundry-managed-test`) · PRD `foundry.local` (`foundry-managed`), behind the nginx edge |
+| Access | **network-gated** — the `FORDISM_ACCESS_TOKEN` gate was dropped; no login |
+| CI/CD | **Jenkins** (native, on tds-lab — `jenkins.local`) — multibranch `fordism`, `Jenkinsfile` in repo. `main` → **UAT** (auto) · tag `vX.Y.Z` → **PRD** (auto — cutting the tag *is* the deploy decision; tags auto-build). GitHub Actions removed; GitHub is the code/PR home only. |
+| Images | built **on the box** by Jenkins (`fordism/fordism-*:local`); the *same* artifact is promoted UAT→PRD, differing only by env file (db/port/ADO-tag scope) |
+| Live | both environments run on **tds-lab**: UAT `fordism-uat.local` (`fordism-managed-test`) · PRD `fordism.local` (`fordism-managed`), behind the nginx edge |
 
 ## Code style
 See [Code style](./README.md#code-style) — three CI gates (`banVar`, `banStyle`, `ng lint`) plus the
@@ -51,9 +51,9 @@ on a method past three parameters; it found four offenders the first time it ran
 ## Package structure
 **core** is the Java workflow engine; **agent** is a shell-driven container (not Java).
 ```
-core   com.hp.vcosmos.foundry   (the workflow engine)
-├── Foundry · App        (composition root/main + the Javalin app)
-├── config/      FoundryConfiguration
+core   tw.mcark.tony.fordism   (the workflow engine)
+├── Fordism · App        (composition root/main + the Javalin app)
+├── config/      FordismConfiguration
 ├── model/       task/ (Task · TaskSeed · TaskConfiguration · TaskState · TaskMode · ReportedState ·
 │                       TaskResult · NetworkPolicy)
 │                workflow/ (Workflow · Step · Strategy · Parameter) · run/ (WorkflowRun · WorkflowRunState)
@@ -77,14 +77,14 @@ agent   (a disposable Claude Code / Qwen Code container — NO Java)
 ├── entrypoint.sh  branches on AGENT_TYPE (claude-code → `claude -p` · qwen-code → `qwen --yolo -p`);
 │                  runs the workspace contract, writes result/result.json, enforces rotten→FAILED
 ├── CLAUDE.md      the agent doctrine (the contract brief)
-└── skills/foundry-agent/SKILL.md   built-in skill = the result contract, staged into every workspace
+└── skills/fordism-agent/SKILL.md   built-in skill = the result contract, staged into every workspace
 ```
 Flow: `Workflow YAML → Orchestrator (per strategy) → Dispatcher → [Task = agent container] → Collector / Reaper`, driven by `ReconcileLoop`.
 
 ## Done — working, verified live
 - [x] **The signed-in account is visible (2026-08-13)** — Heimdall login landed with no consumer:
   `/api/auth/me` verified the token and stored a profile, but nothing in the app ever called it,
-  and `layout/ui/user.ts` was dead code whose docblock still said Foundry has no login. The sidebar
+  and `layout/ui/user.ts` was dead code whose docblock still said Fordism has no login. The sidebar
   now carries an account block (initials · display name · email) with Appearance and Sign out under
   it; a 401 drops the stored token so the next load re-authenticates. Two things the type-checker
   could not see were caught by rendering it: `bg-primary` paints nothing (the theme defines only
@@ -94,11 +94,11 @@ Flow: `Workflow YAML → Orchestrator (per strategy) → Dispatcher → [Task = 
   - **The app has tests now, and they gate the image** — `ng test` (vitest + jsdom) runs in
     `app/Dockerfile` before `ng build`, so a broken template fails CI. `src/test-setup.ts` stubs
     `matchMedia`, without which nothing that reaches Theming can be instantiated.
-  - **The Heimdall service name follows the host** — it was pinned to `foundry-uat`. PRD login
-    still cannot work: Heimdall's `_SEED` registers `foundry-uat` but not `foundry`, and a
+  - **The Heimdall service name follows the host** — it was pinned to `fordism-uat`. PRD login
+    still cannot work: Heimdall's `_SEED` registers `fordism-uat` but not `fordism`, and a
     registration is one exact `redirect_uri`.
   - **`HeimdallAuth.verify` ignores `aud`** — a token minted for any other lab service
-    (`imitation`, `reactor-uat`, `release`) is accepted by Foundry as a valid identity. Signature,
+    (`imitation`, `reactor-uat`, `release`) is accepted by Fordism as a valid identity. Signature,
     `exp` and `iss` are checked; the audience is not. Not fixed here: the check needs core to know
     its own service name, i.e. a new env var through `docker-compose.yml` and both env files.
 - [x] **All six strategies proven end-to-end (2026-08-08)** — including **Graph**, which had never
@@ -146,10 +146,10 @@ Flow: `Workflow YAML → Orchestrator (per strategy) → Dispatcher → [Task = 
 - [x] **Disposable agent, two runtimes** — one image bakes **Claude Code + Qwen Code**; the launcher `docker run`s **one container per Task**, mounting a `/workspace` (`task/` · `skills/` · `memory/` · `result/` · `config.json`). The Agent Profile's `tool` picks the runtime at launch; the agent writes `result/result.json` and exits — **no valid result ⇒ rotten ⇒ FAILED** (the wrapper validates, never rubber-stamps). Cross-container **resume** works (`HOME=/workspace` persists the session). **Both runtimes verified on UAT**: `claude-code` → `api.anthropic.com` (real Claude) and `qwen-code` → Ollama-direct → qwen3 each drive a run and create files (qwen3 ~90% single-shot).
 - [x] **Agent Profiles + direct providers** — no gateway (**LiteLLM removed**); each profile carries `baseUrl` + write-only key + `tool`, and the launcher points the agent straight at the provider. Skills library + template manifests wire through to the launched agent (detail in the P0–P6 block under Next up).
 - [x] **app** — Angular / Fuse SPA served by nginx (also the edge, proxying `/api` → core): **Workflows · Runs · Templates · Skills · Agent Profiles** pages over the core API.
-- [x] **Deployed + CI/CD live (2026-07-15)** — both environments run on **tds-lab** behind an nginx edge: UAT `foundry-uat.local` (ADO tag `foundry-managed-test`) · PRD `foundry.local` (`foundry-managed`). **CI/CD is Jenkins** (native on the box, `jenkins.local`): a multibranch job runs the repo `Jenkinsfile` when its repo scan is fired — the job has no periodic trigger, so `git pushb` (push + scan) is the way to ship — `main` → UAT (auto), `v*` tag → PRD (auto — tags auto-build then deploy, no approval click). One `foundry/foundry-*` image built on the box, promoted to both. GitHub Actions removed; GitHub is the code/PR home. Old Foundry retired + archived.
-- [x] **PRD deploy hardened + made zero-click (2026-07-15)** — Foundry moved out of the shared `lab` home; live deploys bind only jenkins-owned paths; legacy trees archived to `/var/backups/foundry`. PRD cut over to a real release tag (`v0.1.1`), and its deploy is now **zero-click**: tags **auto-build** (`basic-branch-build-strategies`, ignore tags >1 day) and the `Approve PRD` input gate was **removed** (commit `fe88002`) — cutting a `v*` tag is the deploy decision. A red build still never deploys; validation happens on UAT first. Reinstate a gate if Foundry ever goes customer-facing / multi-team.
-- [x] **Zero-click PRD deploy CONFIRMED end-to-end (2026-07-16)** — verified against the box's Jenkins build record: tag **`v0.1.2`** build #1 = SUCCESS, trigger `BranchIndexingCause` (auto-detected, no manual click), stages Checkout → Secret-scan → Build → *Deploy UAT skipped (when-conditional)* → **Deploy PRD** with **no `input`/Approve** step, and the Deploy-PRD stage's `curl localhost:8087/api/health` returned `>> PRD healthy`. The push-`v*`-tag → auto-build → auto-deploy-PRD → health-green path is proven live. (Verify future deploys the same way: SSH the box → `/var/lib/jenkins/jobs/tds-foundry/branches/<mangled>/builds/N/`; tag dirs are name-mangled, e.g. `v0-1-2.nba2f5`.)
-- [x] **`/api/version` endpoint (2026-07-16)** — core now serves `GET /api/version` → `{service, version, gitSha, builtAt}`, stamped by CI at deploy (Jenkinsfile exports `FOUNDRY_GIT_SHA`/`FOUNDRY_VERSION`/`FOUNDRY_BUILT_AT` → compose → core env; safe `dev`/`unknown` fallbacks locally). You can now confirm **which build an env is running over HTTP** (`curl http://foundry.local:8087/api/version`) instead of reading Jenkins records on the box — closing the observability gap that made the `v0.1.2` check a manual SSH.
+- [x] **Deployed + CI/CD live (2026-07-15)** — both environments run on **tds-lab** behind an nginx edge: UAT `fordism-uat.local` (ADO tag `fordism-managed-test`) · PRD `fordism.local` (`fordism-managed`). **CI/CD is Jenkins** (native on the box, `jenkins.local`): a multibranch job runs the repo `Jenkinsfile` when its repo scan is fired — the job has no periodic trigger, so `git pushb` (push + scan) is the way to ship — `main` → UAT (auto), `v*` tag → PRD (auto — tags auto-build then deploy, no approval click). One `fordism/fordism-*` image built on the box, promoted to both. GitHub Actions removed; GitHub is the code/PR home. Old Fordism retired + archived.
+- [x] **PRD deploy hardened + made zero-click (2026-07-15)** — Fordism moved out of the shared `lab` home; live deploys bind only jenkins-owned paths; legacy trees archived to `/var/backups/fordism`. PRD cut over to a real release tag (`v0.1.1`), and its deploy is now **zero-click**: tags **auto-build** (`basic-branch-build-strategies`, ignore tags >1 day) and the `Approve PRD` input gate was **removed** (commit `fe88002`) — cutting a `v*` tag is the deploy decision. A red build still never deploys; validation happens on UAT first. Reinstate a gate if Fordism ever goes customer-facing / multi-team.
+- [x] **Zero-click PRD deploy CONFIRMED end-to-end (2026-07-16)** — verified against the box's Jenkins build record: tag **`v0.1.2`** build #1 = SUCCESS, trigger `BranchIndexingCause` (auto-detected, no manual click), stages Checkout → Secret-scan → Build → *Deploy UAT skipped (when-conditional)* → **Deploy PRD** with **no `input`/Approve** step, and the Deploy-PRD stage's `curl localhost:8087/api/health` returned `>> PRD healthy`. The push-`v*`-tag → auto-build → auto-deploy-PRD → health-green path is proven live. (Verify future deploys the same way: SSH the box → `/var/lib/jenkins/jobs/fordism/branches/<mangled>/builds/N/`; tag dirs are name-mangled, e.g. `v0-1-2.nba2f5`.)
+- [x] **`/api/version` endpoint (2026-07-16)** — core now serves `GET /api/version` → `{service, version, gitSha, builtAt}`, stamped by CI at deploy (Jenkinsfile exports `FORDISM_GIT_SHA`/`FORDISM_VERSION`/`FORDISM_BUILT_AT` → compose → core env; safe `dev`/`unknown` fallbacks locally). You can now confirm **which build an env is running over HTTP** (`curl http://fordism.local:8087/api/version`) instead of reading Jenkins records on the box — closing the observability gap that made the `v0.1.2` check a manual SSH.
 - [x] **Local build** — `JAVA_HOME=~/.jdks/ms-25.0.3 ./gradlew shadowJar` (core, `banVar` + compile) and `ng build` (app) run on the PC for fast pre-deploy verification; Docker stays the shipping path.
 - [x] **Runs are investigable in-UI (2026-07-19)** — run → task drill-down with the agent's **summary**, its `result/` files rendered inline, the session **transcript**, **token usage**, per-task duration, copyable run/task ids, and downloads (`result.zip`, `workspace.zip`). Result files were regularised to `logs/{output.log,errors.log,transcript.jsonl}` with deliverables + `result.json` at the top. ⚠️ The enabling fix: the Collector `docker rm -f`s the container the instant the agent writes `result.json:finished`, so **any post-run wrapper step races and dies** — stdout/stderr must stream to files *during* the run, and usage/transcript are extracted in **core** from the host-persisted workspace, never by the wrapper afterwards.
 - [x] **Rescue — the human in the loop (2026-07-19/20)** — an agent that cannot proceed writes `result.json` `state:needs_rescue` + `question` instead of guessing; the Collector maps it to `NEEDS_RESCUE`, `Engine.tick` pauses the run (uniform across all six strategies), and the task surfaces both inline and in a dedicated **Rescue inbox** (`GET /api/rescues`). A reply (`POST /api/tasks/{id}/rescue`) re-arms the *same* task in `resume` mode, and a fresh container continues the *same session*. **Verified E2E on UAT:** agent asked "X.md or Y.md?" → replied "Use Y.md." → resumed container produced `Y.md`, run DONE.
@@ -165,21 +165,21 @@ _Done in this pass (2026-07-19/20) — see the Done block above: Runs live drill
 - [ ] **Teaching empty states** — convey the model (Workflow → Run → Agent) + a one-click sample run so a new user's first minute works.
 
 ### Other
-- [ ] **Demo workflows — 1–2 per strategy** — ship ready-to-run showcase workflows covering each orchestration strategy (linear · rework · graph · map-reduce · conditional · reconciler) so Foundry's capabilities can be demonstrated out of the box.
-- [ ] **qwen3 reliability — bake the fix** — experiment DONE (2026-07-19): the **strong contract prompt** is the win (10/10 vs ~90% baseline; temp-0 *hurt*, thinking-mode irrelevant), and correctness held **15/15 across a 5-level complexity ladder** — the only residual is a ~13% *contract-miss* (work done, `result.json` skipped). Remaining: **bake the strong prompt into the agent doctrine** (`agent/CLAUDE.md` + `foundry-agent` skill) + **wire rotten→retry** as the backstop.
+- [ ] **Demo workflows — 1–2 per strategy** — ship ready-to-run showcase workflows covering each orchestration strategy (linear · rework · graph · map-reduce · conditional · reconciler) so Fordism's capabilities can be demonstrated out of the box.
+- [ ] **qwen3 reliability — bake the fix** — experiment DONE (2026-07-19): the **strong contract prompt** is the win (10/10 vs ~90% baseline; temp-0 *hurt*, thinking-mode irrelevant), and correctness held **15/15 across a 5-level complexity ladder** — the only residual is a ~13% *contract-miss* (work done, `result.json` skipped). Remaining: **bake the strong prompt into the agent doctrine** (`agent/CLAUDE.md` + `fordism-agent` skill) + **wire rotten→retry** as the backstop.
 - [ ] **Run agents on real workloads** — beyond demo tasks: point a `claude-code` profile at a real repo/task and have it produce real artifacts (a story → PR). Machinery is ready; needs the repo + credential decisions.
 - [x] ~~**Per-run model variation / skills-library + Agent Profiles plan (P0–P6)**~~ — **DONE 2026-07-18, on UAT** (`gitSha 7613dee`). A template now carries its own backend + capabilities, resolved through to the launched agent:
   - **Skills library** (P0/P1): `SkillStore` + `/api/skills` (namespaced names, zip upload) + Skills page.
-  - **Agent Profiles** (P2): `AgentProfileStore` — one JSON per profile under `/foundry/agent-profiles`, **API key write-only** (stripped from browser views; a blank key on save preserves the stored one) — `/api/agent-profiles` CRUD + `GET /api/models` (live `/v1/models` query per profile via `ModelCatalog`, manual fallback). `ModelRegistry.backend(profile, model)` resolves a named profile → `[baseUrl, token, tool, model]`. Each profile's `tool` (`claude-code` \| `qwen-code`, blank → `claude-code`) selects the **agent runtime**: **one image bakes both CLIs**, and the launcher wires `ANTHROPIC_*` (Anthropic dialect) or `OPENAI_*` (OpenAI-chat dialect) per tool. **Renamed from the old "LLM source"** — a boot migration moves any records left in `llm-sources/` into `agent-profiles/`. **LiteLLM/the gateway was removed** — agents call providers directly.
+  - **Agent Profiles** (P2): `AgentProfileStore` — one JSON per profile under `/fordism/agent-profiles`, **API key write-only** (stripped from browser views; a blank key on save preserves the stored one) — `/api/agent-profiles` CRUD + `GET /api/models` (live `/v1/models` query per profile via `ModelCatalog`, manual fallback). `ModelRegistry.backend(profile, model)` resolves a named profile → `[baseUrl, token, tool, model]`. Each profile's `tool` (`claude-code` \| `qwen-code`, blank → `claude-code`) selects the **agent runtime**: **one image bakes both CLIs**, and the launcher wires `ANTHROPIC_*` (Anthropic dialect) or `OPENAI_*` (OpenAI-chat dialect) per tool. **Renamed from the old "LLM source"** — a boot migration moves any records left in `llm-sources/` into `agent-profiles/`. **LiteLLM/the gateway was removed** — agents call providers directly.
   - **Template = manifest** (P3): `<root>/<name>/manifest.json` = `{agentProfile, model, skills[], memory}` (`AgentTemplate`; reads the legacy `llmSource` key too); pre-manifest templates are migrated on read (synthesized, legacy inline files still staged).
   - **Templates page** (P4): Agent Profile dropdown, model picker (derived chips + manual fallback), skill multiselect, memory.
   - **Runtime wiring** (P5): `Dispatcher.applyTemplate` resolves the manifest onto the `Task` (its profile + model win); `stageInto` copies each named library skill (`SkillStore.copyInto`) into `workspace/skills/` + writes the memory seed; the launcher uses the resolved profile's backend.
   - **E2E** (P6): on UAT, template `p6-worker` (profile `p6-src` @ `http://p6-verify.local:4000`, key `sk-p6-secret`, model `p6-model-x`, skill `qa/p6-probe`) → the run's workspace got `skills/qa_p6-probe/SKILL.md` + `memory/seed.md`, `config.json` model = `p6-model-x`, and the **agent container** launched with `ANTHROPIC_BASE_URL=http://p6-verify.local:4000` + `ANTHROPIC_AUTH_TOKEN=sk-p6-secret`. Test artifacts cleaned up.
   - **Both agent runtimes verified on UAT**: a `claude-code` profile → `https://api.anthropic.com` (real Claude) and a `qwen-code` profile → Ollama-direct → qwen3 each drive a run and create files. qwen3 is ~90% reliable single-shot (a model-level flakiness, not a wiring bug — see Next up). The **Agent Profiles** CRUD page (`/agent-profiles`, over `/api/agent-profiles`) is built (was API-only when this plan landed).
 - [ ] **Remove the unused SSR scaffolding** from `app` — the app ships as a static bundle on nginx, so `server.ts` / `main.server.ts` and the `@angular/ssr` + `express` dependencies are dead weight and extra attack surface.
-- [ ] **P6 direct-request intake** (optional) — agent `/tasks` + core `POST /api/requests` so an agent can be asked directly, not only via the Foundry queue.
+- [ ] **P6 direct-request intake** (optional) — agent `/tasks` + core `POST /api/requests` so an agent can be asked directly, not only via the Fordism queue.
 - [ ] **Tests for `app`** — the harness now exists and is a build gate (`ng test`, vitest + jsdom, `src/test-setup.ts` stubs `matchMedia`), but it covers **one component**: 6 specs on the sidebar account block. `core` has 71; `agent` is shell and has none. Every page a bug could hide on is still untested — spec the Runs/Live pages next, they are where the two UAT bugs landed.
-- [ ] **CI on its own identity** — Jenkins uses tony's GitHub PAT, which is **also its multibranch `github-token` credential** (needs scopes `repo` + `read:org`). ⚠️ Don't revoke that PAT without first updating the Jenkins credential — doing so silently breaks scanning + all auto-builds. **PAT rotated 2026-07-15** (it had leaked into a `lab`-readable clone; Jenkins credential updated). Still to do: give CI a dedicated **bot** account / GitHub App with its own rate budget. The box no longer authors commits (the `/opt/foundry` clone was removed 2026-07-15) — author from the PC clone.
+- [ ] **CI on its own identity** — Jenkins uses tony's GitHub PAT, which is **also its multibranch `github-token` credential** (needs scopes `repo` + `read:org`). ⚠️ Don't revoke that PAT without first updating the Jenkins credential — doing so silently breaks scanning + all auto-builds. **PAT rotated 2026-07-15** (it had leaked into a `lab`-readable clone; Jenkins credential updated). Still to do: give CI a dedicated **bot** account / GitHub App with its own rate budget. The box no longer authors commits (the `/opt/fordism` clone was removed 2026-07-15) — author from the PC clone.
 
 ## Migration floor
 - **No floor — every former name still reads.** The paused state has been renamed twice
@@ -213,6 +213,6 @@ _Done in this pass (2026-07-19/20) — see the Done block above: Runs live drill
 - ~~Install a host **JDK 25** for non-Docker local builds?~~ **Resolved** — the PC already has an IntelliJ-managed **Microsoft OpenJDK 25** at `~/.jdks/ms-25.0.3`; `JAVA_HOME=~/.jdks/ms-25.0.3 ./gradlew build` runs `core`/`agent` (incl. `banVar`) locally without Docker. Node + `app/node_modules` are present too, so `ng lint`/`ng build` run locally. Docker stays the shipping path; local build is for fast verification.
 
 ## Links
-- Repo: https://github.com/hpi-secret/tds-foundry (`main` is the source; Jenkins polls it)
-- CI/CD: **Jenkins** on tds-lab — `http://jenkins.local` · live envs `http://foundry-uat.local` (UAT) · `http://foundry.local` (PRD)
+- Repo: https://github.com/mcark/fordism (`main` is the source; Jenkins polls it)
+- CI/CD: **Jenkins** on tds-lab — `http://jenkins.local` · live envs `http://fordism-uat.local` (UAT) · `http://fordism.local` (PRD)
 - Build, deploy and code style: see the [README](./README.md)

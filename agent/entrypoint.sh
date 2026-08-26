@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Foundry agent v3 runtime.
+# Fordism agent v3 runtime.
 #
 # One-shot Claude Code worker over a host-mounted workspace. The container is disposable;
 # everything durable lives in /workspace (a host mount): task in, result out, and Claude
@@ -17,10 +17,10 @@ CFG="$WS/config.json"
 RES="$WS/result/result.json"
 DOCTRINE=/doctrine/CLAUDE.md
 
-# One fixed, deterministic session id + display name for every Foundry agent, so the
+# One fixed, deterministic session id + display name for every Fordism agent, so the
 # session is a stable handle that any later container can resume.
-SID="${FOUNDRY_SESSION_ID:-f0000000-0000-4000-8000-00000000fa01}"
-SNAME="A foundry agent task."
+SID="${FORDISM_SESSION_ID:-f0000000-0000-4000-8000-00000000fa01}"
+SNAME="A fordism agent task."
 
 # --- read config (portable, no jq) -----------------------------------------
 jget() { grep -oE "\"$1\"[[:space:]]*:[[:space:]]*\"?[^\",}]*\"?" "$CFG" 2>/dev/null \
@@ -40,12 +40,12 @@ ATYPE="${AGENT_TYPE:-claude-code}"   # claude-code | qwen-code — which CLI dri
 # clones an internal git server hands it a GitHub token that host has no business holding.
 if [ -n "${GITHUB_TOKEN:-}" ]; then
   git config --global credential."https://github.com".helper '!f(){ echo username=x-access-token; echo "password=$GITHUB_TOKEN"; };f'
-  git config --global user.name  "${GIT_AUTHOR_NAME:-foundry-agent}"
-  git config --global user.email "${GIT_AUTHOR_EMAIL:-foundry-agent@hp.com}"
+  git config --global user.name  "${GIT_AUTHOR_NAME:-fordism-agent}"
+  git config --global user.email "${GIT_AUTHOR_EMAIL:-fordism-agent@mcark.tw}"
 fi
 
 mkdir -p "$WS/result" "$WS/result/logs" "$WS/skills"
-# Always stage the built-in foundry-agent skill (the result contract) alongside the task's skills.
+# Always stage the built-in fordism-agent skill (the result contract) alongside the task's skills.
 cp -r /doctrine/skills/* "$WS/skills/" 2>/dev/null || true
 # NB: token usage + the session transcript are NOT written here — the Collector can reap this
 # container the instant the agent writes result.json:finished (racing any post-run step). The
@@ -134,7 +134,7 @@ if [ "$ATYPE" != "qwen-code" ]; then
   done
 fi
 
-# Completion contract (foundry-agent skill): the AGENT must write result/result.json with
+# Completion contract (fordism-agent skill): the AGENT must write result/result.json with
 # state:finished. The wrapper VALIDATES that — it does NOT rubber-stamp stdout. A model that
 # only emits junk (no real tool use, never writes result.json) leaves state at "running" -> rotten.
 ST="$(rstate)"

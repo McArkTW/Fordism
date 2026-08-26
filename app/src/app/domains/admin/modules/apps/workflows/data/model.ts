@@ -1,4 +1,4 @@
-// Wire DTOs for the foundry-core workflow API (com.hp.vcosmos.foundry.web).
+// Wire DTOs for the fordism-core workflow API (tw.mcark.tony.fordism.web).
 
 /** One workflow in the list. `templates` is what its steps run, for filtering. */
 export type WorkflowSummary = {

@@ -1,7 +1,7 @@
-# The Foundry
+# The Fordism
 
 **A workflow engine that runs AI agents as disposable containers.** You define a
-**Workflow** (YAML) as a series of steps; the Foundry fans each step through a
+**Workflow** (YAML) as a series of steps; the Fordism fans each step through a
 strategy **orchestrator** to a one-shot **agent container** (Claude Code or Qwen
 Code) that does the task in a mounted workspace and reports a result. The engine
 dispatches, collects, and reaps the containers; a run that produces no valid
@@ -32,21 +32,21 @@ agent image bakes both CLIs — so the profile picks both the endpoint and the r
 
 **Run locally** (builds images from source):
 ```bash
-git clone https://github.com/hpi-secret/tds-foundry && cd tds-foundry
+git clone https://github.com/mcark/fordism && cd fordism
 cp .env.example .env        # fill secrets; set OLLAMA_BASE_URL to a GPU host
 docker compose up -d        # builds core · app · agent from source
 ```
 Open `http://localhost` (or `WEB_PORT`) → the operator UI (Workflows · Runs ·
 Templates · Skills · Agent Profiles). The **app container is nginx**: it serves the
-SPA and proxies `/api` → `foundry-core`.
+SPA and proxies `/api` → `fordism-core`.
 
-**Services:** `foundry-core` (Java 25 / Javalin) · `foundry-app` (Angular / Fuse,
+**Services:** `fordism-core` (Java 25 / Javalin) · `fordism-app` (Angular / Fuse,
 nginx). **There is no database** — core keeps run/task state in memory behind a `store`
 port and snapshots it to disk; the Postgres container was removed 2026-08-08 because
 core ships no JDBC driver and nothing ever connected to it. The **agent image** (bakes
 Claude Code + Qwen Code) is **spawned one container per task** by the launcher — not a
 long-lived service. There is no LLM-gateway service; provider keys live per Agent
-Profile in the Foundry UI.
+Profile in the Fordism UI.
 
 **Deploy** by hand on any Docker host: `docker compose up -d --build` — or let
 **Jenkins** do it (below).
@@ -75,8 +75,8 @@ fallback.)
 **Push with `git pushb`.** A local alias in `.git/config` (not committed) that pushes
 and then fires the repo scan, which is what starts the build. It uses a revocable
 `ci-trigger` API token on the Jenkins `admin` account, stored as `JENKINS_CI_TOKEN`
-in `~/.vcosmos/credential.json`. After a plain `git push`, fire the scan by hand —
-`curl -X POST -u admin:$JENKINS_CI_TOKEN http://jenkins.local/job/tds-foundry/build?delay=0`
+in `a local credential file`. After a plain `git push`, fire the scan by hand —
+`curl -X POST -u admin:$JENKINS_CI_TOKEN http://jenkins.local/job/fordism/build?delay=0`
 — or the commit sits on `main` and UAT keeps serving the old build.
 
 > The Jenkins `github-token` credential expired on 2026-07-22 and silently broke this
@@ -97,7 +97,7 @@ Three gates plus a review bar. Every gate fails the build, so a rule here is not
 
 Not gated — applied in review:
 
-- **No DI in Java.** Construct and pass dependencies yourself; the whole graph is `Foundry.main`
+- **No DI in Java.** Construct and pass dependencies yourself; the whole graph is `Fordism.main`
   on one screen. Angular's `inject()` is idiomatic and expected in `app`.
 - **OOP first.** Objects own their state and the behaviour over it — no anemic struct plus a
   `*Utils` bag. Plain DTOs at a boundary are the exception.
@@ -106,7 +106,7 @@ Not gated — applied in review:
 - **Failure and absence are explicit.** Throw with enough context to debug; return an empty
   collection or `Optional`, never a silent `null`.
 - **Construction is not work.** A constructor assigns its fields; it does not touch the disk.
-  Migrations and seeding are called from `Foundry.main`, where the wiring already lives.
+  Migrations and seeding are called from `Fordism.main`, where the wiring already lives.
 - **Comments say why.** No restatement of the line above, no commented-out code.
 - **Angular:** single-file components — split the template out past ~100 lines or when it needs
   real scoped CSS. Signals, standalone, `@if`/`@for`.

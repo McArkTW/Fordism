@@ -19,50 +19,50 @@ export type NavigationItem = {
 // modules/apps/_archive/ and will return as each page is redesigned.
 export const NAVIGATION: NavigationItem[] = [
   {
-    id: 'foundry',
-    label: 'Foundry',
+    id: 'fordism',
+    label: 'Fordism',
     description: 'run agents',
     children: [
       // Operate — what you do day to day
       {
-        id: 'foundry/live',
+        id: 'fordism/live',
         label: 'Live',
         icon: 'radio',
         route: '/live',
       },
       {
-        id: 'foundry/runs',
+        id: 'fordism/runs',
         label: 'History',
         icon: 'history',
         route: '/runs',
       },
       {
-        id: 'foundry/workflows',
+        id: 'fordism/workflows',
         label: 'Workflows',
         icon: 'list-todo',
         route: '/workflows',
       },
       // Configure — set up once
       {
-        id: 'foundry/templates',
+        id: 'fordism/templates',
         label: 'Agent templates',
         icon: 'package',
         route: '/templates',
       },
       {
-        id: 'foundry/skills',
+        id: 'fordism/skills',
         label: 'Skills',
         icon: 'sparkles',
         route: '/skills',
       },
       {
-        id: 'foundry/agent-profiles',
+        id: 'fordism/agent-profiles',
         label: 'Agent Profiles',
         icon: 'server',
         route: '/agent-profiles',
       },
       {
-        id: 'foundry/credentials',
+        id: 'fordism/credentials',
         label: 'Credentials',
         icon: 'key-round',
         route: '/credentials',

@@ -13,7 +13,7 @@ import { User } from '@/app/domains/admin/layout/ui/user';
     <div class="relative flex items-center gap-x-2.5 pt-5 pr-4 pb-0 pl-6">
       <!-- Logo — official HP mark, rendered white (reversed variant) for the dark sidebar -->
       <img
-        src="/images/logo/hp-black.svg"
+        src="/images/logo/logo.svg"
         class="size-8 shrink-0 brightness-0 invert"
         alt="HP"
       />
@@ -22,7 +22,7 @@ import { User } from '@/app/domains/admin/layout/ui/user';
         <div
           class="text-on-surface text-lg leading-none font-bold tracking-wider"
         >
-          TDS Foundry
+          TDS Fordism
         </div>
       </div>
     </div>

@@ -1,5 +1,5 @@
-# foundry-core — the workflow engine (Javalin + tinylog). Gradle shadowJar build.
-# Build context is the repo ROOT:  docker build -f core/Dockerfile -t foundry/foundry-core:local .
+# fordism-core — the workflow engine (Javalin + tinylog). Gradle shadowJar build.
+# Build context is the repo ROOT:  docker build -f core/Dockerfile -t fordism/fordism-core:local .
 FROM eclipse-temurin:25-jdk AS build
 WORKDIR /src
 COPY core ./core
@@ -15,8 +15,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certifi
     && rm -rf /var/lib/apt/lists/* \
     && curl -fsSL https://download.docker.com/linux/static/stable/x86_64/docker-27.5.1.tgz \
        | tar xz -C /usr/local/bin --strip-components=1 docker/docker
-COPY --from=build /src/core/build/libs/foundry-core.jar app.jar
+COPY --from=build /src/core/build/libs/fordism-core.jar app.jar
 COPY core/workflows ./workflows
-ENV FOUNDRY_WORKFLOWS_DIR=/app/workflows
+ENV FORDISM_WORKFLOWS_DIR=/app/workflows
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]

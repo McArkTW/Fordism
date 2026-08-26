@@ -1,4 +1,4 @@
-# The Foundry agent — Claude Code over a host-mounted workspace. The launcher runs one
+# The Fordism agent — Claude Code over a host-mounted workspace. The launcher runs one
 # container per task; it reads task/task.md, does the work, writes result/, and exits.
 # The model backend is chosen at run time by env: ANTHROPIC_BASE_URL points straight at the
 # resolved LLM source's endpoint (e.g. api.anthropic.com for real Claude) — no gateway.
@@ -47,10 +47,10 @@ RUN curl -fsSL https://github.com/cli/cli/releases/download/v2.62.0/gh_2.62.0_li
 
 RUN npm install -g @anthropic-ai/claude-code@latest @qwen-code/qwen-code@latest
 
-COPY entrypoint.sh /usr/local/bin/foundry-agent
+COPY entrypoint.sh /usr/local/bin/fordism-agent
 COPY CLAUDE.md      /doctrine/CLAUDE.md
 COPY skills/        /doctrine/skills/
-RUN chmod +x /usr/local/bin/foundry-agent
+RUN chmod +x /usr/local/bin/fordism-agent
 
 # Claude Code refuses --dangerously-skip-permissions as root, so run as a non-root user.
 # Pin that user to uid/gid 1001 so workspace files on the host are owned by `lab` (uid 1001),
@@ -62,4 +62,4 @@ ENV HOME=/workspace
 # `pip install pytest && pytest` fails with "command not found" one step after appearing to work.
 ENV PATH=/workspace/.local/bin:$PATH
 WORKDIR /workspace
-ENTRYPOINT ["/usr/local/bin/foundry-agent"]
+ENTRYPOINT ["/usr/local/bin/fordism-agent"]

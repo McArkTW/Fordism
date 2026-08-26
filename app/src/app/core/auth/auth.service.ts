@@ -2,8 +2,8 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 
 const HEIMDALL = 'https://heimdall.local';
-const TOKEN_KEY = 'foundry_id_token';
-const VERIFIER_KEY = 'foundry_pkce_verifier';
+const TOKEN_KEY = 'fordism_id_token';
+const VERIFIER_KEY = 'fordism_pkce_verifier';
 
 /** The profile `/api/auth/me` returns — the backend owns it, the browser only displays it. */
 export type UserProfile = {
@@ -15,7 +15,7 @@ export type UserProfile = {
 
 /**
  * OAuth (PKCE) client for TDS Heimdall. The browser gets an identity token from
- * Heimdall and sends it as a Bearer; Foundry's backend verifies it. No secret in
+ * Heimdall and sends it as a Bearer; Fordism's backend verifies it. No secret in
  * the browser — the PKCE code_verifier proves this is the same browser.
  */
 @Injectable({ providedIn: 'root' })
@@ -28,7 +28,7 @@ export class AuthService {
    * matches no registration at all and gets a 400 — log in on the real host.
    */
   private service(): string {
-    return location.hostname === 'foundry.local' ? 'foundry' : 'foundry-uat';
+    return location.hostname === 'fordism.local' ? 'fordism' : 'fordism-uat';
   }
 
   /** Who is signed in — null until loaded, and null again if the token stopped verifying. */

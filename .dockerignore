@@ -1,4 +1,4 @@
-# Build context for `foundry-core` (context = repo root). Keep it small: only core/ is needed.
+# Build context for `fordism-core` (context = repo root). Keep it small: only core/ is needed.
 .git
 **/node_modules
 **/out

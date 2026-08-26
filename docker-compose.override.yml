@@ -1,12 +1,12 @@
 # Local/dev build override (auto-merged by `docker compose`), and used by CI to build
 # the images from source. On a server: docker compose -f docker-compose.yml up -d (pulls).
 services:
-  foundry-core:
+  fordism-core:
     build:
       context: .                 # repo root — core/Dockerfile COPYs core/ (src, lib, workflows)
       dockerfile: core/Dockerfile
-  foundry-app:
+  fordism-app:
     build: ./app
   # Built, never run: the launcher spawns one container per task from this image.
-  foundry-agent:
+  fordism-agent:
     build: ./agent

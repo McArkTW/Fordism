@@ -179,7 +179,7 @@ export class Navigation {
     return this.navigation().map((section) => ({
       ...section,
       children: section.children?.map((item) =>
-        item.id === 'foundry/live' && waiting > 0
+        item.id === 'fordism/live' && waiting > 0
           ? { ...item, badge: String(waiting) }
           : item
       ),

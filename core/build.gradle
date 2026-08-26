@@ -3,7 +3,7 @@ plugins {
     id 'com.gradleup.shadow' version '9.0.0'
 }
 
-group = 'com.hp.vcosmos'
+group = 'tw.mcark.tony'
 version = '1.0.0'
 
 java {
@@ -44,12 +44,12 @@ test {
 }
 
 application {
-    mainClass = 'com.hp.vcosmos.foundry.Foundry'
+    mainClass = 'tw.mcark.tony.fordism.Fordism'
 }
 
-// Fat jar -> build/libs/foundry-core.jar
+// Fat jar -> build/libs/fordism-core.jar
 shadowJar {
-    archiveBaseName = 'foundry-core'
+    archiveBaseName = 'fordism-core'
     archiveClassifier = ''
     archiveVersion = ''
     mergeServiceFiles()

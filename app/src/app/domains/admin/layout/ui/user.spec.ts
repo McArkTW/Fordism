@@ -38,7 +38,7 @@ describe('User', () => {
       ],
     }).compileComponents();
 
-    localStorage.setItem('foundry_id_token', 'test-token');
+    localStorage.setItem('fordism_id_token', 'test-token');
     http = TestBed.inject(HttpTestingController);
     fixture = TestBed.createComponent(User);
     fixture.detectChanges();
@@ -78,12 +78,12 @@ describe('User', () => {
       .flush({ error: 'not logged in' }, { status: 401, statusText: 'Unauthorized' });
     await fixture.whenStable();
 
-    expect(localStorage.getItem('foundry_id_token')).toBeNull();
+    expect(localStorage.getItem('fordism_id_token')).toBeNull();
   });
 
   it('does not call the backend without a token', () => {
     http.expectOne('/api/auth/me').flush(PROFILE); // the fixture built in beforeEach
-    localStorage.removeItem('foundry_id_token');
+    localStorage.removeItem('fordism_id_token');
 
     TestBed.createComponent(User).detectChanges();
 
@@ -91,7 +91,7 @@ describe('User', () => {
   });
 
   afterEach(() => {
-    localStorage.removeItem('foundry_id_token');
+    localStorage.removeItem('fordism_id_token');
     http.verify();
   });
 });

@@ -11,7 +11,7 @@ import {
   WorkflowSummary,
 } from './model';
 
-/** CRUD, validation, pre-flight and run against foundry-core's /api/workflows. */
+/** CRUD, validation, pre-flight and run against fordism-core's /api/workflows. */
 @Injectable({ providedIn: 'root' })
 export class WorkflowsService {
   private http = inject(HttpClient);

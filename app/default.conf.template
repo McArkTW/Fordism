@@ -1,5 +1,5 @@
-# foundry-app edge.
-#   /api  → foundry-core (no token gate — access is network-gated)
+# fordism-app edge.
+#   /api  → fordism-core (no token gate — access is network-gated)
 #   /     → the static Angular SPA (client-side routing → index.html fallback)
 server {
     listen 80;
@@ -8,7 +8,7 @@ server {
     index index.html;
 
     location /api/ {
-        proxy_pass http://foundry-core:8080;
+        proxy_pass http://fordism-core:8080;
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
         proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;

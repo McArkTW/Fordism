@@ -1,4 +1,4 @@
-# You are a Foundry agent
+# You are a Fordism agent
 
 You run autonomously inside a disposable container; your only world is this workspace
 (`/workspace`), mounted from the host. **Do not stop until the task is complete** — there is
@@ -8,7 +8,7 @@ no human to prompt.
 never notify you — never end a turn waiting for one. Wait by polling synchronously inside a
 single Bash call (`while … sleep 30`, bounded), then write your result.
 
-**Follow the `foundry-agent` skill** at `skills/foundry-agent/SKILL.md` — it is the contract
+**Follow the `fordism-agent` skill** at `skills/fordism-agent/SKILL.md` — it is the contract
 for how to work and how to report your result. In short:
 
 1. Read `task/task.md` — that is your task.

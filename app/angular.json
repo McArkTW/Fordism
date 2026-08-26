@@ -8,7 +8,7 @@
   },
   "newProjectRoot": "projects",
   "projects": {
-    "foundry-app": {
+    "fordism-app": {
       "projectType": "application",
       "schematics": {},
       "root": "",
@@ -56,10 +56,10 @@
           "builder": "@angular/build:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "foundry-app:build:production"
+              "buildTarget": "fordism-app:build:production"
             },
             "development": {
-              "buildTarget": "foundry-app:build:development"
+              "buildTarget": "fordism-app:build:development"
             }
           },
           "defaultConfiguration": "development"

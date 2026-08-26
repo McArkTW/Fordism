@@ -1,16 +1,16 @@
-// Foundry CI/CD — runs on the native Jenkins on tds-lab (host: jenkins.local).
+// Fordism CI/CD — runs on the native Jenkins on tds-lab (host: jenkins.local).
 //   PRs    -> secret-scan + build only (the merge gate)
-//   main       -> deploy UAT   (foundry-uat.local, :8088, ADO tag foundry-managed-test)
-//   experiment -> deploy EXP   (foundry-exp.local, :8091) — throwaway experiment env
-//   v* tag -> deploy PRD   (foundry.local,     :8087, ADO tag foundry-managed) — auto (cutting the tag is the deploy decision)
+//   main       -> deploy UAT   (fordism-uat.local, :8088, ADO tag fordism-managed-test)
+//   experiment -> deploy EXP   (fordism-exp.local, :8091) — throwaway experiment env
+//   v* tag -> deploy PRD   (fordism.local,     :8087, ADO tag fordism-managed) — auto (cutting the tag is the deploy decision)
 //
-// One image is built (foundry/foundry-*:local) and the SAME artifact is deployed to
+// One image is built (fordism/fordism-*:local) and the SAME artifact is deployed to
 // both environments — they differ only by env file (db, port, tag scope, secrets).
 // Env files live on the box at $ENVDIR (jenkins-owned, 600) — never in the repo.
 pipeline {
   agent any
   options { disableConcurrentBuilds() }
-  environment { ENVDIR = '/var/lib/jenkins/foundry-envs' }
+  environment { ENVDIR = '/var/lib/jenkins/fordism-envs' }
 
   stages {
     stage('Secret scan') {
@@ -27,7 +27,7 @@ pipeline {
       steps {
         // --profile build-only so the agent image is built too: the launcher spawns it per
         // task, so it never appears in `up`, but it still has to exist on the box.
-        sh 'docker compose --env-file $ENVDIR/uat.env -p foundry-build --profile build-only build'
+        sh 'docker compose --env-file $ENVDIR/uat.env -p fordism-build --profile build-only build'
       }
     }
 
@@ -35,9 +35,9 @@ pipeline {
       when { branch 'main' }
       steps {
         sh '''
-          export FOUNDRY_GIT_SHA="${GIT_COMMIT:-unknown}"
-          export FOUNDRY_VERSION="${TAG_NAME:-${BRANCH_NAME:-dev}}"
-          export FOUNDRY_BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          export FORDISM_GIT_SHA="${GIT_COMMIT:-unknown}"
+          export FORDISM_VERSION="${TAG_NAME:-${BRANCH_NAME:-dev}}"
+          export FORDISM_BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           docker compose -p uat --env-file $ENVDIR/uat.env up -d --remove-orphans
           for i in $(seq 1 40); do
             curl -fsS http://localhost:8088/api/health >/dev/null 2>&1 && { echo ">> UAT healthy"; exit 0; }
@@ -52,9 +52,9 @@ pipeline {
       when { branch 'experiment' }
       steps {
         sh '''
-          export FOUNDRY_GIT_SHA="${GIT_COMMIT:-unknown}"
-          export FOUNDRY_VERSION="${TAG_NAME:-${BRANCH_NAME:-dev}}"
-          export FOUNDRY_BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          export FORDISM_GIT_SHA="${GIT_COMMIT:-unknown}"
+          export FORDISM_VERSION="${TAG_NAME:-${BRANCH_NAME:-dev}}"
+          export FORDISM_BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           docker compose -p exp --env-file $ENVDIR/exp.env up -d --remove-orphans
           for i in $(seq 1 40); do
             curl -fsS http://localhost:8091/api/health >/dev/null 2>&1 && { echo ">> EXP healthy"; exit 0; }
@@ -69,9 +69,9 @@ pipeline {
       when { buildingTag() }
       steps {
         sh '''
-          export FOUNDRY_GIT_SHA="${GIT_COMMIT:-unknown}"
-          export FOUNDRY_VERSION="${TAG_NAME:-${BRANCH_NAME:-dev}}"
-          export FOUNDRY_BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          export FORDISM_GIT_SHA="${GIT_COMMIT:-unknown}"
+          export FORDISM_VERSION="${TAG_NAME:-${BRANCH_NAME:-dev}}"
+          export FORDISM_BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           docker compose -p prd --env-file $ENVDIR/prd.env up -d --remove-orphans
           for i in $(seq 1 40); do
             curl -fsS http://localhost:8087/api/health >/dev/null 2>&1 && { echo ">> PRD healthy"; exit 0; }
