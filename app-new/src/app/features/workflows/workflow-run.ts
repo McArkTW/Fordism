@@ -1,0 +1,152 @@
+import { DatePipe } from '@angular/common';
+import { Component, computed, effect, inject, input, signal } from '@angular/core';
+import { Router, RouterLink } from '@angular/router';
+import { apiError } from '../../core/api-error';
+import { RunSummary } from '../../core/api/runs.service';
+import { Preflight, StagedFile, WorkflowDetail } from '../../core/api/workflows.model';
+import { WorkflowsService } from '../../core/api/workflows.service';
+import { Icon } from '../../core/icon';
+import { formatDuration, formatSize, statusView } from '../../core/status';
+import { Toasts } from '../../core/toast';
+
+/**
+ * Start one workflow.
+ *
+ * Files are inputs. The workflow's own `task:` is the task — an upload named task.md is refused
+ * rather than allowed to replace it, because two sources for the task is how you end up running
+ * something other than what the workflow says.
+ */
+@Component({
+  selector: 'workflow-run',
+  imports: [RouterLink, Icon, DatePipe],
+  host: { class: 'block' },
+  templateUrl: './workflow-run.html',
+})
+export class WorkflowRun {
+  readonly name = input<string>();
+
+  private service = inject(WorkflowsService);
+  private router = inject(Router);
+  private toasts = inject(Toasts);
+
+  readonly detail = signal<WorkflowDetail | null>(null);
+  readonly preflight = signal<Preflight | null>(null);
+  readonly recent = signal<RunSummary[]>([]);
+  readonly files = signal<StagedFile[]>([]);
+  readonly values = signal<Record<string, string>>({});
+  readonly dragging = signal(false);
+  readonly busy = signal(false);
+  readonly loadError = signal('');
+
+  protected readonly sv = statusView;
+  protected readonly duration = formatDuration;
+  protected readonly size = formatSize;
+
+  /** Required parameters still blank — shown beside the button rather than failing on press. */
+  readonly missing = computed(() => {
+    const w = this.detail();
+    if (!w) {
+      return [];
+    }
+    return w.parameters.filter((p) => p.required && !this.value(p.name).trim()).map((p) => p.name);
+  });
+
+  readonly canRun = computed(
+    () =>
+      this.missing().length === 0 &&
+      !this.files().some((f) => this.isTaskMd(f.name)) &&
+      (this.preflight()?.ready ?? true),
+  );
+
+  /** The name already loaded, so a re-render does not refetch. */
+  private loadedFor = signal('');
+
+  constructor() {
+    // Routed inputs bind after construction — reading name() here would see undefined and fetch nothing.
+    effect(() => {
+      const name = this.name() ?? '';
+      if (!name || this.loadedFor() === name) {
+        return;
+      }
+      this.loadedFor.set(name);
+      this.service.get(name).subscribe({
+        next: (w) => {
+          this.detail.set(w);
+          const seeded: Record<string, string> = {};
+          for (const p of w.parameters) {
+            seeded[p.name] = p.defaultValue ?? '';
+          }
+          this.values.set(seeded);
+        },
+        error: (e) => this.loadError.set(apiError(e, `Could not load "${name}"`)),
+      });
+      this.service.preflight(name).subscribe({ next: (p) => this.preflight.set(p) });
+      this.service.runs(name).subscribe({ next: (list) => this.recent.set(list.slice(0, 10)) });
+    });
+  }
+
+  value(name: string): string {
+    return this.values()[name] ?? '';
+  }
+
+  set(name: string, value: string): void {
+    this.values.update((v) => ({ ...v, [name]: value }));
+  }
+
+  isTaskMd(name: string): boolean {
+    return name.trim().toLowerCase() === 'task.md';
+  }
+
+  drop(event: DragEvent): void {
+    event.preventDefault();
+    this.dragging.set(false);
+    this.add(event.dataTransfer?.files);
+  }
+
+  pick(event: Event): void {
+    const picker = event.target as HTMLInputElement;
+    this.add(picker.files);
+    // So picking the same file again still fires (change).
+    picker.value = '';
+  }
+
+  private add(list: FileList | null | undefined): void {
+    if (!list) {
+      return;
+    }
+    const staged: StagedFile[] = [];
+    for (const file of Array.from(list)) {
+      if (this.isTaskMd(file.name)) {
+        this.toasts.error('task.md comes from the workflow itself and cannot be uploaded.');
+        continue;
+      }
+      staged.push({ name: file.name, file });
+    }
+    if (staged.length) {
+      this.files.update((current) => [...current, ...staged]);
+    }
+  }
+
+  rename(index: number, name: string): void {
+    this.files.update((list) => list.map((f, i) => (i === index ? { ...f, name } : f)));
+  }
+
+  removeFile(index: number): void {
+    this.files.update((list) => list.filter((_f, i) => i !== index));
+  }
+
+  start(): void {
+    this.busy.set(true);
+    this.service.run(this.name() ?? '', this.values(), this.files()).subscribe({
+      next: (started) => {
+        this.busy.set(false);
+        this.toasts.ok(`Run started: ${started.runId.slice(0, 8)}`);
+        this.router.navigate(['/runs', started.runId]);
+      },
+      error: (e) => {
+        this.busy.set(false);
+        this.toasts.error(apiError(e, 'Could not start the run'));
+      },
+    });
+  }
+}

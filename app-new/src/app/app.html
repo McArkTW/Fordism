@@ -1,0 +1,75 @@
+<div [innerHTML]="sprite"></div>
+
+<div class="flex min-h-screen">
+  <!-- Sidebar -->
+  <aside class="flex w-56 shrink-0 flex-col border-r border-edge bg-panel">
+    <a routerLink="/live" class="flex items-center gap-2.5 px-5 py-5">
+      <img src="favicon.svg" alt="" class="h-7 w-7" />
+      <span class="text-lg font-semibold tracking-tight">Fordism</span>
+    </a>
+
+    <nav class="flex-1 space-y-6 px-3 py-2">
+      <div>
+        <div class="px-2 pb-1 text-[11px] font-semibold tracking-wider text-muted uppercase">Operate</div>
+        @for (item of operate; track item.path) {
+          <a
+            [routerLink]="item.path"
+            routerLinkActive="bg-accent/10 text-accent"
+            class="flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm font-medium text-ink/80 hover:bg-ink/5"
+          >
+            <app-icon [name]="item.icon" class="text-base" />
+            {{ item.label }}
+            @if (item.path === '/live' && attention.askedCount() > 0) {
+              <span class="ml-auto rounded-full bg-amber-500/20 px-1.5 text-xs font-semibold text-amber-600 dark:text-amber-400">
+                {{ attention.askedCount() }}
+              </span>
+            }
+          </a>
+        }
+      </div>
+      <div>
+        <div class="px-2 pb-1 text-[11px] font-semibold tracking-wider text-muted uppercase">Configure</div>
+        @for (item of configure; track item.path) {
+          <a
+            [routerLink]="item.path"
+            routerLinkActive="bg-accent/10 text-accent"
+            class="flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm font-medium text-ink/80 hover:bg-ink/5"
+          >
+            <app-icon [name]="item.icon" class="text-base" />
+            {{ item.label }}
+          </a>
+        }
+      </div>
+    </nav>
+
+    <div class="border-t border-edge px-3 py-3">
+      <button class="btn w-full justify-center" (click)="toggleScheme()">
+        <app-icon name="sun" class="dark:hidden" />
+        <app-icon name="moon" class="hidden dark:inline-flex" />
+        Appearance
+      </button>
+    </div>
+  </aside>
+
+  <!-- Content -->
+  <main class="min-w-0 flex-1 px-8 py-6">
+    <router-outlet />
+  </main>
+</div>
+
+<!-- Toasts -->
+<div class="fixed right-4 bottom-4 z-50 flex w-80 flex-col gap-2">
+  @for (toast of toasts.items(); track toast.id) {
+    <div
+      class="card flex items-start gap-2 p-3 text-sm shadow-lg"
+      [class.border-red-500!]="toast.kind === 'error'"
+    >
+      <app-icon [name]="toast.kind === 'ok' ? 'circle-check' : 'circle-x'" class="mt-0.5 shrink-0"
+        [class.text-emerald-500]="toast.kind === 'ok'" [class.text-red-500]="toast.kind === 'error'" />
+      <span class="min-w-0 break-words">{{ toast.text }}</span>
+      <button class="ml-auto cursor-pointer text-muted hover:text-ink" (click)="toasts.dismiss(toast.id)">
+        <app-icon name="x" />
+      </button>
+    </div>
+  }
+</div>
