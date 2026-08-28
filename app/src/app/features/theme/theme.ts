@@ -1,10 +1,19 @@
 import { Component, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatExpansionModule } from '@angular/material/expansion';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatMenuModule } from '@angular/material/menu';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
+import { MatSliderModule } from '@angular/material/slider';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatStepperModule } from '@angular/material/stepper';
+import { MatTabsModule } from '@angular/material/tabs';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { Icon } from '../../core/icon';
 import { statusView } from '../../core/status';
 import { Theme } from '../../core/theme';
@@ -35,6 +44,26 @@ a code block
 \`\`\`
 `;
 
+/** A content modal, as distinct from the one-question confirm. */
+@Component({
+  selector: 'app-theme-modal',
+  imports: [MatButtonModule, MatDialogModule],
+  template: `
+    <h2 mat-dialog-title>A content modal</h2>
+    <mat-dialog-content>
+      <p class="text-sm">
+        Bigger than a confirm: it carries real content — a form, a preview, a diff. Escape or the
+        backdrop closes it; the actions row commits.
+      </p>
+    </mat-dialog-content>
+    <mat-dialog-actions align="end">
+      <button matButton mat-dialog-close>Close</button>
+      <button matButton="filled" [mat-dialog-close]="true">Apply</button>
+    </mat-dialog-actions>
+  `,
+})
+export class ThemeModal {}
+
 /**
  * The design audit page (not in the nav — open /theme directly): every token, shared
  * class, widget and icon rendered by the real components, so a change to the theme
@@ -43,8 +72,10 @@ a code block
 @Component({
   selector: 'app-theme',
   imports: [
-    Icon, Markdown, MatButtonModule, MatCheckboxModule, MatFormFieldModule,
-    MatInputModule, MatSelectModule, MatSlideToggleModule,
+    Icon, Markdown, MatButtonModule, MatCheckboxModule, MatDialogModule, MatExpansionModule,
+    MatFormFieldModule, MatInputModule, MatMenuModule, MatProgressBarModule,
+    MatProgressSpinnerModule, MatSelectModule, MatSliderModule, MatSlideToggleModule,
+    MatStepperModule, MatTabsModule, MatTooltipModule,
   ],
   templateUrl: './theme.html',
   styles: `
@@ -58,11 +89,14 @@ export class ThemePage {
   protected readonly theme = inject(Theme);
   private toasts = inject(Toasts);
   private confirm = inject(Confirm);
+  private dialog = inject(MatDialog);
 
   protected readonly icons = ICON_NAMES;
   protected readonly markdownSample = MARKDOWN_SAMPLE;
   protected readonly toggleOn = signal(true);
   protected readonly checked = signal(true);
+  protected readonly sliderValue = signal(35);
+  protected readonly progress = signal(65);
 
   protected readonly tokens = [
     { name: 'bg', varName: '--bg', note: 'page background' },
@@ -100,5 +134,9 @@ export class ThemePage {
       true,
     );
     this.toasts.ok(yes ? 'Confirmed.' : 'Cancelled.');
+  }
+
+  protected openModal(): void {
+    this.dialog.open(ThemeModal, { width: '30rem' });
   }
 }
