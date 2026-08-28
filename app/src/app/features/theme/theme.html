@@ -1,0 +1,175 @@
+<div class="flex max-w-5xl flex-col gap-8">
+
+  <div class="flex items-center gap-4">
+    <div>
+      <h1 class="page-h">Theme</h1>
+      <p class="text-sm text-muted">Every token, class and widget in one place. Flip the scheme to audit both.</p>
+    </div>
+    <button matButton="outlined" class="ml-auto" (click)="theme.set('light')">
+      <app-icon name="sun" /> Light
+    </button>
+    <button matButton="outlined" (click)="theme.set('dark')">
+      <app-icon name="moon" /> Dark
+    </button>
+  </div>
+
+  <!-- Tokens -->
+  <section class="card p-5">
+    <h2 class="mb-3 text-sm font-semibold tracking-wide text-muted uppercase">Color tokens</h2>
+    <div class="flex flex-wrap gap-4">
+      @for (token of tokens; track token.name) {
+        <div class="flex flex-col items-center gap-1.5">
+          <div class="h-14 w-14 rounded-xl border border-edge" [style.background]="'var(' + token.varName + ')'"></div>
+          <div class="text-xs font-medium">{{ token.name }}</div>
+          <div class="text-[11px] text-muted">{{ token.note }}</div>
+        </div>
+      }
+    </div>
+  </section>
+
+  <!-- Typography -->
+  <section class="card p-5">
+    <h2 class="mb-3 text-sm font-semibold tracking-wide text-muted uppercase">Typography</h2>
+    <div class="flex flex-col gap-2">
+      <div class="page-h">Page title — .page-h</div>
+      <div class="text-sm">Body text — the default 14px ink.</div>
+      <div class="text-sm text-muted">Secondary text — text-muted, for hints and metadata.</div>
+      <div class="font-mono text-xs">Monospace — ids, paths, YAML: fd-2683b055</div>
+      <a href="#" class="text-sm text-accent underline" (click)="$event.preventDefault()">A link</a>
+    </div>
+  </section>
+
+  <!-- Buttons -->
+  <section class="card p-5">
+    <h2 class="mb-3 text-sm font-semibold tracking-wide text-muted uppercase">Buttons (Material)</h2>
+    <div class="flex flex-wrap items-center gap-3">
+      <button matButton="filled"><app-icon name="play" /> Primary</button>
+      <button matButton="outlined"><app-icon name="pencil" /> Outlined</button>
+      <button matButton>Text</button>
+      <button matIconButton aria-label="copy"><app-icon name="copy" /></button>
+      <button matButton="filled" class="btn-danger-mat"><app-icon name="trash-2" /> Danger</button>
+      <button matButton="filled" disabled>Disabled</button>
+    </div>
+    <div class="mt-4 flex flex-wrap items-center gap-3">
+      <span class="text-xs text-muted">Legacy Tailwind buttons (kept for download links):</span>
+      <span class="btn">.btn</span>
+      <span class="btn btn-primary">.btn-primary</span>
+    </div>
+  </section>
+
+  <!-- Badges / states -->
+  <section class="card p-5">
+    <h2 class="mb-3 text-sm font-semibold tracking-wide text-muted uppercase">Run &amp; task states (statusView)</h2>
+    <div class="flex flex-col gap-3">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="w-20 text-xs text-muted">task</span>
+        @for (state of taskStates; track state) {
+          <span [class]="view(state).badge"><app-icon [name]="view(state).icon" [class.spin]="view(state).icon === 'loader'" /> {{ view(state).label }} <span class="opacity-60">({{ state }})</span></span>
+        }
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="w-20 text-xs text-muted">run</span>
+        @for (state of runStates; track state) {
+          <span [class]="view(state).badge"><app-icon [name]="view(state).icon" [class.spin]="view(state).icon === 'loader'" /> {{ view(state).label }} <span class="opacity-60">({{ state }})</span></span>
+        }
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="w-20 text-xs text-muted">special</span>
+        <span [class]="stoppedView().badge"><app-icon [name]="stoppedView().icon" /> {{ stoppedView().label }} <span class="opacity-60">(REAPED under an ABANDONED run)</span></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Forms -->
+  <section class="card p-5">
+    <h2 class="mb-3 text-sm font-semibold tracking-wide text-muted uppercase">Forms</h2>
+    <div class="grid grid-cols-2 gap-x-6 gap-y-2">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full">
+        <mat-label>Text field</mat-label>
+        <input matInput placeholder="matInput" />
+        <mat-hint>A hint below the field</mat-hint>
+      </mat-form-field>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full">
+        <mat-label>Select</mat-label>
+        <mat-select value="claude-code">
+          <mat-option value="claude-code">claude-code — Anthropic dialect</mat-option>
+          <mat-option value="qwen-code">qwen-code — OpenAI-chat dialect</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full">
+        <mat-label>Password</mat-label>
+        <input matInput type="password" value="sk-secret" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full">
+        <mat-label>Textarea</mat-label>
+        <textarea matInput rows="2">Standing instructions…</textarea>
+      </mat-form-field>
+    </div>
+    <div class="mt-3 flex flex-wrap items-center gap-6">
+      <div class="relative w-64">
+        <app-icon name="search" class="absolute top-1/2 left-2.5 -translate-y-1/2 text-muted" />
+        <input class="input pl-8" placeholder="Filter box — Tailwind .input" />
+      </div>
+      <mat-checkbox [checked]="checked()" (change)="checked.set($event.checked)">mat-checkbox</mat-checkbox>
+      <mat-slide-toggle [checked]="toggleOn()" (change)="toggleOn.set($event.checked)">mat-slide-toggle</mat-slide-toggle>
+    </div>
+  </section>
+
+  <!-- Table -->
+  <section class="card overflow-x-auto">
+    <table class="w-full">
+      <thead>
+        <tr>
+          <th class="th">Workflow</th>
+          <th class="th">State</th>
+          <th class="th">Created</th>
+          <th class="th">Duration</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="td">linear-example</td>
+          <td class="td"><span [class]="view('DONE').badge"><app-icon name="circle-check" /> Done</span></td>
+          <td class="td text-muted">Aug 28, 10:15:02</td>
+          <td class="td">1m 4s</td>
+        </tr>
+        <tr>
+          <td class="td">graph-example</td>
+          <td class="td"><span [class]="view('RUNNING').badge"><app-icon name="loader" class="spin" /> Running</span></td>
+          <td class="td text-muted">Aug 28, 10:18:44</td>
+          <td class="td">12s</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- Overlays -->
+  <section class="card p-5">
+    <h2 class="mb-3 text-sm font-semibold tracking-wide text-muted uppercase">Toasts &amp; dialog</h2>
+    <div class="flex flex-wrap gap-3">
+      <button matButton="outlined" (click)="toastOk()">Snackbar: ok</button>
+      <button matButton="outlined" (click)="toastError()">Snackbar: error</button>
+      <button matButton="outlined" (click)="openConfirm()">Confirm dialog</button>
+    </div>
+  </section>
+
+  <!-- Markdown -->
+  <section class="card p-5">
+    <h2 class="mb-3 text-sm font-semibold tracking-wide text-muted uppercase">Markdown (prose-md)</h2>
+    <app-markdown [source]="markdownSample" />
+  </section>
+
+  <!-- Icons -->
+  <section class="card p-5">
+    <h2 class="mb-3 text-sm font-semibold tracking-wide text-muted uppercase">Icons ({{ icons.length }})</h2>
+    <div class="grid grid-cols-6 gap-x-4 gap-y-3">
+      @for (icon of icons; track icon) {
+        <div class="flex items-center gap-2 text-sm">
+          <app-icon [name]="icon" class="text-lg" />
+          <span class="truncate text-xs text-muted">{{ icon }}</span>
+        </div>
+      }
+    </div>
+  </section>
+
+</div>
