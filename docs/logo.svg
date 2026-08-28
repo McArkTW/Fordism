@@ -2,7 +2,7 @@
   <rect x="16" y="16" width="16" height="64" fill="#4f46e5"/>
   <rect x="16" y="16" width="64" height="16" fill="#4f46e5"/>
   <rect x="16" y="44" width="40" height="16" fill="#4f46e5"/>
-  <rect x="48" y="70" width="4" height="4" fill="#8b5cf6" opacity="0.3"/>
-  <rect x="56" y="70" width="4" height="4" fill="#8b5cf6" opacity="0.55"/>
-  <rect x="64" y="64" width="16" height="16" rx="2" fill="#8b5cf6"/>
+  <rect x="40" y="74" width="9" height="5" rx="2" fill="#8b5cf6" opacity="0.55"/>
+  <rect x="53" y="74" width="9" height="5" rx="2" fill="#8b5cf6" opacity="0.8"/>
+  <rect x="66" y="64" width="16" height="16" rx="2" fill="#8b5cf6"/>
 </svg>
