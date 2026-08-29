@@ -42,7 +42,7 @@ Workflow YAML → Orchestrator (per strategy) → Dispatcher → [Task = agent c
 | Path | What |
 |---|---|
 | `core/` | Java 25 / Javalin — the **workflow engine**: strategy orchestrators, Dispatcher/Collector/Reaper, the container launcher, and the Agent Profile / template / skill stores. |
-| `app/` | Angular — the operator UI: **Workflows · Runs · Templates · Skills · Agent Profiles · Credentials**. Built to a static SPA; the container is nginx (and the edge, proxying `/api` → core). |
+| `app/` | Angular 21 + Tailwind 4 + spartan/ui — the operator UI: **Workflows · Runs · Templates · Skills · Agent Profiles · Credentials**. Built to a static SPA; the container is nginx (and the edge, proxying `/api` → core). |
 | `agent/` | The containerized agent runner — one image baking **both agent CLIs** (Claude Code + Qwen Code); the Agent Profile's `tool` selects which drives the task. The launcher runs one disposable container per task over a host-mounted `/workspace`. |
 | `deploy/` | Deploy assets: per-env `*.env.example` templates and `scripts/deploy.sh` (pull + `compose up` + health check). |
 

@@ -13,7 +13,7 @@ Fordism — a workflow engine that runs AI agents as disposable containers.
 - **Agent** (`agent/`): one image baking Claude Code and Qwen Code; the Agent
   Profile's `tool` picks the runtime; headless self-heal loop resumes a session that
   ended its turn waiting on background work.
-- **Operator UI** (`app/`): Angular 21 + Tailwind 4 + Angular Material (M3), fully
+- **Operator UI** (`app/`): Angular 21 + Tailwind 4 + spartan/ui (vendored, MIT), fully
   rewritten for this release — Live/History run views, run→task drill-down with
   transcripts and token usage, YAML workflow editor with live server-side
   validation, templates/skills/profiles/credentials management.
