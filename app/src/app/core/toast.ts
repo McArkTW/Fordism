@@ -1,16 +1,14 @@
-import { Injectable, inject } from '@angular/core';
-import { MatSnackBar } from '@angular/material/snack-bar';
+import { Injectable } from '@angular/core';
+import { toast } from '@spartan-ng/brain/sonner';
 
-/** Transient notifications via Material's snackbar. Errors stay longer and must be dismissable. */
+/** Transient notifications via sonner (the shell renders <hlm-toaster>). */
 @Injectable({ providedIn: 'root' })
 export class Toasts {
-  private snackBar = inject(MatSnackBar);
-
   ok(text: string): void {
-    this.snackBar.open(text, undefined, { duration: 3500 });
+    toast.success(text);
   }
 
   error(text: string): void {
-    this.snackBar.open(text, 'Dismiss', { duration: 8000 });
+    toast.error(text, { duration: 8000 });
   }
 }

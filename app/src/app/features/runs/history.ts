@@ -1,10 +1,12 @@
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DatePipe } from '@angular/common';
-import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatSelectModule } from '@angular/material/select';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { HlmButton } from '@spartan-ng/helm/button';
+import { HlmInput } from '@spartan-ng/helm/input';
+import { HlmSelectImports } from '@spartan-ng/helm/select';
+import { HlmSkeleton } from '@spartan-ng/helm/skeleton';
+import { HlmTableImports } from '@spartan-ng/helm/table';
 import { apiError } from '../../core/api-error';
 import { RunFilter, RunSummary, RunsService } from '../../core/api/runs.service';
 import { Icon } from '../../core/icon';
@@ -31,7 +33,16 @@ const SEARCH_DEBOUNCE_MS = 300;
  */
 @Component({
   selector: 'app-history',
-  imports: [RouterLink, Icon, DatePipe, MatButtonModule, MatFormFieldModule, MatSelectModule],
+  imports: [
+    RouterLink,
+    Icon,
+    DatePipe,
+    HlmButton,
+    HlmInput,
+    HlmSelectImports,
+    HlmSkeleton,
+    HlmTableImports,
+  ],
   host: { class: 'block' },
   templateUrl: './history.html',
 })
@@ -50,6 +61,8 @@ export class History {
   readonly filter = signal<RunFilter>({ limit: PAGE_SIZE });
 
   readonly states = STATES;
+  /** Fixed-count placeholder rows while the first page is in flight. */
+  readonly skeletonRows = [0, 1, 2];
 
   readonly filterActive = computed(() => {
     const f = this.filter();

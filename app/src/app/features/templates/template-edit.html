@@ -1,119 +1,139 @@
 <div class="mx-auto flex max-w-3xl flex-col gap-6">
   <div class="flex flex-wrap items-center gap-3">
-    <a matButton routerLink="/templates"><app-icon name="arrow-left" />Agent Templates</a>
+    <a hlmBtn variant="ghost" routerLink="/templates"><app-icon name="arrow-left" />Agent Templates</a>
     <h1 class="page-h">{{ isNew() ? 'New template' : name() || 'Template' }}</h1>
     <span class="flex-auto"></span>
     @if (dirty()) {
-      <span class="text-xs text-muted">unsaved changes</span>
+      <span class="text-muted-foreground text-xs">unsaved changes</span>
     }
   </div>
 
-  <div class="card p-5">
-    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full">
-      <mat-label>Name</mat-label>
+  <div class="border-border bg-card rounded-xl border p-5">
+    <div class="flex flex-col gap-1.5">
+      <label hlmLabel for="template-name">Name</label>
       <input
-        matInput
+        hlmInput
         id="template-name"
         required
         placeholder="e.g. worker"
         [value]="name()"
         (input)="name.set($any($event.target).value)"
       />
-    </mat-form-field>
+    </div>
 
-    <div class="mt-4 grid grid-cols-1 items-start gap-x-6 gap-y-5 sm:grid-cols-2">
-      <div>
-        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full">
-          <mat-label>Agent profile</mat-label>
-          <mat-select
-            id="template-profile"
-            [value]="agentProfile()"
-            (selectionChange)="agentProfile.set($event.value)"
-          >
-            <mat-option value="">— sole profile / default —</mat-option>
+    <div class="mt-5 grid grid-cols-1 items-start gap-x-6 gap-y-5 sm:grid-cols-2">
+      <div class="flex flex-col gap-1.5">
+        <label hlmLabel for="template-profile">Agent profile</label>
+        <hlm-select
+          [value]="agentProfile()"
+          [itemToString]="profileLabel"
+          (valueChange)="setProfile($event)"
+        >
+          <hlm-select-trigger class="w-full" buttonId="template-profile">
+            <!-- '' is a real choice, not a missing one: with no profile named, the sole profile
+                 (or the instance default) drives this template — the placeholder says so. -->
+            <hlm-select-value placeholder="— sole profile / default —" />
+          </hlm-select-trigger>
+          <hlm-select-content *hlmSelectPortal>
+            <hlm-select-item value="">— sole profile / default —</hlm-select-item>
             @for (p of profileOptions(); track p.id) {
-              <mat-option [value]="p.name">{{ p.name }} · {{ p.model || 'no model' }}</mat-option>
+              <hlm-select-item [value]="p.name">{{ p.name }} · {{ p.model || 'no model' }}</hlm-select-item>
             }
-          </mat-select>
-        </mat-form-field>
+          </hlm-select-content>
+        </hlm-select>
         @if (profileOptions().length === 0) {
-          <p class="mt-1 text-xs text-muted">
+          <p class="text-muted-foreground text-xs">
             No profiles yet — add one on the Agent Profiles page.
           </p>
         } @else {
-          <p class="mt-1 text-xs text-muted">
+          <p class="text-muted-foreground text-xs">
             The model backend this template's agent runs on, referenced by name.
           </p>
         }
       </div>
-      <div>
-        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full">
-          <mat-label>Model</mat-label>
-          <input
-            matInput
-            id="template-model"
-            placeholder="e.g. claude-sonnet-5"
-            [value]="model()"
-            (input)="model.set($any($event.target).value)"
-          />
-          <mat-hint>blank = the profile's model</mat-hint>
-        </mat-form-field>
+      <div class="flex flex-col gap-1.5">
+        <label hlmLabel for="template-model">Model</label>
+        <input
+          hlmInput
+          id="template-model"
+          placeholder="e.g. claude-sonnet-5"
+          [value]="model()"
+          (input)="model.set($any($event.target).value)"
+        />
+        <p class="text-muted-foreground text-xs">blank = the profile's model</p>
       </div>
     </div>
 
     <div class="mt-6">
       <div class="flex items-center justify-between">
-        <div class="text-sm font-semibold tracking-wide text-muted uppercase">
+        <div class="text-muted-foreground text-sm font-semibold tracking-wide uppercase">
           Skills the agent may use
           <span class="font-normal tracking-normal normal-case">· {{ skills().length }} selected</span>
         </div>
         @if (skills().length) {
-          <button matButton type="button" (click)="skills.set([])">Clear all</button>
+          <button hlmBtn variant="ghost" size="sm" type="button" (click)="skills.set([])">
+            Clear all
+          </button>
         }
       </div>
       @if (skillOptions().length === 0) {
-        <p class="mt-2 text-xs text-muted">No skills in the library yet — sync them on the Skills page.</p>
+        <p class="text-muted-foreground mt-2 text-xs">
+          No skills in the library yet — sync them on the Skills page.
+        </p>
       } @else {
         <div class="relative mt-2">
-          <app-icon name="search" class="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-muted" />
+          <app-icon
+            name="search"
+            class="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2"
+          />
           <input
-            class="input pl-8"
+            hlmInput
+            class="pl-8"
             placeholder="Filter skills…"
             [value]="skillFilter()"
             (input)="skillFilter.set($any($event.target).value)"
           />
         </div>
-        <div class="mt-2 max-h-72 divide-y divide-edge overflow-y-auto rounded-lg border border-edge">
+        <div class="divide-border border-border mt-2 max-h-72 divide-y overflow-y-auto rounded-lg border">
           @for (s of filteredSkills(); track s.name) {
-            <div class="px-3 py-2 hover:bg-ink/5">
-              <mat-checkbox
-                class="w-full"
+            <div class="hover:bg-foreground/5 flex items-start gap-3 px-3 py-2">
+              <hlm-checkbox
+                class="mt-0.5"
+                [aria-label]="'Grant skill ' + s.name"
                 [checked]="skills().includes(s.name)"
-                (change)="toggleSkill(s.name)"
+                (checkedChange)="toggleSkill(s.name)"
+              />
+              <!-- The whole text region toggles too — one handler each, so no double-fire. -->
+              <button
+                type="button"
+                class="min-w-0 flex-auto cursor-pointer text-left"
+                (click)="toggleSkill(s.name)"
               >
-                <span class="min-w-0">
-                  <span class="flex items-center gap-2">
-                    <span
-                      class="font-mono text-[13px]"
-                      [class.text-muted]="!s.enabled"
-                      [class.line-through]="!s.enabled"
-                      >{{ s.name }}</span
-                    >
-                    @if (!s.enabled) {
-                      <span class="badge-muted">disabled</span>
-                    }
-                  </span>
-                  @if (s.description) {
-                    <span class="mt-0.5 line-clamp-1 block text-xs text-muted">{{ s.description }}</span>
+                <span class="flex items-center gap-2">
+                  <span
+                    class="font-mono text-[13px]"
+                    [class.text-muted-foreground]="!s.enabled"
+                    [class.line-through]="!s.enabled"
+                    >{{ s.name }}</span
+                  >
+                  @if (!s.enabled) {
+                    <span class="badge-muted">disabled</span>
                   }
                 </span>
-              </mat-checkbox>
+                @if (s.description) {
+                  <span class="text-muted-foreground mt-0.5 line-clamp-1 block text-xs">
+                    {{ s.description }}
+                  </span>
+                }
+              </button>
             </div>
           } @empty {
-            <div class="px-3 py-6 text-center text-sm text-muted">No skills match “{{ skillFilter() }}”.</div>
+            <div class="text-muted-foreground px-3 py-6 text-center text-sm">
+              No skills match “{{ skillFilter() }}”.
+            </div>
           }
         </div>
-        <p class="mt-1 text-xs text-muted">
+        <p class="text-muted-foreground mt-1 text-xs">
           Only checked skills are copied into the agent's workspace. Globally-disabled skills are
           skipped even if checked.
         </p>
@@ -122,82 +142,93 @@
 
     <div class="mt-6">
       <div class="flex items-center justify-between">
-        <div class="text-sm font-semibold tracking-wide text-muted uppercase">
+        <div class="text-muted-foreground text-sm font-semibold tracking-wide uppercase">
           Credentials the agent receives
           <span class="font-normal tracking-normal normal-case">· {{ credentials().length }} granted</span>
         </div>
         @if (credentials().length) {
-          <button matButton type="button" (click)="credentials.set([])">Clear all</button>
+          <button hlmBtn variant="ghost" size="sm" type="button" (click)="credentials.set([])">
+            Clear all
+          </button>
         }
       </div>
       @if (credentialOptions().length === 0) {
-        <p class="mt-2 text-xs text-muted">No credentials stored — add one on the Credentials page.</p>
+        <p class="text-muted-foreground mt-2 text-xs">
+          No credentials stored — add one on the Credentials page.
+        </p>
       } @else {
         <div class="relative mt-2">
-          <app-icon name="search" class="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-muted" />
+          <app-icon
+            name="search"
+            class="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2"
+          />
           <input
-            class="input pl-8"
+            hlmInput
+            class="pl-8"
             placeholder="Filter credentials…"
             [value]="credentialFilter()"
             (input)="credentialFilter.set($any($event.target).value)"
           />
         </div>
-        <div class="mt-2 max-h-72 divide-y divide-edge overflow-y-auto rounded-lg border border-edge">
+        <div class="divide-border border-border mt-2 max-h-72 divide-y overflow-y-auto rounded-lg border">
           @for (c of filteredCredentials(); track c.key) {
-            <div class="px-3 py-2 hover:bg-ink/5">
-              <mat-checkbox
-                class="w-full"
+            <div class="hover:bg-foreground/5 flex items-start gap-3 px-3 py-2">
+              <hlm-checkbox
+                class="mt-0.5"
+                [aria-label]="'Grant credential ' + c.key"
                 [checked]="credentials().includes(c.key)"
-                (change)="toggleCredential(c.key)"
+                (checkedChange)="toggleCredential(c.key)"
+              />
+              <button
+                type="button"
+                class="min-w-0 flex-auto cursor-pointer text-left"
+                (click)="toggleCredential(c.key)"
               >
-                <span class="min-w-0">
-                  <span class="flex items-center gap-2">
-                    <span class="font-mono text-[13px]">{{ c.key }}</span>
-                    @if (!c.hasValue) {
-                      <span class="badge-warn">no value</span>
-                    }
-                  </span>
-                  @if (c.note) {
-                    <span class="mt-0.5 block text-xs text-muted">{{ c.note }}</span>
+                <span class="flex items-center gap-2">
+                  <span class="font-mono text-[13px]">{{ c.key }}</span>
+                  @if (!c.hasValue) {
+                    <span class="badge-warn">no value</span>
                   }
                 </span>
-              </mat-checkbox>
+                @if (c.note) {
+                  <span class="text-muted-foreground mt-0.5 block text-xs">{{ c.note }}</span>
+                }
+              </button>
             </div>
           } @empty {
-            <div class="px-3 py-6 text-center text-sm text-muted">
+            <div class="text-muted-foreground px-3 py-6 text-center text-sm">
               No credentials match “{{ credentialFilter() }}”.
             </div>
           }
         </div>
-        <p class="mt-1 text-xs text-muted">
+        <p class="text-muted-foreground mt-1 text-xs">
           Every task run from this template gets exactly these environment variables. Grant only
           what it needs.
         </p>
       }
     </div>
 
-    <div class="mt-6">
-      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full">
-        <mat-label>Instructions</mat-label>
-        <textarea
-          matInput
-          id="template-instructions"
-          rows="8"
-          spellcheck="false"
-          class="resize-y font-mono text-[13px] leading-relaxed"
-          [value]="instructions()"
-          (input)="instructions.set($any($event.target).value)"
-        ></textarea>
-      </mat-form-field>
-      <p class="mt-1 text-xs text-muted">Standing guidance prepended to every task this template runs.</p>
+    <div class="mt-6 flex flex-col gap-1.5">
+      <label hlmLabel for="template-instructions">Instructions</label>
+      <textarea
+        hlmTextarea
+        id="template-instructions"
+        rows="8"
+        spellcheck="false"
+        class="resize-y font-mono text-[13px] leading-relaxed"
+        [value]="instructions()"
+        (input)="instructions.set($any($event.target).value)"
+      ></textarea>
+      <p class="text-muted-foreground text-xs">
+        Standing guidance prepended to every task this template runs.
+      </p>
     </div>
 
     <div class="mt-6 flex flex-wrap items-center gap-3">
-      <button matButton="filled" [disabled]="busy()" (click)="save()">
-        <app-icon name="save" />Save
-      </button>
+      <!-- The one filled button on this view. -->
+      <button hlmBtn [disabled]="busy()" (click)="save()"><app-icon name="save" />Save</button>
       @if (!isNew()) {
-        <button matButton="filled" class="btn-danger-mat" [disabled]="busy()" (click)="remove()">
+        <button hlmBtn variant="destructive" [disabled]="busy()" (click)="remove()">
           <app-icon name="trash-2" />Delete
         </button>
       }

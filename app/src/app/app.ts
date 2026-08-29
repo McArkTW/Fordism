@@ -1,7 +1,8 @@
 import { Component, inject } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { HlmButton } from '@spartan-ng/helm/button';
+import { HlmToaster } from '@spartan-ng/helm/sonner';
 import { Attention } from './core/attention';
 import { Icon } from './core/icon';
 import { lucideSprite } from './core/icons';
@@ -23,7 +24,7 @@ const CONFIGURE: NavItem[] = [
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, Icon, MatButtonModule],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, Icon, HlmButton, HlmToaster],
   templateUrl: './app.html',
 })
 export class App {

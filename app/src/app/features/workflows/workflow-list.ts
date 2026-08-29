@@ -1,6 +1,9 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
+import { HlmBadge } from '@spartan-ng/helm/badge';
+import { HlmButton } from '@spartan-ng/helm/button';
+import { HlmInput } from '@spartan-ng/helm/input';
+import { HlmSpinner } from '@spartan-ng/helm/spinner';
 import { apiError } from '../../core/api-error';
 import { WorkflowSummary } from '../../core/api/workflows.model';
 import { WorkflowsService } from '../../core/api/workflows.service';
@@ -10,23 +13,28 @@ import { Toasts } from '../../core/toast';
 /** Browse the workflows: what the agents run, and how their steps are ordered. */
 @Component({
   selector: 'app-workflow-list',
-  imports: [RouterLink, Icon, MatButtonModule],
+  imports: [RouterLink, Icon, HlmButton, HlmBadge, HlmInput, HlmSpinner],
   host: { class: 'block' },
   template: `
     <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
       <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 class="page-h">Workflows</h1>
-          <p class="text-sm text-muted">What the agents run, and how their steps are ordered.</p>
+          <p class="text-muted-foreground text-sm">What the agents run, and how their steps are ordered.</p>
         </div>
-        <a matButton="filled" routerLink="/workflows/new"><app-icon name="plus" />New workflow</a>
+        <!-- The page's one filled button: creating a workflow is what you come here to do next. -->
+        <a hlmBtn routerLink="/workflows/new"><app-icon name="plus" />New workflow</a>
       </div>
 
       <div class="flex flex-col gap-3">
         <div class="relative">
-          <app-icon name="search" class="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-muted" />
+          <app-icon
+            name="search"
+            class="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2"
+          />
           <input
-            class="input pl-8"
+            hlmInput
+            class="pl-8"
             placeholder="Filter by name, description, tag, strategy or template…"
             [value]="filter()"
             (input)="filter.set($any($event.target).value)"
@@ -36,11 +44,17 @@ import { Toasts } from '../../core/toast';
         @if (tags().length) {
           <div class="flex flex-wrap gap-2">
             @for (t of tags(); track t) {
+              <!-- Chips are a toggle over the search text, not a second filter — hence hand-rolled,
+                   not hlmBadge: the selected state needs the primary tint a badge variant lacks. -->
               <button
                 type="button"
                 (click)="toggleTag(t)"
                 class="cursor-pointer rounded-full border px-2.5 py-1 text-xs transition"
-                [class]="filter().includes(t) ? 'border-accent bg-accent/15 text-accent' : 'border-edge bg-panel text-muted hover:text-ink'"
+                [class]="
+                  filter().includes(t)
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-border bg-card text-muted-foreground hover:text-foreground'
+                "
               >
                 {{ t }}
               </button>
@@ -50,33 +64,39 @@ import { Toasts } from '../../core/toast';
       </div>
 
       @if (loading()) {
-        <div class="flex justify-center py-10 text-muted"><app-icon name="loader" class="spin text-xl" /></div>
+        <div class="text-muted-foreground flex justify-center py-10"><hlm-spinner class="text-2xl" /></div>
       } @else {
         <div class="flex flex-col gap-2">
-          <div class="text-xs text-muted">{{ shown().length }} of {{ all().length }}</div>
+          <div class="text-muted-foreground text-xs">{{ shown().length }} of {{ all().length }}</div>
 
           <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
             @for (w of shown(); track w.name) {
-              <section class="card p-4 transition hover:border-muted">
+              <section class="border-border bg-card hover:border-ring/40 rounded-xl border p-4 shadow-xs transition">
                 <div class="flex flex-wrap items-center gap-2">
                   <a class="font-medium hover:underline" [routerLink]="['/workflows', w.name, 'edit']">{{ w.name }}</a>
-                  <span class="badge-muted">{{ w.strategy }}</span>
-                  <span class="text-xs text-muted">{{ w.steps }} {{ w.steps === 1 ? 'step' : 'steps' }}</span>
+                  <span hlmBadge variant="outline">{{ w.strategy }}</span>
+                  <span class="text-muted-foreground text-xs">{{ w.steps }} {{ w.steps === 1 ? 'step' : 'steps' }}</span>
                   <span class="flex-auto"></span>
-                  <!-- Outlined, not filled: a filled Run in every card would drown the page's one primary action. -->
-                  <a matButton="outlined" [routerLink]="['/workflows', w.name, 'run']"><app-icon name="play" />Run</a>
-                  <a matButton="outlined" [routerLink]="['/workflows', w.name, 'edit']"><app-icon name="pencil" />Edit</a>
+                  <!-- Outline, not filled: a filled Run in every card would drown the page's one primary action. -->
+                  <a hlmBtn variant="outline" size="sm" [routerLink]="['/workflows', w.name, 'run']">
+                    <app-icon name="play" />Run
+                  </a>
+                  <a hlmBtn variant="ghost" size="sm" [routerLink]="['/workflows', w.name, 'edit']">
+                    <app-icon name="pencil" />Edit
+                  </a>
                 </div>
                 @if (w.description) {
-                  <p class="mt-1.5 line-clamp-2 text-sm text-muted">{{ w.description }}</p>
+                  <p class="text-muted-foreground mt-1.5 line-clamp-2 text-sm">{{ w.description }}</p>
                 }
                 @if (w.tags.length || w.templates.length) {
                   <div class="mt-2 flex flex-wrap items-center gap-1.5">
                     @for (t of w.tags; track t) {
-                      <span class="rounded-full bg-ink/10 px-2 py-0.5 text-[11px]">{{ t }}</span>
+                      <span hlmBadge variant="secondary">{{ t }}</span>
                     }
                     @for (t of w.templates; track t) {
-                      <span class="rounded bg-ink/5 px-1.5 py-0.5 font-mono text-[11px] text-muted">{{ t }}</span>
+                      <span class="bg-muted text-muted-foreground rounded px-1.5 py-0.5 font-mono text-[11px]">
+                        {{ t }}
+                      </span>
                     }
                   </div>
                 }
@@ -85,14 +105,16 @@ import { Toasts } from '../../core/toast';
           </div>
 
           @if (shown().length === 0) {
-            <div class="card mt-2 border-dashed px-6 py-16 text-center">
+            <div class="border-border bg-card mt-2 rounded-xl border border-dashed px-6 py-16 text-center">
               @if (all().length === 0) {
-                <p class="text-sm text-muted">
+                <p class="text-muted-foreground text-sm">
                   No workflows yet. A workflow is the YAML that tells the agents what to run and in what order.
                 </p>
-                <a matButton="outlined" class="mt-4" routerLink="/workflows/new"><app-icon name="plus" />Create your first workflow</a>
+                <a hlmBtn variant="outline" class="mt-4" routerLink="/workflows/new">
+                  <app-icon name="plus" />Create your first workflow
+                </a>
               } @else {
-                <p class="text-sm text-muted">Nothing matches "{{ filter() }}".</p>
+                <p class="text-muted-foreground text-sm">Nothing matches "{{ filter() }}".</p>
               }
             </div>
           }

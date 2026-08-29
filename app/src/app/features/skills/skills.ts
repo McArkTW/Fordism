@@ -1,7 +1,8 @@
 import { DatePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
-import { MatSlideToggleModule } from '@angular/material/slide-toggle';
-import { MatTooltipModule } from '@angular/material/tooltip';
+import { HlmInput } from '@spartan-ng/helm/input';
+import { HlmSwitch } from '@spartan-ng/helm/switch';
+import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { apiError } from '../../core/api-error';
 import {
   SkillDetail,
@@ -20,7 +21,7 @@ import { Markdown } from '../../shared/markdown';
  */
 @Component({
   selector: 'app-skills',
-  imports: [DatePipe, Icon, Markdown, MatSlideToggleModule, MatTooltipModule],
+  imports: [DatePipe, Icon, Markdown, HlmInput, HlmSwitch, HlmTooltip],
   templateUrl: './skills.html',
 })
 export class Skills {
@@ -83,7 +84,7 @@ export class Skills {
   }
 
   toggle(skill: SkillSummary, enabled: boolean): void {
-    // Optimistic: flip immediately so the checkbox never lags, revert if core refuses.
+    // Optimistic: flip immediately so the switch never lags, revert if core refuses.
     this.applyEnabled(skill.name, enabled);
     this.service.setEnabled(skill.name, enabled).subscribe({
       next: () => this.toasts.ok(`${enabled ? 'Enabled' : 'Disabled'} “${skill.name}”`),
@@ -95,6 +96,8 @@ export class Skills {
   }
 
   private applyEnabled(name: string, enabled: boolean): void {
+    // New object identity so the switch's [checked] input actually changes — that is what
+    // makes the revert visibly snap the control back when core refuses the update.
     this.skills.update((list) => list.map((s) => (s.name === name ? { ...s, enabled } : s)));
     const d = this.detail();
     if (d && d.name === name) {

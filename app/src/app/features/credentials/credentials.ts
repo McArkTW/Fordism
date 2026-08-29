@@ -1,9 +1,9 @@
 import { DatePipe } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatTooltipModule } from '@angular/material/tooltip';
+import { HlmButton } from '@spartan-ng/helm/button';
+import { HlmInput } from '@spartan-ng/helm/input';
+import { HlmLabel } from '@spartan-ng/helm/label';
+import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { apiError } from '../../core/api-error';
 import { CredentialView, CredentialsService } from '../../core/api/credentials.service';
 import { Icon } from '../../core/icon';
@@ -21,7 +21,7 @@ type Draft = { key: string; value: string; note: string };
  */
 @Component({
   selector: 'app-credentials',
-  imports: [DatePipe, Icon, MatButtonModule, MatFormFieldModule, MatInputModule, MatTooltipModule],
+  imports: [DatePipe, Icon, HlmButton, HlmInput, HlmLabel, HlmTooltip],
   templateUrl: './credentials.html',
 })
 export class Credentials {

@@ -1,8 +1,10 @@
 import { Component, OnDestroy, computed, effect, inject, input, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
-import { MatButtonModule } from '@angular/material/button';
-import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
+import { HlmButton } from '@spartan-ng/helm/button';
+import { HlmSkeleton } from '@spartan-ng/helm/skeleton';
+import { HlmTableImports } from '@spartan-ng/helm/table';
+import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { apiError } from '../../core/api-error';
 import { RunDetail, RunsService, TaskView } from '../../core/api/runs.service';
 import { Icon } from '../../core/icon';
@@ -22,15 +24,9 @@ const TERMINAL = ['DONE', 'FAILED', 'ABANDONED'];
  */
 @Component({
   selector: 'app-run-detail',
-  imports: [RouterLink, Icon, DatePipe, MatButtonModule, MatTooltipModule],
+  imports: [RouterLink, Icon, DatePipe, HlmButton, HlmSkeleton, HlmTableImports, HlmTooltip],
   host: { class: 'block' },
   templateUrl: './run-detail.html',
-  styles: `
-    .btn-danger-mat {
-      --mat-button-filled-container-color: var(--color-red-600, #dc2626);
-      --mat-button-filled-label-text-color: #fff;
-    }
-  `,
 })
 export class RunDetailPage implements OnDestroy {
   readonly id = input.required<string>();

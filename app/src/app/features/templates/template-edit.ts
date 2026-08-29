@@ -1,10 +1,11 @@
 import { Component, computed, effect, inject, input, signal } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
-import { MatCheckboxModule } from '@angular/material/checkbox';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { Router, RouterLink } from '@angular/router';
+import { HlmButton } from '@spartan-ng/helm/button';
+import { HlmCheckbox } from '@spartan-ng/helm/checkbox';
+import { HlmInput } from '@spartan-ng/helm/input';
+import { HlmLabel } from '@spartan-ng/helm/label';
+import { HlmSelectImports } from '@spartan-ng/helm/select';
+import { HlmTextarea } from '@spartan-ng/helm/textarea';
 import { apiError } from '../../core/api-error';
 import {
   AgentProfileOption,
@@ -26,20 +27,14 @@ import { Confirm } from '../../shared/confirm';
   imports: [
     RouterLink,
     Icon,
-    MatButtonModule,
-    MatCheckboxModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatSelectModule,
+    HlmButton,
+    HlmCheckbox,
+    HlmInput,
+    HlmLabel,
+    HlmSelectImports,
+    HlmTextarea,
   ],
   templateUrl: './template-edit.html',
-  // The stock filled button is the accent color; delete must read as destructive.
-  styles: `
-    .btn-danger-mat {
-      --mat-button-filled-container-color: var(--color-red-600, #dc2626);
-      --mat-button-filled-label-text-color: #fff;
-    }
-  `,
 })
 export class TemplateEdit {
   /** Route param; absent on /templates/new. Bound after construction, so loading happens in an effect. */
@@ -144,6 +139,17 @@ export class TemplateEdit {
       },
     });
   }
+
+  /** brn-select emits null when nothing is selected; the form stores '' for "sole profile / default". */
+  setProfile(value: unknown): void {
+    this.agentProfile.set(typeof value === 'string' ? value : '');
+  }
+
+  /** Closed-trigger label: "name · model", like the option rows (the value itself is just the name). */
+  readonly profileLabel = (name: string): string => {
+    const p = this.profileOptions().find((o) => o.name === name);
+    return p ? `${p.name} · ${p.model || 'no model'}` : name;
+  };
 
   toggleSkill(name: string): void {
     const current = this.skills();

@@ -2,14 +2,14 @@
   <div class="flex flex-wrap items-center justify-between gap-3">
     <div>
       <h1 class="page-h">Agent Profiles</h1>
-      <p class="text-sm text-muted">
+      <p class="text-muted-foreground text-sm">
         A model backend + the agent tool that drives it. Templates pick a profile by name.
       </p>
     </div>
-    <button matButton="outlined" (click)="startNew()"><app-icon name="plus" />New profile</button>
+    <button hlmBtn variant="outline" (click)="startNew()"><app-icon name="plus" />New profile</button>
   </div>
 
-  <div class="card flex items-start gap-2.5 p-3 text-xs text-muted">
+  <div class="border-border bg-card text-muted-foreground flex items-start gap-2.5 rounded-xl border p-3 text-xs">
     <app-icon name="info" class="mt-0.5 shrink-0" />
     <p>
       API keys are write-only: a stored key is never shown again — type one only to set or replace
@@ -18,21 +18,21 @@
   </div>
 
   <div class="grid grid-cols-1 gap-6 lg:grid-cols-12">
-    <div class="card overflow-hidden lg:col-span-5">
+    <div class="border-border bg-card overflow-hidden rounded-xl border lg:col-span-5">
       @if (profiles().length === 0) {
-        <div class="px-4 py-16 text-center text-sm text-muted">No agent profiles yet.</div>
+        <div class="text-muted-foreground px-4 py-16 text-center text-sm">No agent profiles yet.</div>
       } @else {
-        <div class="divide-y divide-edge">
+        <div class="divide-border divide-y">
           @for (p of profiles(); track p.id) {
             <button
               type="button"
-              class="flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left hover:bg-ink/5"
-              [class]="p.id === selected() ? 'bg-ink/5' : ''"
+              class="hover:bg-foreground/5 flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left"
+              [class]="p.id === selected() ? 'bg-foreground/5' : ''"
               (click)="select(p.id)"
             >
               <div class="min-w-0 flex-auto">
                 <div class="truncate text-sm font-medium">{{ p.name }}</div>
-                <div class="truncate font-mono text-xs text-muted">{{ p.baseUrl || '—' }}</div>
+                <div class="text-muted-foreground truncate font-mono text-xs">{{ p.baseUrl || '—' }}</div>
               </div>
               <div class="flex shrink-0 flex-col items-end gap-1">
                 <span class="flex items-center gap-1.5">
@@ -43,7 +43,7 @@
                     <span class="badge-warn">no key</span>
                   }
                 </span>
-                <span class="font-mono text-xs text-muted">{{ p.model || '—' }}</span>
+                <span class="text-muted-foreground font-mono text-xs">{{ p.model || '—' }}</span>
               </div>
             </button>
           }
@@ -52,88 +52,82 @@
     </div>
 
     <div class="lg:col-span-7">
-      <div class="card p-5">
-        <h2 class="text-sm font-semibold tracking-wide text-muted uppercase">
+      <div class="border-border bg-card rounded-xl border p-5">
+        <h2 class="text-muted-foreground text-sm font-semibold tracking-wide uppercase">
           {{ selected() ? 'Edit “' + name() + '”' : 'New profile' }}
         </h2>
 
         <div class="mt-4 grid grid-cols-1 items-start gap-x-6 gap-y-5 sm:grid-cols-2">
-          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full">
-            <mat-label>Profile name</mat-label>
+          <div class="flex flex-col gap-1.5">
+            <label hlmLabel for="profile-name">Profile name</label>
             <input
-              matInput
+              hlmInput
               id="profile-name"
               placeholder="e.g. claude-prod"
               [value]="name()"
               (input)="name.set($any($event.target).value)"
             />
-          </mat-form-field>
-          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full">
-            <mat-label>Model</mat-label>
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <label hlmLabel for="profile-model">Model</label>
             <input
-              matInput
+              hlmInput
               id="profile-model"
               placeholder="e.g. claude-sonnet-5"
               [value]="model()"
               (input)="model.set($any($event.target).value)"
             />
-          </mat-form-field>
+          </div>
         </div>
 
-        <div class="mt-4">
-          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full">
-            <mat-label>Agent tool</mat-label>
-            <mat-select
-              id="profile-tool"
-              [value]="tool()"
-              (selectionChange)="tool.set($event.value)"
-            >
-              <mat-option value="claude-code">Claude Code — Anthropic API</mat-option>
-              <mat-option value="qwen-code">Qwen Code — OpenAI-compatible API</mat-option>
-            </mat-select>
-          </mat-form-field>
+        <div class="mt-4 flex flex-col gap-1.5">
+          <label hlmLabel for="profile-tool">Agent tool</label>
+          <hlm-select [value]="tool()" [itemToString]="toolLabel" (valueChange)="setTool($event)">
+            <hlm-select-trigger class="w-full" buttonId="profile-tool">
+              <hlm-select-value />
+            </hlm-select-trigger>
+            <hlm-select-content *hlmSelectPortal>
+              <hlm-select-item value="claude-code">Claude Code — Anthropic API</hlm-select-item>
+              <hlm-select-item value="qwen-code">Qwen Code — OpenAI-compatible API</hlm-select-item>
+            </hlm-select-content>
+          </hlm-select>
         </div>
 
-        <div class="mt-4">
-          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full">
-            <mat-label>Base URL</mat-label>
-            <input
-              matInput
-              id="profile-base-url"
-              class="font-mono"
-              spellcheck="false"
-              placeholder="https://api.anthropic.com"
-              [value]="baseUrl()"
-              (input)="baseUrl.set($any($event.target).value)"
-            />
-          </mat-form-field>
+        <div class="mt-4 flex flex-col gap-1.5">
+          <label hlmLabel for="profile-base-url">Base URL</label>
+          <input
+            hlmInput
+            id="profile-base-url"
+            class="font-mono"
+            spellcheck="false"
+            placeholder="https://api.anthropic.com"
+            [value]="baseUrl()"
+            (input)="baseUrl.set($any($event.target).value)"
+          />
         </div>
 
-        <div class="mt-4">
-          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full">
-            <mat-label>
-              API key {{ selected() && hasKey() ? '(stored — leave blank to keep)' : '(optional)' }}
-            </mat-label>
-            <input
-              matInput
-              id="profile-api-key"
-              class="font-mono"
-              type="password"
-              autocomplete="new-password"
-              spellcheck="false"
-              [placeholder]="selected() && hasKey() ? 'unchanged — blank keeps the stored key' : 'sk-…'"
-              [value]="apiKey()"
-              (input)="apiKey.set($any($event.target).value)"
-            />
-          </mat-form-field>
+        <div class="mt-4 flex flex-col gap-1.5">
+          <label hlmLabel for="profile-api-key">
+            API key {{ selected() && hasKey() ? '(stored — leave blank to keep)' : '(optional)' }}
+          </label>
+          <input
+            hlmInput
+            id="profile-api-key"
+            class="font-mono"
+            type="password"
+            autocomplete="new-password"
+            spellcheck="false"
+            [placeholder]="selected() && hasKey() ? 'unchanged — blank keeps the stored key' : 'sk-…'"
+            [value]="apiKey()"
+            (input)="apiKey.set($any($event.target).value)"
+          />
         </div>
 
         <div class="mt-6 flex flex-wrap items-center gap-3">
-          <button matButton="filled" [disabled]="busy()" (click)="save()">
-            <app-icon name="save" />Save
-          </button>
+          <!-- The one filled button on this view. -->
+          <button hlmBtn [disabled]="busy()" (click)="save()"><app-icon name="save" />Save</button>
           @if (selected()) {
-            <button matButton="filled" class="btn-danger-mat" [disabled]="busy()" (click)="remove()">
+            <button hlmBtn variant="destructive" [disabled]="busy()" (click)="remove()">
               <app-icon name="trash-2" />Delete
             </button>
           }

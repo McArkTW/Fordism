@@ -2,7 +2,7 @@
 
 <div class="flex min-h-screen">
   <!-- Sidebar -->
-  <aside class="flex w-56 shrink-0 flex-col border-r border-edge bg-panel">
+  <aside class="border-border bg-card flex w-56 shrink-0 flex-col border-r">
     <a routerLink="/live" class="flex items-center gap-2.5 px-5 py-5">
       <img src="favicon.svg" alt="" class="h-7 w-7" />
       <span class="text-lg font-semibold tracking-tight">Fordism</span>
@@ -10,12 +10,12 @@
 
     <nav class="flex-1 space-y-6 px-3 py-2">
       <div>
-        <div class="px-2 pb-1 text-[11px] font-semibold tracking-wider text-muted uppercase">Operate</div>
+        <div class="text-muted-foreground px-2 pb-1 text-[11px] font-semibold tracking-wider uppercase">Operate</div>
         @for (item of operate; track item.path) {
           <a
             [routerLink]="item.path"
-            routerLinkActive="bg-accent/10 text-accent"
-            class="flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm font-medium text-ink/80 hover:bg-ink/5"
+            routerLinkActive="bg-primary/10 text-primary"
+            class="text-foreground/80 hover:bg-foreground/5 flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm font-medium"
           >
             <app-icon [name]="item.icon" class="text-base" />
             {{ item.label }}
@@ -28,12 +28,12 @@
         }
       </div>
       <div>
-        <div class="px-2 pb-1 text-[11px] font-semibold tracking-wider text-muted uppercase">Configure</div>
+        <div class="text-muted-foreground px-2 pb-1 text-[11px] font-semibold tracking-wider uppercase">Configure</div>
         @for (item of configure; track item.path) {
           <a
             [routerLink]="item.path"
-            routerLinkActive="bg-accent/10 text-accent"
-            class="flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm font-medium text-ink/80 hover:bg-ink/5"
+            routerLinkActive="bg-primary/10 text-primary"
+            class="text-foreground/80 hover:bg-foreground/5 flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm font-medium"
           >
             <app-icon [name]="item.icon" class="text-base" />
             {{ item.label }}
@@ -42,8 +42,8 @@
       </div>
     </nav>
 
-    <div class="border-t border-edge px-3 py-3">
-      <button matButton="outlined" class="w-full" (click)="toggleScheme()">
+    <div class="border-border border-t px-3 py-3">
+      <button hlmBtn variant="outline" class="w-full" (click)="toggleScheme()">
         <app-icon name="sun" class="dark:hidden" />
         <app-icon name="moon" class="hidden dark:inline-flex" />
         Appearance
@@ -56,3 +56,5 @@
     <router-outlet />
   </main>
 </div>
+
+<hlm-toaster richColors closeButton />

@@ -1,7 +1,8 @@
 import { Component, OnDestroy, computed, inject, signal } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
-import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
+import { HlmButton } from '@spartan-ng/helm/button';
+import { HlmSkeleton } from '@spartan-ng/helm/skeleton';
+import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { apiError } from '../../core/api-error';
 import { RunSummary, RunsService } from '../../core/api/runs.service';
 import { Icon } from '../../core/icon';
@@ -23,42 +24,68 @@ const REFRESH_MS = 10_000;
  */
 @Component({
   selector: 'app-live',
-  imports: [RouterLink, Icon, MatButtonModule, MatTooltipModule],
+  imports: [RouterLink, Icon, HlmButton, HlmSkeleton, HlmTooltip],
   host: { class: 'block' },
   template: `
     <div class="mx-auto w-full max-w-5xl">
       <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 class="page-h flex items-center gap-2">
-            <app-icon name="radio" class="text-accent" />
+            <app-icon name="radio" class="text-primary" />
             Live
           </h1>
-          <p class="mt-0.5 text-sm text-muted">What is running, and what is waiting on you.</p>
+          <p class="text-muted-foreground mt-0.5 text-sm">What is running, and what is waiting on you.</p>
         </div>
-        <div class="flex items-center gap-2 text-xs text-muted">
+        <div class="text-muted-foreground flex items-center gap-2 text-xs">
           <span>{{ asked().length }} waiting · {{ running().length }} running</span>
           <span class="size-2 animate-pulse rounded-full bg-emerald-500"></span>
         </div>
       </div>
 
       @if (error()) {
-        <div class="card mt-4 border-red-500/40 px-3 py-2 text-sm text-red-500">{{ error() }}</div>
-      }
-
-      @if (idle()) {
-        <div class="card mt-6 flex min-h-[40vh] flex-col items-center justify-center px-6 text-center">
-          <app-icon name="moon" class="text-3xl text-muted" />
-          <div class="mt-3 text-sm font-medium">Nothing needs you</div>
-          <div class="mt-1 text-xs text-muted">
-            Nothing running, nothing waiting. Start something from
-            <a routerLink="/workflows" class="text-accent underline">Workflows</a>, or look through
-            <a routerLink="/runs" class="text-accent underline">History</a>.
-          </div>
+        <div class="border-destructive/40 bg-destructive/10 text-destructive mt-4 rounded-xl border px-3 py-2 text-sm">
+          {{ error() }}
         </div>
       }
 
+      @if (!loaded() && !error()) {
+        <!-- First poll in flight — sketch the two row groups instead of flashing empty. -->
+        <div class="mt-6 space-y-2">
+          <div hlmSkeleton class="h-12 w-full rounded-xl"></div>
+          <div hlmSkeleton class="h-12 w-full rounded-xl"></div>
+          <div hlmSkeleton class="h-12 w-full rounded-xl"></div>
+        </div>
+      }
+
+      @if (idle()) {
+        <section
+          class="border-border bg-card mt-6 flex min-h-[40vh] flex-col items-center justify-center rounded-xl border border-dashed px-6 text-center"
+        >
+          <div class="bg-muted flex size-12 items-center justify-center rounded-full">
+            <app-icon name="moon" class="text-muted-foreground text-xl" />
+          </div>
+          <div class="mt-4 text-sm font-medium">Nothing needs you</div>
+          <p class="text-muted-foreground mt-1 max-w-sm text-xs">
+            Nothing running, nothing waiting. Start something from Workflows, or look through what
+            already ran in History.
+          </p>
+          <div class="mt-4 flex items-center gap-2">
+            <a hlmBtn variant="outline" size="sm" routerLink="/workflows">
+              <app-icon name="workflow" />
+              Workflows
+            </a>
+            <a hlmBtn variant="ghost" size="sm" routerLink="/runs">
+              <app-icon name="history" />
+              History
+            </a>
+          </div>
+        </section>
+      }
+
       @if (asked().length) {
-        <div class="mt-6 text-sm font-semibold tracking-wide text-muted uppercase">Waiting on you · longest first</div>
+        <div class="text-muted-foreground mt-6 text-sm font-semibold tracking-wide uppercase">
+          Waiting on you · longest first
+        </div>
         <div class="mt-2 space-y-2">
           @for (r of asked(); track r.id) {
             <a
@@ -67,10 +94,17 @@ const REFRESH_MS = 10_000;
             >
               <app-icon name="message-circle-question-mark" class="shrink-0 text-amber-500" />
               <span class="font-medium">{{ r.workflow }}</span>
-              <span class="font-mono text-[11px] text-muted">{{ r.id }}</span>
+              <span class="text-muted-foreground font-mono text-[11px]">{{ r.id }}</span>
               <span class="flex-auto"></span>
-              <span class="text-xs text-amber-500">asked {{ ago(r.createdAt) }}</span>
-              <button matIconButton type="button" matTooltip="Stop this run" (click)="abandon(r, $event)">
+              <span class="text-xs text-amber-600 dark:text-amber-400">asked {{ ago(r.createdAt) }}</span>
+              <button
+                hlmBtn
+                variant="destructive"
+                size="icon-sm"
+                type="button"
+                hlmTooltip="Stop this run"
+                (click)="abandon(r, $event)"
+              >
                 <app-icon name="circle-slash" />
               </button>
             </a>
@@ -79,23 +113,32 @@ const REFRESH_MS = 10_000;
       }
 
       @if (running().length) {
-        <div class="mt-6 text-sm font-semibold tracking-wide text-muted uppercase">Running · newest first</div>
-        <div class="card mt-2 divide-y divide-edge">
+        <div class="text-muted-foreground mt-6 text-sm font-semibold tracking-wide uppercase">
+          Running · newest first
+        </div>
+        <div class="divide-border border-border bg-card mt-2 divide-y overflow-hidden rounded-xl border">
           @for (r of running(); track r.id) {
             @let v = view(r.state);
             <a
               [routerLink]="['/runs', r.id]"
-              class="flex flex-wrap items-center gap-3 px-4 py-3 transition hover:bg-ink/5"
+              class="hover:bg-foreground/5 flex flex-wrap items-center gap-3 px-4 py-3 transition"
             >
               <span [class]="v.badge">
                 <app-icon [name]="v.icon" [class.spin]="v.icon === 'loader'" />
                 {{ v.label }}
               </span>
               <span class="font-medium">{{ r.workflow }}</span>
-              <span class="font-mono text-[11px] text-muted">{{ r.id }}</span>
+              <span class="text-muted-foreground font-mono text-[11px]">{{ r.id }}</span>
               <span class="flex-auto"></span>
-              <span class="text-xs text-muted">started {{ ago(r.createdAt) }}</span>
-              <button matIconButton type="button" matTooltip="Stop this run" (click)="abandon(r, $event)">
+              <span class="text-muted-foreground text-xs">started {{ ago(r.createdAt) }}</span>
+              <button
+                hlmBtn
+                variant="destructive"
+                size="icon-sm"
+                type="button"
+                hlmTooltip="Stop this run"
+                (click)="abandon(r, $event)"
+              >
                 <app-icon name="circle-slash" />
               </button>
             </a>

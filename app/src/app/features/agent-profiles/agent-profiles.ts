@@ -1,13 +1,19 @@
 import { Component, inject, signal } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
+import { HlmButton } from '@spartan-ng/helm/button';
+import { HlmInput } from '@spartan-ng/helm/input';
+import { HlmLabel } from '@spartan-ng/helm/label';
+import { HlmSelectImports } from '@spartan-ng/helm/select';
 import { apiError } from '../../core/api-error';
 import { AgentProfileView, AgentProfilesService } from '../../core/api/agent-profiles.service';
 import { Icon } from '../../core/icon';
 import { Toasts } from '../../core/toast';
 import { Confirm } from '../../shared/confirm';
+
+/** The two agent runtimes a profile can be driven by, with the dialect each one speaks. */
+const TOOL_LABELS: Record<string, string> = {
+  'claude-code': 'Claude Code — Anthropic API',
+  'qwen-code': 'Qwen Code — OpenAI-compatible API',
+};
 
 /**
  * Agent Profiles — a named model backend + the agent tool that drives it (claude-code =
@@ -16,15 +22,8 @@ import { Confirm } from '../../shared/confirm';
  */
 @Component({
   selector: 'app-agent-profiles',
-  imports: [Icon, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule],
+  imports: [Icon, HlmButton, HlmInput, HlmLabel, HlmSelectImports],
   templateUrl: './agent-profiles.html',
-  // The stock filled button is the accent color; delete must read as destructive.
-  styles: `
-    .btn-danger-mat {
-      --mat-button-filled-container-color: var(--color-red-600, #dc2626);
-      --mat-button-filled-label-text-color: #fff;
-    }
-  `,
 })
 export class AgentProfiles {
   private service = inject(AgentProfilesService);
@@ -40,6 +39,9 @@ export class AgentProfiles {
   readonly tool = signal('claude-code');
   readonly hasKey = signal(false);
   readonly busy = signal(false);
+
+  /** The select stores the raw tool id; the trigger shows the human label via itemToString. */
+  readonly toolLabel = (tool: string): string => TOOL_LABELS[tool] ?? tool;
 
   constructor() {
     this.reload();
@@ -76,6 +78,11 @@ export class AgentProfiles {
     this.hasKey.set(false);
     this.model.set('');
     this.tool.set('claude-code');
+  }
+
+  setTool(value: unknown): void {
+    // brn-select can emit null on deselect; the tool is never optional, so fall back.
+    this.tool.set(typeof value === 'string' && value ? value : 'claude-code');
   }
 
   save(): void {

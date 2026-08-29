@@ -19,7 +19,7 @@ import {
   selector: 'yaml-editor',
   host: { class: 'block' },
   template: `
-    <div class="h-full w-full overflow-hidden rounded-lg border border-edge bg-bg">
+    <div class="h-full w-full overflow-hidden rounded-lg border border-border bg-background">
       @if (!ready()) {
         <textarea
           spellcheck="false"

@@ -1,44 +1,46 @@
 import { Component, Injectable, inject } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
-import { MAT_DIALOG_DATA, MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
+import { BrnDialogRef, injectBrnDialogContext } from '@spartan-ng/brain/dialog';
+import { HlmButton } from '@spartan-ng/helm/button';
+import { HlmDialogService, HlmDialogImports } from '@spartan-ng/helm/dialog';
 
 type ConfirmData = { title: string; body: string; action: string; danger: boolean };
 
 @Component({
   selector: 'confirm-dialog',
-  imports: [MatButtonModule, MatDialogModule],
+  imports: [HlmButton, HlmDialogImports],
   template: `
-    <h2 mat-dialog-title>{{ data.title }}</h2>
-    <mat-dialog-content class="whitespace-pre-line">{{ data.body }}</mat-dialog-content>
-    <mat-dialog-actions align="end">
-      <button matButton mat-dialog-close>Cancel</button>
-      <button matButton="filled" [class.danger]="data.danger" [mat-dialog-close]="true" cdkFocusInitial>
+    <hlm-dialog-header>
+      <h3 hlmDialogTitle>{{ data.title }}</h3>
+      <p hlmDialogDescription class="whitespace-pre-line">{{ data.body }}</p>
+    </hlm-dialog-header>
+    <hlm-dialog-footer class="mt-4">
+      <button hlmBtn variant="outline" (click)="close(false)">Cancel</button>
+      <button hlmBtn [variant]="data.danger ? 'destructive' : 'default'" (click)="close(true)">
         {{ data.action }}
       </button>
-    </mat-dialog-actions>
-  `,
-  styles: `
-    .danger {
-      --mat-button-filled-container-color: var(--color-red-600, #dc2626);
-      --mat-button-filled-label-text-color: #fff;
-    }
+    </hlm-dialog-footer>
   `,
 })
 export class ConfirmDialog {
-  protected readonly data = inject<ConfirmData>(MAT_DIALOG_DATA);
+  protected readonly data = injectBrnDialogContext<ConfirmData>();
+  private readonly ref = inject<BrnDialogRef<boolean>>(BrnDialogRef);
+
+  protected close(result: boolean): void {
+    this.ref.close(result);
+  }
 }
 
 /** window.confirm, but themed and awaitable: `if (await confirm.ask(...)) { ... }`. */
 @Injectable({ providedIn: 'root' })
 export class Confirm {
-  private dialog = inject(MatDialog);
+  private dialog = inject(HlmDialogService);
 
   async ask(title: string, body: string, action = 'Confirm', danger = false): Promise<boolean> {
     const ref = this.dialog.open(ConfirmDialog, {
-      data: { title, body, action, danger } satisfies ConfirmData,
-      width: '26rem',
+      context: { title, body, action, danger } satisfies ConfirmData,
+      contentClass: 'w-[26rem] max-w-[calc(100vw-2rem)]',
     });
-    return (await firstValueFrom(ref.afterClosed())) === true;
+    return (await firstValueFrom(ref.closed$)) === true;
   }
 }

@@ -1,7 +1,8 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, effect, inject, input, signal } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
 import { Router, RouterLink } from '@angular/router';
+import { HlmBadge } from '@spartan-ng/helm/badge';
+import { HlmButton } from '@spartan-ng/helm/button';
 import { apiError } from '../../core/api-error';
 import { WorkflowParsed } from '../../core/api/workflows.model';
 import { WorkflowsService } from '../../core/api/workflows.service';
@@ -38,16 +39,9 @@ steps:
  */
 @Component({
   selector: 'app-workflow-edit',
-  imports: [RouterLink, Icon, YamlEditor, MatButtonModule],
+  imports: [RouterLink, Icon, YamlEditor, HlmButton, HlmBadge],
   host: { class: 'block' },
   templateUrl: './workflow-edit.html',
-  // Material's filled button has no destructive variant — repaint its tokens red for Delete.
-  styles: `
-    .btn-danger-mat {
-      --mat-button-filled-container-color: var(--color-red-600, #dc2626);
-      --mat-button-filled-label-text-color: #fff;
-    }
-  `,
 })
 export class WorkflowEdit {
   /** Route parameter; absent for /workflows/new. */

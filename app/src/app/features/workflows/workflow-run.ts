@@ -1,10 +1,13 @@
 import { DatePipe } from '@angular/common';
 import { Component, computed, effect, inject, input, signal } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatTooltipModule } from '@angular/material/tooltip';
 import { Router, RouterLink } from '@angular/router';
+import { HlmButton } from '@spartan-ng/helm/button';
+import { HlmInput } from '@spartan-ng/helm/input';
+import { HlmLabel } from '@spartan-ng/helm/label';
+import { HlmSpinner } from '@spartan-ng/helm/spinner';
+import { HlmTable, HlmTableContainer, HlmTBody, HlmTd, HlmTh, HlmTHead, HlmTr } from '@spartan-ng/helm/table';
+import { HlmTextarea } from '@spartan-ng/helm/textarea';
+import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { apiError } from '../../core/api-error';
 import { RunSummary } from '../../core/api/runs.service';
 import { Preflight, StagedFile, WorkflowDetail } from '../../core/api/workflows.model';
@@ -22,7 +25,24 @@ import { Toasts } from '../../core/toast';
  */
 @Component({
   selector: 'app-workflow-run',
-  imports: [RouterLink, Icon, DatePipe, MatButtonModule, MatFormFieldModule, MatInputModule, MatTooltipModule],
+  imports: [
+    RouterLink,
+    Icon,
+    DatePipe,
+    HlmButton,
+    HlmInput,
+    HlmLabel,
+    HlmSpinner,
+    HlmTextarea,
+    HlmTooltip,
+    HlmTableContainer,
+    HlmTable,
+    HlmTHead,
+    HlmTBody,
+    HlmTr,
+    HlmTh,
+    HlmTd,
+  ],
   host: { class: 'block' },
   templateUrl: './workflow-run.html',
 })

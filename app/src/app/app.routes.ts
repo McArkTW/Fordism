@@ -49,8 +49,6 @@ export const routes: Routes = [
     path: 'credentials',
     loadComponent: () => import('./features/credentials/credentials').then((m) => m.Credentials),
   },
-  // Design audit — every token, widget and icon on one page. Not in the nav; open /theme.
-  { path: 'theme', loadComponent: () => import('./features/theme/theme').then((m) => m.ThemePage) },
   // The old inbox: a question is a run that needs you, and Live already shows those.
   { path: 'questions', redirectTo: 'live' },
   { path: '**', redirectTo: 'live' },

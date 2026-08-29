@@ -1,10 +1,12 @@
 import { Component, computed, effect, inject, input, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
-import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatTooltipModule } from '@angular/material/tooltip';
 import { Router, RouterLink } from '@angular/router';
+import { HlmButton } from '@spartan-ng/helm/button';
+import { HlmInput } from '@spartan-ng/helm/input';
+import { HlmLabel } from '@spartan-ng/helm/label';
+import { HlmSkeleton } from '@spartan-ng/helm/skeleton';
+import { HlmTextarea } from '@spartan-ng/helm/textarea';
+import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { apiError } from '../../core/api-error';
 import { ResultFile, RunDetail, RunsService, TaskView } from '../../core/api/runs.service';
 import { Icon } from '../../core/icon';
@@ -25,7 +27,18 @@ type FileView = { name: string; size: number; binary: boolean; markdown: boolean
  */
 @Component({
   selector: 'app-task-detail',
-  imports: [RouterLink, Icon, DatePipe, Markdown, MatButtonModule, MatFormFieldModule, MatInputModule, MatTooltipModule],
+  imports: [
+    RouterLink,
+    Icon,
+    DatePipe,
+    Markdown,
+    HlmButton,
+    HlmInput,
+    HlmLabel,
+    HlmSkeleton,
+    HlmTextarea,
+    HlmTooltip,
+  ],
   host: { class: 'block' },
   templateUrl: './task-detail.html',
 })
