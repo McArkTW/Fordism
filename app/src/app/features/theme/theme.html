@@ -160,25 +160,30 @@
   <!-- Stepper -->
   <section class="card p-5">
     <h2 class="mb-3 text-sm font-semibold tracking-wide text-muted uppercase">Stepper</h2>
-    <mat-stepper>
+    <mat-stepper animationDuration="0ms">
       <!-- Material's default step icons are Material-Icons font ligatures; without that
            font the raw ligature text leaks into the circle. Render our own instead. -->
       <ng-template matStepperIcon="edit" let-index="index">{{ index + 1 }}</ng-template>
       <ng-template matStepperIcon="done"><app-icon name="check" /></ng-template>
       <mat-step label="Draft">
         <p class="py-3 text-sm text-muted">A linear run's steps could render as a stepper.</p>
-        <button matButton="outlined" matStepperNext>Next</button>
+        <div class="flex justify-end">
+          <button matButton="outlined" matStepperNext>Next</button>
+        </div>
       </mat-step>
       <mat-step label="Review">
         <p class="py-3 text-sm text-muted">Second step.</p>
-        <div class="flex gap-2">
+        <div class="flex justify-between">
           <button matButton matStepperPrevious>Back</button>
           <button matButton="outlined" matStepperNext>Next</button>
         </div>
       </mat-step>
       <mat-step label="Ship">
         <p class="py-3 text-sm text-muted">Last step.</p>
-        <button matButton matStepperPrevious>Back</button>
+        <div class="flex justify-between">
+          <button matButton matStepperPrevious>Back</button>
+          <button matButton="filled">Finish</button>
+        </div>
       </mat-step>
     </mat-stepper>
   </section>
