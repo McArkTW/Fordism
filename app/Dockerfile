@@ -1,6 +1,6 @@
 # fordism-app — Angular static SPA served by nginx, which also proxies /api to
 # fordism-core. Node 24 for the build (the workspace pins Node >= 24).
-FROM node:24-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /src
 COPY package*.json ./
 RUN npm ci
