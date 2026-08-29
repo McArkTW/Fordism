@@ -1,4 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
@@ -6,16 +7,18 @@ import { MatExpansionModule } from '@angular/material/expansion';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatMenuModule } from '@angular/material/menu';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSliderModule } from '@angular/material/slider';
+import { MatSortModule, Sort } from '@angular/material/sort';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatStepperModule } from '@angular/material/stepper';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Icon } from '../../core/icon';
-import { statusView } from '../../core/status';
+import { formatDuration, statusView } from '../../core/status';
 import { Theme } from '../../core/theme';
 import { Toasts } from '../../core/toast';
 import { Confirm } from '../../shared/confirm';
@@ -72,10 +75,10 @@ export class ThemeModal {}
 @Component({
   selector: 'app-theme',
   imports: [
-    Icon, Markdown, MatButtonModule, MatCheckboxModule, MatDialogModule, MatExpansionModule,
-    MatFormFieldModule, MatInputModule, MatMenuModule, MatProgressBarModule,
-    MatProgressSpinnerModule, MatSelectModule, MatSliderModule, MatSlideToggleModule,
-    MatStepperModule, MatTabsModule, MatTooltipModule,
+    DatePipe, Icon, Markdown, MatButtonModule, MatCheckboxModule, MatDialogModule, MatExpansionModule,
+    MatFormFieldModule, MatInputModule, MatMenuModule, MatPaginatorModule,
+    MatProgressBarModule, MatProgressSpinnerModule, MatSelectModule, MatSliderModule,
+    MatSlideToggleModule, MatSortModule, MatStepperModule, MatTabsModule, MatTooltipModule,
   ],
   templateUrl: './theme.html',
   styles: `
@@ -118,6 +121,10 @@ export class ThemePage {
     return statusView('REAPED', 'ABANDONED');
   }
 
+  protected duration(ms: number): string {
+    return formatDuration(ms);
+  }
+
   protected toastOk(): void {
     this.toasts.ok('Saved — everything went fine.');
   }
@@ -138,5 +145,65 @@ export class ThemePage {
 
   protected openModal(): void {
     this.dialog.open(ThemeModal, { width: '30rem' });
+  }
+
+  /* --- data table demo: search + sort + pagination over a static sample --- */
+
+  protected readonly tableQuery = signal('');
+  protected readonly tableSort = signal<Sort>({ active: 'createdAt', direction: 'desc' });
+  protected readonly pageIndex = signal(0);
+  protected readonly pageSize = signal(5);
+
+  private readonly sampleRuns = [
+    { workflow: 'linear-example', state: 'DONE', createdAt: 1787780321000, durationMs: 64000 },
+    { workflow: 'graph-example', state: 'RUNNING', createdAt: 1787780521000, durationMs: 12000 },
+    { workflow: 'rework-example', state: 'FAILED', createdAt: 1787770321000, durationMs: 220000 },
+    { workflow: 'map-reduce-example', state: 'DONE', createdAt: 1787760321000, durationMs: 480000 },
+    { workflow: 'conditional-example', state: 'ASKED', createdAt: 1787750321000, durationMs: 30000 },
+    { workflow: 'reconciler-example', state: 'DONE', createdAt: 1787740321000, durationMs: 900000 },
+    { workflow: 'linear-example', state: 'ABANDONED', createdAt: 1787730321000, durationMs: 5000 },
+    { workflow: 'graph-example', state: 'DONE', createdAt: 1787720321000, durationMs: 150000 },
+    { workflow: 'rework-example', state: 'DONE', createdAt: 1787710321000, durationMs: 310000 },
+    { workflow: 'linear-example', state: 'FAILED', createdAt: 1787700321000, durationMs: 45000 },
+    { workflow: 'map-reduce-example', state: 'DONE', createdAt: 1787690321000, durationMs: 610000 },
+    { workflow: 'conditional-example', state: 'DONE', createdAt: 1787680321000, durationMs: 95000 },
+  ];
+
+  /** Everything that survives the filter, sorted — paging slices from this. */
+  protected filteredRuns() {
+    const query = this.tableQuery().trim().toLowerCase();
+    const { active, direction } = this.tableSort();
+    const rows = this.sampleRuns.filter(
+      (run) => !query || run.workflow.includes(query) || run.state.toLowerCase().includes(query),
+    );
+    if (direction) {
+      const sign = direction === 'asc' ? 1 : -1;
+      rows.sort((a, b) => {
+        const left = a[active as keyof typeof a];
+        const right = b[active as keyof typeof b];
+        return (left < right ? -1 : left > right ? 1 : 0) * sign;
+      });
+    }
+    return rows;
+  }
+
+  protected pagedRuns() {
+    const start = this.pageIndex() * this.pageSize();
+    return this.filteredRuns().slice(start, start + this.pageSize());
+  }
+
+  protected onTableSearch(value: string): void {
+    this.tableQuery.set(value);
+    this.pageIndex.set(0); // a new search starts from the first page
+  }
+
+  protected onSort(sort: Sort): void {
+    this.tableSort.set(sort);
+    this.pageIndex.set(0);
+  }
+
+  protected onPage(event: PageEvent): void {
+    this.pageIndex.set(event.pageIndex);
+    this.pageSize.set(event.pageSize);
   }
 }
