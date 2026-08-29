@@ -4,7 +4,10 @@ import com.google.gson.Gson;
 import tw.mcark.tony.fordism.skill.SkillStore;
 import io.javalin.http.Context;
 import io.javalin.http.UploadedFile;
+import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 /** /api/skills[...] — skills library CRUD (namespaced names) + zip upload. */
@@ -76,24 +79,52 @@ public final class SkillController {
         }
     }
 
-    /** POST /api/skills/upload?name=<namespaced> with multipart skillZip. */
+    /**
+     * POST /api/skills/upload?name=&lt;namespaced&gt; — multipart: one {@code files} part per file in
+     * the picked folder, plus a {@code paths} JSON array of their paths relative to it.
+     *
+     * <p>The browser knows each file's folder-relative path ({@code webkitRelativePath}); a
+     * multipart part carries only the base name, so the paths ride alongside in the same order.
+     */
     public void upload(Context ctx) {
         try {
             String name = ctx.queryParam("name");
-            UploadedFile uploaded = ctx.uploadedFile("skillZip");
-            if (uploaded == null) {
-                ctx.status(400).contentType("application/json").result("{\"error\":\"skillZip required\"}");
+            List<UploadedFile> uploaded = ctx.uploadedFiles("files");
+            List<String> paths = Api.names(GSON.fromJson(ctx.formParam("paths"), List.class));
+            if (uploaded.isEmpty()) {
+                Api.fail(ctx, 400, "pick a folder to upload");
                 return;
             }
-            try (InputStream in = uploaded.content()) {
-                skills.upload(name, in);
+            List<InputStream> contents = new ArrayList<>();
+            try {
+                for (UploadedFile file : uploaded) {
+                    contents.add(file.content());
+                }
+                skills.writeFolder(name, paths.isEmpty() ? filenames(uploaded) : paths, contents);
+            } finally {
+                for (InputStream in : contents) {
+                    try {
+                        in.close();
+                    } catch (IOException ignored) {
+                        // The upload is already read; a close that fails cannot unwrite it.
+                    }
+                }
             }
-            ctx.status(200).contentType("application/json").result("{\"name\":\"" + name + "\"}");
+            Api.ok(ctx, "name", name);
         } catch (IllegalArgumentException e) {
-            ctx.status(400).contentType("application/json").result("{\"error\":\"" + e.getMessage() + "\"}");
+            Api.fail(ctx, 400, e.getMessage());
         } catch (Exception e) {
-            ctx.status(400).contentType("application/json").result("{\"error\":\"upload failed\"}");
+            Api.fail(ctx, 400, "upload failed");
         }
+    }
+
+    /** A flat drop of files, with no folder structure to preserve. */
+    private static List<String> filenames(List<UploadedFile> uploaded) {
+        List<String> out = new ArrayList<>();
+        for (UploadedFile file : uploaded) {
+            out.add(file.filename());
+        }
+        return out;
     }
 
     private static String str(Object value) {

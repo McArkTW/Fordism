@@ -73,6 +73,14 @@ CJ="$WS/.claude.json"
 
 echo "[agent] type=$ATYPE mode=$MODE model=$MODEL timeout=${TIMEOUT}s session=$SID"
 
+# Claude Code discovers skills under $HOME/.claude/skills and the project's .claude/skills —
+# HOME and cwd are both /workspace, so both resolve to /workspace/.claude/skills. The Template
+# stages into /workspace/skills, which is neither: without this mirror the library is on disk but
+# never registered, so nothing is model-invocable and the doctrine's "read skills/" is all that
+# makes it work. Same fix as the qwen-code mirror below.
+mkdir -p "$WS/.claude/skills"
+cp -r "$WS"/skills/* "$WS/.claude/skills/" 2>/dev/null || true
+
 cd "$WS"
 BRIEF="$(cat "$DOCTRINE" 2>/dev/null)"
 # Standing instructions from the Agent Template. Carried in the prompt rather than left as a file,

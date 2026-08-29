@@ -1,0 +1,277 @@
+package tw.mcark.tony.fordism.skill;
+
+import com.google.gson.Gson;
+import tw.mcark.tony.fordism.config.FordismConfiguration;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Stream;
+import org.tinylog.Logger;
+
+/**
+ * The plugins the skills library mirrors. Each plugin owns one folder under the library
+ * ({@code <skillsDir>/<plugin>/}); adding, syncing and removing only ever touch that folder, so a
+ * hand-written skill is never in reach of a sync.
+ *
+ * <p>The repo arrives as a zip over HTTPS rather than a clone: the core image carries curl and
+ * ca-certificates but no git, and {@link SkillStore#extractZip} already unpacks an untrusted
+ * archive safely.
+ *
+ * <p>The registry is persisted to {@code <stateDir>/skill-plugins.json} so it survives a redeploy;
+ * the skills themselves live in the library beside every other skill.
+ */
+public final class SkillPluginStore {
+    private static final Gson GSON = new Gson();
+    private static final Duration TIMEOUT = Duration.ofSeconds(60);
+
+    private final Path file;
+    private final Path skillsRoot;
+    private final HttpClient http;
+    private final Map<String, SkillPlugin> plugins = new LinkedHashMap<>();
+
+    public SkillPluginStore(FordismConfiguration configuration) {
+        this(configuration, HttpClient.newBuilder().connectTimeout(TIMEOUT)
+                .followRedirects(HttpClient.Redirect.NORMAL).build());
+    }
+
+    public SkillPluginStore(FordismConfiguration configuration, HttpClient http) {
+        this(Paths.get(configuration.stateDir), Paths.get(configuration.skillsDir), http);
+    }
+
+    /**
+     * The seam a test drives: a temp library and a stub client, because
+     * {@link FordismConfiguration} reads the environment and the real client needs GitHub.
+     */
+    public SkillPluginStore(Path stateDir, Path skillsRoot, HttpClient http) {
+        this.file = stateDir.resolve("skill-plugins.json");
+        this.skillsRoot = skillsRoot;
+        this.http = http;
+        load();
+    }
+
+    public synchronized List<SkillPlugin> list() {
+        return new ArrayList<>(plugins.values());
+    }
+
+    /** Register a plugin and pull it in. A failed first sync leaves the entry with its error. */
+    public SkillPlugin add(String url, String ref) throws IOException {
+        String trimmed = url == null ? "" : url.trim();
+        if (trimmed.isEmpty()) {
+            throw new IllegalArgumentException("a git URL is required");
+        }
+        String name = folderName(trimmed);
+        synchronized (this) {
+            for (SkillPlugin existing : plugins.values()) {
+                if (existing.name().equals(name)) {
+                    throw new IllegalArgumentException("a plugin named " + name + " is already added");
+                }
+            }
+        }
+        SkillPlugin plugin = new SkillPlugin(UUID.randomUUID().toString(), name, trimmed,
+                ref == null || ref.isBlank() ? "HEAD" : ref.trim(), "", "");
+        put(plugin);
+        return sync(plugin.id());
+    }
+
+    /** Re-pull a plugin: its folder is replaced wholesale, so an upstream deletion propagates. */
+    public SkillPlugin sync(String id) throws IOException {
+        SkillPlugin plugin = get(id);
+        Path target = skillsRoot.resolve(plugin.name());
+        Path staging = Files.createTempDirectory("fordism-plugin-");
+        try {
+            try (InputStream zip = download(plugin)) {
+                SkillStore.extractZip(staging, zip);
+            }
+            List<Path> skills = skillFolders(staging);
+            if (skills.isEmpty()) {
+                throw new IllegalArgumentException("no SKILL.md found in " + plugin.url());
+            }
+            SkillStore.deleteTree(target);
+            for (Path skill : skills) {
+                copyTree(skill, target.resolve(skill.getFileName().toString()));
+            }
+            SkillPlugin synced = plugin.synced(Instant.now().toString());
+            put(synced);
+            Logger.info("skill plugin {} synced — {} skills", plugin.name(), skills.size());
+            return synced;
+        } catch (Exception e) {
+            SkillPlugin failed = plugin.failed(e.getMessage() == null ? e.toString() : e.getMessage());
+            put(failed);
+            Logger.warn("skill plugin {} sync failed: {}", plugin.name(), failed.lastError());
+            return failed;
+        } finally {
+            SkillStore.deleteTree(staging);
+        }
+    }
+
+    /** Forget a plugin and delete the skills it installed. Nothing else in the library is touched. */
+    public void remove(String id) throws IOException {
+        SkillPlugin plugin = get(id);
+        SkillStore.deleteTree(skillsRoot.resolve(plugin.name()));
+        synchronized (this) {
+            plugins.remove(id);
+            save();
+        }
+    }
+
+    private synchronized SkillPlugin get(String id) {
+        SkillPlugin plugin = plugins.get(id);
+        if (plugin == null) {
+            throw new IllegalArgumentException("no such plugin");
+        }
+        return plugin;
+    }
+
+    private synchronized void put(SkillPlugin plugin) {
+        plugins.put(plugin.id(), plugin);
+        save();
+    }
+
+    private InputStream download(SkillPlugin plugin) throws IOException {
+        HttpRequest request = HttpRequest.newBuilder(URI.create(archiveUrl(plugin.url(), plugin.ref())))
+                .timeout(TIMEOUT).header("Accept", "application/zip").GET().build();
+        try {
+            HttpResponse<InputStream> response =
+                    http.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            if (response.statusCode() / 100 != 2) {
+                response.body().close();
+                throw new IllegalArgumentException("the repo answered HTTP " + response.statusCode()
+                        + " — check the URL, the ref, and that the repo is public");
+            }
+            return response.body();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("download interrupted", e);
+        }
+    }
+
+    /**
+     * The zip URL for a repo. A GitHub repo (or {@code owner/repo}) resolves to its codeload
+     * archive; anything already ending in {@code .zip} is taken as-is, which is what makes a CI
+     * artifact or a self-hosted archive work without a GitHub-shaped URL.
+     */
+    static String archiveUrl(String url, String ref) {
+        String cleaned = url.trim();
+        if (cleaned.toLowerCase(Locale.ROOT).endsWith(".zip")) {
+            return cleaned;
+        }
+        String path = cleaned
+                .replaceFirst("^git@github[.]com:", "")
+                .replaceFirst("^https?://github[.]com/", "")
+                .replaceFirst("[.]git$", "")
+                .replaceAll("^/+|/+$", "");
+        if (path.isEmpty() || path.split("/").length != 2) {
+            throw new IllegalArgumentException(
+                    "expected a GitHub repo (owner/repo or its https URL) or a direct .zip URL");
+        }
+        return "https://codeload.github.com/" + path + "/zip/" + ref;
+    }
+
+    /** {@code <plugin>} in the library — the repo name, with anything path-unsafe dropped. */
+    static String folderName(String url) {
+        String cleaned = url.trim().replaceFirst("[.]zip$", "").replaceFirst("[.]git$", "")
+                .replaceAll("/+$", "");
+        String last = cleaned.substring(cleaned.lastIndexOf('/') + 1);
+        last = last.substring(last.lastIndexOf(':') + 1);
+        String safe = last.replaceAll("[^A-Za-z0-9._-]", "-").replaceAll("^[.-]+", "");
+        if (safe.isEmpty()) {
+            throw new IllegalArgumentException("could not read a plugin name from " + url);
+        }
+        return safe;
+    }
+
+    /**
+     * The skill folders inside an unpacked archive. A GitHub zip wraps everything in one
+     * {@code <repo>-<sha>/} directory, and a Claude Code plugin keeps its skills under
+     * {@code skills/} — both are unwrapped here so the library gets {@code <plugin>/<skill>} rather
+     * than the repo's own scaffolding.
+     */
+    private static List<Path> skillFolders(Path staging) throws IOException {
+        Path root = onlyChildDirectory(staging);
+        Path skillsDir = root.resolve("skills");
+        Path base = Files.isDirectory(skillsDir) ? skillsDir : root;
+        List<Path> out = new ArrayList<>();
+        if (Files.isRegularFile(base.resolve("SKILL.md"))) {
+            out.add(base);
+            return out;
+        }
+        try (Stream<Path> children = Files.list(base)) {
+            for (Path child : (Iterable<Path>) children.sorted()::iterator) {
+                if (Files.isRegularFile(child.resolve("SKILL.md"))) {
+                    out.add(child);
+                }
+            }
+        }
+        return out;
+    }
+
+    private static Path onlyChildDirectory(Path dir) throws IOException {
+        try (Stream<Path> children = Files.list(dir)) {
+            List<Path> found = children.toList();
+            if (found.size() == 1 && Files.isDirectory(found.get(0))) {
+                return found.get(0);
+            }
+        }
+        return dir;
+    }
+
+    private static void copyTree(Path from, Path to) throws IOException {
+        try (Stream<Path> walk = Files.walk(from)) {
+            for (Path p : (Iterable<Path>) walk::iterator) {
+                Path target = to.resolve(from.relativize(p).toString());
+                if (Files.isDirectory(p)) {
+                    Files.createDirectories(target);
+                } else {
+                    Files.createDirectories(target.getParent());
+                    Files.copy(p, target, StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
+        }
+    }
+
+    private void load() {
+        try {
+            if (!Files.exists(file)) {
+                return;
+            }
+            State state = GSON.fromJson(Files.readString(file), State.class);
+            if (state != null && state.plugins != null) {
+                for (SkillPlugin plugin : state.plugins) {
+                    plugins.put(plugin.id(), plugin);
+                }
+            }
+        } catch (Exception e) {
+            Logger.warn(e, "skill-plugins load failed");
+        }
+    }
+
+    private void save() {
+        try {
+            Files.createDirectories(file.getParent());
+            State state = new State();
+            state.plugins = new ArrayList<>(plugins.values());
+            Files.writeString(file, GSON.toJson(state));
+        } catch (Exception e) {
+            Logger.error(e, "skill-plugins save failed");
+        }
+    }
+
+    private static final class State {
+        List<SkillPlugin> plugins;
+    }
+}

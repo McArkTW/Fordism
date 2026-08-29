@@ -22,7 +22,12 @@ public final class SkillState {
     private final Set<String> disabled = new LinkedHashSet<>();
 
     public SkillState(FordismConfiguration configuration) {
-        this.file = Paths.get(configuration.stateDir, "skills-state.json");
+        this(Paths.get(configuration.stateDir));
+    }
+
+    /** The seam a test points at a temp directory — {@link FordismConfiguration} reads the environment. */
+    public SkillState(Path stateDir) {
+        this.file = stateDir.resolve("skills-state.json");
         load();
     }
 

@@ -49,10 +49,27 @@ jobs:
       - run: npm run build
         working-directory: app
 
+  vectors:
+    # The permission-matcher vectors are duplicated because the Java and Angular builds
+    # cannot share a file. Compare the PARSED JSON — the app copy is Prettier-formatted,
+    # so a byte diff would fail on whitespace alone.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Vectors match
+        run: |
+          node -e "
+            const assert = require('assert');
+            const a = require('./core/src/test/resources/permission-matcher-vectors.json');
+            const b = require('./app/src/app/auth/permission-matcher-vectors.json');
+            assert.deepStrictEqual(a, b, 'permission-matcher-vectors.json has drifted between core/ and app/');
+            console.log('vectors identical (' + a.length + ' cases)');
+          "
+
   images:
     # Compose-build all three images so a Dockerfile break fails the PR. Nothing is
     # pushed here; release.yml owns publishing so a tag cannot be pushed twice.
-    needs: [secret-scan, core, app]
+    needs: [secret-scan, core, app, vectors]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

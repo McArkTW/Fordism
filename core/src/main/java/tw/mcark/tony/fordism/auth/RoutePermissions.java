@@ -44,6 +44,10 @@ public final class RoutePermissions {
             new Rule(HandlerType.POST, "/api/skills-state", Permission.SKILL_WRITE),
             new Rule(HandlerType.POST, "/api/skills/**", Permission.SKILL_WRITE),
             new Rule(HandlerType.DELETE, "/api/skills/**", Permission.SKILL_WRITE),
+            new Rule(HandlerType.GET, "/api/skill-plugins", Permission.SKILL_READ),
+            new Rule(HandlerType.POST, "/api/skill-plugins", Permission.SKILL_WRITE),
+            new Rule(HandlerType.POST, "/api/skill-plugins/**", Permission.SKILL_WRITE),
+            new Rule(HandlerType.DELETE, "/api/skill-plugins/**", Permission.SKILL_WRITE),
 
             // ---- agent profiles ----
             new Rule(HandlerType.GET, "/api/agent-profiles", Permission.PROFILE_READ),

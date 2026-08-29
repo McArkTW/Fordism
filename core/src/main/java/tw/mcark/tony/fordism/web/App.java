@@ -9,6 +9,7 @@ import tw.mcark.tony.fordism.config.FordismConfiguration;
 import tw.mcark.tony.fordism.credential.CredentialStore;
 import tw.mcark.tony.fordism.orchestrate.Engine;
 import tw.mcark.tony.fordism.secret.SecretVault;
+import tw.mcark.tony.fordism.skill.SkillPluginStore;
 import tw.mcark.tony.fordism.skill.SkillStore;
 import tw.mcark.tony.fordism.workspace.TemplateStore;
 import tw.mcark.tony.fordism.workspace.TaskResults;
@@ -25,6 +26,7 @@ public final class App {
     private final TaskResults results;
     private final WorkspaceArchive archive;
     private final SkillStore skills;
+    private final SkillPluginStore skillPlugins;
     private final AgentProfileStore profiles;
     private final SecretVault secrets;
     private final CredentialStore credentials;
@@ -32,7 +34,8 @@ public final class App {
 
     public App(Engine engine, FordismConfiguration configuration, TemplateStore templates, TaskResults results,
             WorkspaceArchive archive,
-            SkillStore skills, AgentProfileStore profiles, SecretVault secrets, CredentialStore credentials,
+            SkillStore skills, SkillPluginStore skillPlugins, AgentProfileStore profiles,
+            SecretVault secrets, CredentialStore credentials,
             Accounts accounts) {
         this.engine = engine;
         this.configuration = configuration;
@@ -40,6 +43,7 @@ public final class App {
         this.results = results;
         this.archive = archive;
         this.skills = skills;
+        this.skillPlugins = skillPlugins;
         this.profiles = profiles;
         this.secrets = secrets;
         this.credentials = credentials;
@@ -59,6 +63,7 @@ public final class App {
         RunController runs = new RunController(engine, results, archive, secrets);
         TemplateController templateApi = new TemplateController(templates);
         SkillController skillApi = new SkillController(skills);
+        SkillPluginController pluginApi = new SkillPluginController(skillPlugins);
         AgentProfileController profileApi = new AgentProfileController(profiles, templates);
         CredentialController credentialApi = new CredentialController(credentials, templates);
         AuthController authApi = new AuthController(accounts,
@@ -102,6 +107,10 @@ public final class App {
         app.post("/api/skills/upload", skillApi::upload);
         app.get("/api/skills/<name>", skillApi::get);
         app.delete("/api/skills/<name>", skillApi::delete);
+        app.get("/api/skill-plugins", pluginApi::list);
+        app.post("/api/skill-plugins", pluginApi::add);
+        app.post("/api/skill-plugins/{id}/sync", pluginApi::sync);
+        app.delete("/api/skill-plugins/{id}", pluginApi::remove);
         app.get("/api/agent-profiles", profileApi::list);
         app.post("/api/agent-profiles", profileApi::create);
         app.get("/api/agent-profiles/{id}", profileApi::get);

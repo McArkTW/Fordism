@@ -26,6 +26,7 @@ import tw.mcark.tony.fordism.launch.ModelRegistry;
 import tw.mcark.tony.fordism.launch.SessionIdentifierFactory;
 import tw.mcark.tony.fordism.orchestrate.Engine;
 import tw.mcark.tony.fordism.secret.SecretVault;
+import tw.mcark.tony.fordism.skill.SkillPluginStore;
 import tw.mcark.tony.fordism.skill.SkillState;
 import tw.mcark.tony.fordism.skill.SkillStore;
 import tw.mcark.tony.fordism.store.InMemoryTaskRepository;
@@ -73,6 +74,7 @@ final class FordismUnderTest implements AutoCloseable {
         WorkflowRunRepository runs = new InMemoryWorkflowRunRepository();
         AgentProfileStore profiles = new AgentProfileStore(stateDir.resolve("agent-profiles"));
         SkillStore skills = new SkillStore(configuration, new SkillState(configuration));
+        SkillPluginStore skillPlugins = new SkillPluginStore(configuration);
         TemplateStore templates = new TemplateStore(stateDir.resolve("templates"), skills);
         TaskResults results = new TaskResults();
         SecretVault secrets = new SecretVault();
@@ -93,7 +95,7 @@ final class FordismUnderTest implements AutoCloseable {
                 new UserStore(stateDir), groups, new SessionStore(stateDir));
 
         this.javalin = new App(engine, configuration, templates, results, new WorkspaceArchive(),
-                skills, profiles, secrets, credentials, accounts).startOn(0);
+                skills, skillPlugins, profiles, secrets, credentials, accounts).startOn(0);
         this.port = javalin.port();
     }
 

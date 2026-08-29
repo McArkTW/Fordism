@@ -24,6 +24,7 @@ import tw.mcark.tony.fordism.model.workflow.Workflow;
 import tw.mcark.tony.fordism.orchestrate.Engine;
 import tw.mcark.tony.fordism.orchestrate.ReconcileLoop;
 import tw.mcark.tony.fordism.parse.WorkflowLoader;
+import tw.mcark.tony.fordism.skill.SkillPluginStore;
 import tw.mcark.tony.fordism.skill.SkillState;
 import tw.mcark.tony.fordism.skill.SkillStore;
 import tw.mcark.tony.fordism.store.InMemoryTaskRepository;
@@ -60,6 +61,7 @@ public final class Fordism {
         WorkspaceArchive archive = new WorkspaceArchive();
         SkillState skillState = new SkillState(configuration);
         SkillStore skills = new SkillStore(configuration, skillState);
+        SkillPluginStore skillPlugins = new SkillPluginStore(configuration);
         TemplateStore templates = new TemplateStore(configuration, skills);
         templates.migrateAndSeed();
         SecretVault secrets = new SecretVault();
@@ -90,7 +92,7 @@ public final class Fordism {
         loop.setDaemon(true);
         loop.start();
 
-        new App(engine, configuration, templates, results, archive, skills, profiles, secrets, credentials,
+        new App(engine, configuration, templates, results, archive, skills, skillPlugins, profiles, secrets, credentials,
                 accounts).start();
         Logger.info("fordism-core up version={} gitSha={}", configuration.version, configuration.gitSha);
     }

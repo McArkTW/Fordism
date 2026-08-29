@@ -19,7 +19,17 @@ export type SkillDetail = {
 /** The mirror's source: repo + pinned tag. */
 export type SkillSource = { repo?: string; tag?: string; syncedAt?: string };
 
-/** Skills library (read-only mirror of an external skills repo): list / preview / enable-disable. */
+/** A skills repo the library mirrors. `lastError` is blank when the last sync worked. */
+export type SkillPlugin = {
+  id: string;
+  name: string;
+  url: string;
+  ref: string;
+  lastSyncedAt: string;
+  lastError: string;
+};
+
+/** The skills library: browse, edit, and the plugins it mirrors. */
 @Injectable({ providedIn: 'root' })
 export class SkillsService {
   private http = inject(HttpClient);
@@ -39,4 +49,59 @@ export class SkillsService {
   setEnabled(name: string, enabled: boolean): Observable<{ name: string }> {
     return this.http.post<{ name: string }>('/api/skills-state', { name, enabled });
   }
+
+  save(name: string, content: string): Observable<{ name: string }> {
+    return this.http.post<{ name: string }>('/api/skills', { name, content });
+  }
+
+  remove(name: string): Observable<void> {
+    return this.http.delete<void>(`/api/skills/${encodeURIComponent(name)}`);
+  }
+
+  /**
+   * Upload a picked folder. A multipart part carries only a file's base name, so each file's
+   * path relative to the folder rides alongside in the same order — that is what preserves
+   * `scripts/run.sh` instead of flattening it to `run.sh`.
+   */
+  upload(name: string, files: File[]): Observable<{ name: string }> {
+    const form = new FormData();
+    const paths = files.map((f) => relativePath(f));
+    form.append('paths', JSON.stringify(paths));
+    for (const file of files) {
+      form.append('files', file, file.name);
+    }
+    return this.http.post<{ name: string }>(
+      `/api/skills/upload?name=${encodeURIComponent(name)}`,
+      form,
+    );
+  }
+
+  plugins(): Observable<SkillPlugin[]> {
+    return this.http.get<SkillPlugin[]>('/api/skill-plugins');
+  }
+
+  addPlugin(url: string, ref: string): Observable<SkillPlugin> {
+    return this.http.post<SkillPlugin>('/api/skill-plugins', { url, ref });
+  }
+
+  syncPlugin(id: string): Observable<SkillPlugin> {
+    return this.http.post<SkillPlugin>(`/api/skill-plugins/${encodeURIComponent(id)}/sync`, {});
+  }
+
+  removePlugin(id: string): Observable<void> {
+    return this.http.delete<void>(`/api/skill-plugins/${encodeURIComponent(id)}`);
+  }
+}
+
+/**
+ * The file's path inside the picked folder, with the folder's own name dropped — the user names
+ * the skill, so `my-skill/SKILL.md` must arrive as `SKILL.md`.
+ */
+function relativePath(file: File): string {
+  const full = (file as File & { webkitRelativePath?: string }).webkitRelativePath ?? '';
+  if (!full) {
+    return file.name;
+  }
+  const cut = full.indexOf('/');
+  return cut < 0 ? full : full.slice(cut + 1);
 }

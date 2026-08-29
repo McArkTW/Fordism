@@ -26,16 +26,21 @@ import org.tinylog.Logger;
  */
 public final class SkillStore {
     private static final Gson GSON = new Gson();
-    private final FordismConfiguration configuration;
+    private final Path root;
     private final SkillState state;
 
     public SkillStore(FordismConfiguration configuration, SkillState state) {
-        this.configuration = configuration;
+        this(Paths.get(configuration.skillsDir), state);
+    }
+
+    /** The seam a test points at a temp directory — {@link FordismConfiguration} reads the environment. */
+    public SkillStore(Path root, SkillState state) {
+        this.root = root;
         this.state = state;
     }
 
     private Path root() {
-        return Paths.get(configuration.skillsDir);
+        return root;
     }
 
     private Path resolve(String name) {
@@ -92,7 +97,51 @@ public final class SkillStore {
     }
 
     public void delete(String name) throws IOException {
+        deleteTree(resolve(name));
+    }
+
+    /**
+     * Replace a skill's folder with an uploaded one: the browser sends each file's path relative
+     * to the picked folder alongside its content. The folder is cleared first, so a file the user
+     * deleted upstream does not survive the re-upload.
+     */
+    public void writeFolder(String name, List<String> paths, List<InputStream> contents) throws IOException {
+        if (paths.size() != contents.size()) {
+            throw new IllegalArgumentException("each file needs a path");
+        }
         Path dir = resolve(name);
+        delete(name);
+        Files.createDirectories(dir);
+        for (int i = 0; i < paths.size(); i++) {
+            Path target = safeChild(dir, paths.get(i));
+            if (target == null) {
+                continue;
+            }
+            Files.createDirectories(target.getParent());
+            try (OutputStream os = Files.newOutputStream(target)) {
+                contents.get(i).transferTo(os);
+            }
+        }
+        if (!Files.isRegularFile(dir.resolve("SKILL.md"))) {
+            delete(name);
+            throw new IllegalArgumentException("the folder must contain SKILL.md");
+        }
+    }
+
+    /**
+     * {@code dir/relative}, or null when the entry escapes {@code dir}. A zip entry and a browser
+     * upload both carry an attacker-chosen path, so neither is resolved without this.
+     */
+    public static Path safeChild(Path dir, String relative) {
+        if (relative == null || relative.isBlank()) {
+            return null;
+        }
+        Path target = dir.resolve(relative.replace('\\', '/')).normalize();
+        return target.startsWith(dir) && !target.equals(dir) ? target : null;
+    }
+
+    /** Delete a directory and everything under it. */
+    public static void deleteTree(Path dir) throws IOException {
         if (!Files.exists(dir)) {
             return;
         }
@@ -103,15 +152,14 @@ public final class SkillStore {
         }
     }
 
-    /** Extract an uploaded skill.zip into the skill dir (must contain SKILL.md; zip-slip guarded). */
-    public void upload(String name, InputStream zipStream) throws IOException {
-        Path dir = resolve(name);
+    /** Extract a zip into {@code dir}, skipping any entry that escapes it. */
+    public static void extractZip(Path dir, InputStream zipStream) throws IOException {
         Files.createDirectories(dir);
         try (ZipInputStream zis = new ZipInputStream(zipStream)) {
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
-                Path target = dir.resolve(entry.getName()).normalize();
-                if (!target.startsWith(dir)) {
+                Path target = safeChild(dir, entry.getName());
+                if (target == null) {
                     continue;
                 }
                 if (entry.isDirectory()) {
@@ -123,9 +171,6 @@ public final class SkillStore {
                     }
                 }
             }
-        }
-        if (!Files.isRegularFile(dir.resolve("SKILL.md"))) {
-            throw new IllegalArgumentException("skill.zip must contain SKILL.md");
         }
     }
 
@@ -164,6 +209,7 @@ public final class SkillStore {
         }
         Path dir = resolve(name);
         if (!Files.isDirectory(dir)) {
+            Logger.warn("skill {} is named by a template but is not in the library — skipped", name);
             return;
         }
         Path dest = destSkillsDir.resolve(name.replace('/', '_'));
