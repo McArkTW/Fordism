@@ -3,28 +3,24 @@
 /* The scheme is a class on <html> (core/theme.ts), not the media query alone. */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Design tokens. Light is the base; .dark swaps the surfaces. Panels sit on a
-   slightly cooler ground and carry a soft shadow, so depth comes from elevation
-   rather than hard borders alone. */
+/* Design tokens. Light is the base; .dark swaps the surfaces. */
 :root {
-  --bg: oklch(0.972 0.004 258);
+  --bg: oklch(0.985 0.002 250);
   --panel: #ffffff;
-  --border: oklch(0.92 0.005 258);
-  --ink: oklch(0.24 0.012 258);
-  --muted: oklch(0.52 0.012 258);
+  --border: oklch(0.9 0.005 250);
+  --ink: oklch(0.25 0.01 250);
+  --muted: oklch(0.55 0.01 250);
   --accent: oklch(0.55 0.19 262);
   --accent-ink: #ffffff;
-  --shadow-card: 0 1px 2px oklch(0.2 0.02 260 / 0.05), 0 6px 20px -10px oklch(0.2 0.02 260 / 0.12);
 }
 .dark {
-  --bg: oklch(0.175 0.012 262);
-  --panel: oklch(0.225 0.012 262);
-  --border: oklch(0.3 0.012 262);
-  --ink: oklch(0.93 0.005 262);
-  --muted: oklch(0.66 0.012 262);
+  --bg: oklch(0.2 0.012 260);
+  --panel: oklch(0.24 0.012 260);
+  --border: oklch(0.32 0.012 260);
+  --ink: oklch(0.93 0.005 260);
+  --muted: oklch(0.68 0.01 260);
   --accent: oklch(0.68 0.16 262);
   --accent-ink: oklch(0.18 0.03 262);
-  --shadow-card: 0 1px 2px oklch(0 0 0 / 0.3), 0 10px 28px -14px oklch(0 0 0 / 0.5);
 }
 
 @theme inline {
@@ -47,15 +43,7 @@ body {
 /* Shared component classes — keep the screens' markup consistent. */
 @layer components {
   .card {
-    @apply rounded-2xl border border-edge bg-panel;
-    box-shadow: var(--shadow-card);
-  }
-  /* Data rows respond to the pointer — most of them navigate. */
-  .card tbody tr {
-    @apply transition-colors;
-  }
-  .card tbody tr:hover {
-    background: color-mix(in oklab, var(--ink) 4%, transparent);
+    @apply rounded-xl border border-edge bg-panel;
   }
   .btn,
   .btn-primary,
@@ -71,14 +59,11 @@ body {
   .input {
     @apply w-full rounded-lg border border-edge bg-bg px-3 py-1.5 text-sm text-ink outline-none placeholder:text-muted focus:border-accent;
   }
-  .input:focus {
-    box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 18%, transparent);
-  }
   .label {
     @apply mb-1 block text-xs font-medium text-muted;
   }
   .page-h {
-    @apply text-2xl font-semibold tracking-tight;
+    @apply text-xl font-semibold tracking-tight;
   }
   /* @apply cannot reference another component class, so the shared base is a grouped selector. */
   .badge,
@@ -105,24 +90,11 @@ body {
     @apply bg-ink/10 text-muted;
   }
   .th {
-    @apply px-3 py-2 text-left text-xs font-semibold tracking-wide text-muted uppercase;
+    @apply px-3 py-2 text-left text-xs font-medium tracking-wide text-muted;
   }
   .td {
     @apply border-t border-edge px-3 py-2 text-sm;
-    font-variant-numeric: tabular-nums; /* durations and counts align in columns */
   }
-}
-
-/* Keyboard focus is visible everywhere, in the accent, without hijacking Material's own. */
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-/* Slim scrollbars that match the surface. */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in oklab, var(--ink) 25%, transparent) transparent;
 }
 
 /* A spinning loader icon wherever the "loader" icon shows a live state. */
