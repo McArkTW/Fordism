@@ -138,8 +138,8 @@ Not gated — applied in review:
 
 Microsoft sign-in · API tokens for programmatic access · qwen-code session resume
 and self-heal · `onFail.mode: resume` for rework · orchestrator reconcile tests ·
-arm64 images · skills management from the UI · per-step `network` in the workflow
-editor · finer user/group permissions · child runs for the reconciler strategy.
+arm64 images · per-step `network` in the workflow editor · finer user/group
+permissions · child runs for the reconciler strategy.
 
 ## License
 

@@ -25,5 +25,10 @@ Fordism — a workflow engine that runs AI agents as disposable containers.
   Live/History run views, run→task drill-down with transcripts and token usage,
   YAML workflow editor with live server-side validation, templates/skills/profiles/
   credentials management, and user/group administration.
+- **Skills library**: write a skill in the UI or upload its folder, edit and delete
+  it; add a plugin by git URL and its skills install under the plugin name, synced
+  or removed as a unit. Each plugin owns its own folder, so a sync never touches a
+  skill you wrote. Staged skills are registered where the agent CLI discovers them,
+  so they are model-invocable rather than only readable.
 - Out of the box: bootstrap the admin, create one Agent Profile, and the bundled
   example workflows run.
