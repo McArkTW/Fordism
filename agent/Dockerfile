@@ -3,7 +3,7 @@
 # reads task/task.md, does the work, writes result/, and exits.
 # The model backend is chosen at run time by env: ANTHROPIC_BASE_URL (or OPENAI_BASE_URL for
 # qwen-code) points straight at the resolved LLM source's endpoint — no gateway.
-FROM node:22-slim
+FROM node:26-slim
 
 # openssh-client is REQUIRED: skills that reach remote machines shell out to `ssh`/`scp`, so
 # without it a workflow's log-collection steps silently degrade to API-only
