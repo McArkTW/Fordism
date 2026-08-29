@@ -18,7 +18,7 @@ repositories {
 
 ext {
     javalinVersion = '6.3.0'
-    gsonVersion = '2.11.0'
+    gsonVersion = '2.14.0'
     tinylogVersion = '2.7.0'
     snakeyamlVersion = '2.2'
     junitVersion = '5.11.3'
