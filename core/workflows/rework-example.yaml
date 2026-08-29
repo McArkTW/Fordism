@@ -1,5 +1,5 @@
 name: rework-example
-description: A gate step re-seeds the work step (same session, resume mode) until it passes or maxAttempts is hit, then NEEDS_RESCUE.
+description: A gate step re-seeds the work step (continuing from its last workspace) until it passes; once maxAttempts is spent the run finishes FAILED.
 strategy: rework
 parameters: [requirement]
 steps:
@@ -19,4 +19,3 @@ steps:
     onFail:
       retry: work
       maxAttempts: 3
-      mode: resume

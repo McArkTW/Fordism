@@ -6,11 +6,12 @@
 environment (a homelab, a private VPC, an office LAN), operated by people you would
 also trust with the Docker host itself:
 
-- **The API requires no authentication by default.** Anyone who can reach the port can
-  create credentials, edit workflows, and start agent runs. Optional Bearer-token
-  verification exists (`FORDISM_AUTH_PUBKEY` / `FORDISM_AUTH_ISSUER` /
-  `FORDISM_AUTH_AUDIENCE` against your OIDC provider's RS256 key), but the default is
-  off — the network is the gate.
+- **Auth is always on, but an operator account is a powerful thing.** Every API
+  route (beyond health/version and the login surface) requires a session and a
+  permission; sign-in is local accounts, Google, or GitHub, and OAuth logins map only
+  to existing users or an explicit email/domain allowlist. Still: anyone with
+  `workflow.write` + `workflow.run` can make an agent execute arbitrary code in a
+  container on your Docker host.
 - **Core mounts the host Docker socket** to spawn agent containers. Anyone who
   controls core effectively controls the Docker host.
 - **Agents run with their CLI safety prompts disabled**
@@ -21,8 +22,15 @@ also trust with the Docker host itself:
 
 ## What the design does protect
 
-- **Credential values are write-only.** No API endpoint ever returns a stored value
-  (`ApiShapeTest` pins this); the only reader is the launcher.
+- **Access is permissioned.** Routes declare dot-named permissions
+  (`workflow.run`, `credential.write`, …); groups hold users and grant patterns
+  (trailing `.*` covers descendants, `*` covers all). Sessions are opaque HttpOnly
+  cookies (`SameSite=Lax`, `Secure` when `FORDISM_COOKIE_SECURE=true`); mutating
+  requests additionally require a custom header, and the admin bootstrap secret works
+  exactly once. The auth test suite pins that every non-exempt route rejects the
+  unauthenticated (401) and the under-privileged (403).
+- **Credential values are write-only.** No API response shape ever carries a stored
+  value (`ApiShapeTest` pins this); the only reader is the launcher.
 - **Grants are explicit and captured at seed time.** An agent receives exactly the
   environment variables its Agent Template declared (`CredentialStoreTest` pins this),
   and editing a template cannot change what an already-queued task receives.

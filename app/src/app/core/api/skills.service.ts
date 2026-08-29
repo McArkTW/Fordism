@@ -29,7 +29,7 @@ export class SkillsService {
   }
 
   get(name: string): Observable<SkillDetail> {
-    return this.http.get<SkillDetail>(`/api/skills/${name}`);
+    return this.http.get<SkillDetail>(`/api/skills/${encodeURIComponent(name)}`);
   }
 
   source(): Observable<SkillSource> {

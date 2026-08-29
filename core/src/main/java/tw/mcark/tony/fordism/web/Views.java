@@ -68,4 +68,34 @@ public final class Views {
 
     /** The acknowledgement for a started run. */
     public record RunStarted(String runId, String workflow, String state) {}
+
+    /* ---- auth ---- */
+
+    /**
+     * What the login screen needs before anyone has signed in: which providers to offer, and
+     * whether this install still has no accounts at all — the only state in which the one-time
+     * admin bootstrap is open.
+     */
+    public record AuthProviders(List<Provider> providers, boolean bootstrapRequired) {}
+
+    public record Provider(String id) {}
+
+    /** The signed-in user, with the effective grants the UI hides or shows actions by. */
+    public record Me(String id, String email, String displayName, List<String> groups,
+                     List<String> permissions) {}
+
+    /**
+     * A user as the Users page reads one. There is deliberately no field for the password hash:
+     * the record cannot carry it, so no endpoint can leak it by forgetting to strip it.
+     */
+    public record UserSummary(String id, String email, String displayName, List<Identity> identities) {}
+
+    /**
+     * One way an account can sign in. A stored password appears as the {@code local} provider —
+     * the Users page's honest answer to "how does this person actually get in" is one list, not a
+     * flag plus a list.
+     */
+    public record Identity(String provider, String subject) {}
+
+    public record GroupSummary(String id, String name, List<String> members, List<String> grants) {}
 }

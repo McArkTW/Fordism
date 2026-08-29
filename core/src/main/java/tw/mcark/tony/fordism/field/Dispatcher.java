@@ -54,16 +54,27 @@ public final class Dispatcher {
     }
 
     /**
-     * Resolve the step's template manifest onto the task: its Agent Profile + (if set) its model
-     * win, and its credential grant is captured here rather than at launch — so editing a template
-     * cannot change what an already-seeded task receives, and the snapshot records what it had.
+     * Snapshot the template's credential grant onto the task. The engine calls this the moment a
+     * task is seeded — not at dispatch — because that is the documented guarantee: editing a
+     * template cannot change what an already-queued task receives. Dispatch and launch spend the
+     * list the task carried in. A retried or reseeded task is a NEW seed, so it captures the
+     * template as of that later moment.
+     */
+    public void captureCredentials(Task task) {
+        templates.getByName(task.template)
+                .ifPresent(template -> task.credentials = template.credentials());
+    }
+
+    /**
+     * Resolve the step's template manifest onto the task at dispatch: its Agent Profile + (if set)
+     * its model win. The credential grant is deliberately NOT read here — it was captured at seed
+     * time ({@link #captureCredentials}), and the snapshot records what the task had.
      */
     private void applyTemplate(Task task) {
         AgentTemplate template = templates.getByName(task.template).orElse(null);
         if (template == null) {
             return;   // a template-less step runs bare on the default backend
         }
-        task.credentials = template.credentials();
         if (template.agentProfile() != null && !template.agentProfile().isBlank()) {
             task.agentProfile = template.agentProfile();
         }

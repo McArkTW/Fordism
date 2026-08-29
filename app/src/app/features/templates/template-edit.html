@@ -1,6 +1,8 @@
 <div class="mx-auto flex max-w-3xl flex-col gap-6">
   <div class="flex flex-wrap items-center gap-3">
-    <a hlmBtn variant="ghost" routerLink="/templates"><app-icon name="arrow-left" />Agent Templates</a>
+    <a hlmBtn variant="ghost" routerLink="/templates"
+      ><app-icon name="arrow-left" />Agent Templates</a
+    >
     <h1 class="page-h">{{ isNew() ? 'New template' : name() || 'Template' }}</h1>
     <span class="flex-auto"></span>
     @if (dirty()) {
@@ -37,11 +39,18 @@
           <hlm-select-content *hlmSelectPortal>
             <hlm-select-item value="">— sole profile / default —</hlm-select-item>
             @for (p of profileOptions(); track p.id) {
-              <hlm-select-item [value]="p.name">{{ p.name }} · {{ p.model || 'no model' }}</hlm-select-item>
+              <hlm-select-item [value]="p.name"
+                >{{ p.name }} · {{ p.model || 'no model' }}</hlm-select-item
+              >
             }
           </hlm-select-content>
         </hlm-select>
-        @if (profileOptions().length === 0) {
+        @if (profileOptionsLoading()) {
+          <p class="text-muted-foreground text-xs">Loading profiles…</p>
+        } @else if (profileOptionsError()) {
+          <!-- Not "no profiles yet": the list never arrived, so it says nothing about what exists. -->
+          <p class="text-destructive text-xs">{{ profileOptionsError() }}</p>
+        } @else if (profileOptions().length === 0) {
           <p class="text-muted-foreground text-xs">
             No profiles yet — add one on the Agent Profiles page.
           </p>
@@ -68,7 +77,9 @@
       <div class="flex items-center justify-between">
         <div class="text-muted-foreground text-sm font-semibold tracking-wide uppercase">
           Skills the agent may use
-          <span class="font-normal tracking-normal normal-case">· {{ skills().length }} selected</span>
+          <span class="font-normal tracking-normal normal-case"
+            >· {{ skills().length }} selected</span
+          >
         </div>
         @if (skills().length) {
           <button hlmBtn variant="ghost" size="sm" type="button" (click)="skills.set([])">
@@ -76,7 +87,11 @@
           </button>
         }
       </div>
-      @if (skillOptions().length === 0) {
+      @if (skillOptionsLoading()) {
+        <p class="text-muted-foreground mt-2 text-xs">Loading the skills library…</p>
+      } @else if (skillOptionsError()) {
+        <p class="text-destructive mt-2 text-xs">{{ skillOptionsError() }}</p>
+      } @else if (skillOptions().length === 0) {
         <p class="text-muted-foreground mt-2 text-xs">
           No skills in the library yet — sync them on the Skills page.
         </p>
@@ -94,7 +109,9 @@
             (input)="skillFilter.set($any($event.target).value)"
           />
         </div>
-        <div class="divide-border border-border mt-2 max-h-72 divide-y overflow-y-auto rounded-lg border">
+        <div
+          class="divide-border border-border mt-2 max-h-72 divide-y overflow-y-auto rounded-lg border"
+        >
           @for (s of filteredSkills(); track s.name) {
             <div class="hover:bg-foreground/5 flex items-start gap-3 px-3 py-2">
               <hlm-checkbox
@@ -144,7 +161,9 @@
       <div class="flex items-center justify-between">
         <div class="text-muted-foreground text-sm font-semibold tracking-wide uppercase">
           Credentials the agent receives
-          <span class="font-normal tracking-normal normal-case">· {{ credentials().length }} granted</span>
+          <span class="font-normal tracking-normal normal-case"
+            >· {{ credentials().length }} granted</span
+          >
         </div>
         @if (credentials().length) {
           <button hlmBtn variant="ghost" size="sm" type="button" (click)="credentials.set([])">
@@ -152,7 +171,11 @@
           </button>
         }
       </div>
-      @if (credentialOptions().length === 0) {
+      @if (credentialOptionsLoading()) {
+        <p class="text-muted-foreground mt-2 text-xs">Loading credentials…</p>
+      } @else if (credentialOptionsError()) {
+        <p class="text-destructive mt-2 text-xs">{{ credentialOptionsError() }}</p>
+      } @else if (credentialOptions().length === 0) {
         <p class="text-muted-foreground mt-2 text-xs">
           No credentials stored — add one on the Credentials page.
         </p>
@@ -170,7 +193,9 @@
             (input)="credentialFilter.set($any($event.target).value)"
           />
         </div>
-        <div class="divide-border border-border mt-2 max-h-72 divide-y overflow-y-auto rounded-lg border">
+        <div
+          class="divide-border border-border mt-2 max-h-72 divide-y overflow-y-auto rounded-lg border"
+        >
           @for (c of filteredCredentials(); track c.key) {
             <div class="hover:bg-foreground/5 flex items-start gap-3 px-3 py-2">
               <hlm-checkbox

@@ -35,13 +35,8 @@ public final class FordismConfiguration {
     public final String llmBaseUrl = env("LLM_BASE_URL", "http://localhost:11434");
     public final String agentModel = env("AGENT_MODEL", "qwen3");
 
-    // Identity provider: RS256 public key (PEM) used to verify Bearer identity tokens.
-    // Empty = auth off (network-gate the deployment instead). Issuer must match the token's
-    // `iss`; audience, when set, must match `aud` — leave it blank only if the issuer mints
-    // tokens for this service alone.
-    public final String authPubKey = env("FORDISM_AUTH_PUBKEY", "");
-    public final String authIssuer = env("FORDISM_AUTH_ISSUER", "");
-    public final String authAudience = env("FORDISM_AUTH_AUDIENCE", "");
+    // Authentication settings live in AuthConfiguration, not here: auth is always on, so they are
+    // validated at startup (half-configured provider, zero providers) rather than defaulted.
 
     // Build identity (stamped by CI) surfaced at /api/version
     public final String version = env("FORDISM_VERSION", "dev");

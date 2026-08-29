@@ -25,8 +25,8 @@ public final class LinearOrchestrator implements Orchestrator {
         }
         switch (planted.get().state) {
             case COLLECTED -> { run.currentStepIndex++; engine.saveRun(run); }
-            case FAILED, REAPED, ASKED -> engine.finishRun(run, WorkflowRunState.FAILED);
-            default -> { /* PENDING / RUNNING: wait */ }
+            case FAILED, REAPED -> engine.finishRun(run, WorkflowRunState.FAILED);
+            default -> { /* PENDING / RUNNING: wait. ASKED never reaches here — Engine parks the run. */ }
         }
     }
 }

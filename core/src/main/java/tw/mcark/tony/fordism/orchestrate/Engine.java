@@ -146,6 +146,9 @@ public final class Engine {
         if (seed.stepIndex() == 0 && run.taskZipPath != null) {
             task.taskZipPath = run.taskZipPath;
         }
+        // The credential grant is captured NOW, while the task is being seeded: editing the
+        // template after this moment must not change what this already-queued task receives.
+        dispatcher.captureCredentials(task);
         tasks.save(task);
         Logger.info("seed run {} step {} template={} attempt={}",
                 run.id, seed.stepIndex(), seed.template(), seed.attempt());

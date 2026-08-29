@@ -1,6 +1,8 @@
 import { DatePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
+import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmInput } from '@spartan-ng/helm/input';
+import { HlmSpinner } from '@spartan-ng/helm/spinner';
 import { HlmSwitch } from '@spartan-ng/helm/switch';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { apiError } from '../../core/api-error';
@@ -21,7 +23,7 @@ import { Markdown } from '../../shared/markdown';
  */
 @Component({
   selector: 'app-skills',
-  imports: [DatePipe, Icon, Markdown, HlmInput, HlmSwitch, HlmTooltip],
+  imports: [DatePipe, Icon, Markdown, HlmButton, HlmInput, HlmSpinner, HlmSwitch, HlmTooltip],
   templateUrl: './skills.html',
 })
 export class Skills {
@@ -29,6 +31,10 @@ export class Skills {
   private toasts = inject(Toasts);
 
   readonly skills = signal<SkillSummary[]>([]);
+  /** The first list request is still out — an empty list means nothing yet. */
+  readonly loading = signal(true);
+  /** Why the library could not be read. Rendered instead of the "nothing synced" empty state. */
+  readonly loadError = signal('');
   readonly filter = signal('');
   readonly selected = signal<string | null>(null);
   readonly detail = signal<SkillDetail | null>(null);
@@ -51,14 +57,33 @@ export class Skills {
   });
 
   constructor() {
-    this.service.list().subscribe({
-      next: (list) => this.skills.set(list),
-      error: (e) => this.toasts.error(apiError(e, 'Could not load skills')),
-    });
+    this.reload();
     this.service.source().subscribe({
       next: (s) => this.source.set(s ?? {}),
       error: () => {
         // The source strip just stays blank.
+      },
+    });
+  }
+
+  /**
+   * (Re)read the library.
+   *
+   * The failure used to leave the list empty and say so with a toast, which the page then
+   * explained as "No skills synced yet" — a statement about the library, made when the library
+   * could not be read at all. The error is rendered in its place instead.
+   */
+  reload(): void {
+    this.loading.set(true);
+    this.service.list().subscribe({
+      next: (list) => {
+        this.skills.set(list);
+        this.loadError.set('');
+        this.loading.set(false);
+      },
+      error: (e) => {
+        this.loadError.set(apiError(e, 'Could not load skills'));
+        this.loading.set(false);
       },
     });
   }

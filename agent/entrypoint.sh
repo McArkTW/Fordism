@@ -2,7 +2,8 @@
 #
 # Fordism agent v3 runtime.
 #
-# One-shot Claude Code worker over a host-mounted workspace. The container is disposable;
+# One-shot agent worker — claude-code or qwen-code, chosen by AGENT_TYPE — over a
+# host-mounted workspace. The container is disposable;
 # everything durable lives in /workspace (a host mount): task in, result out, and Claude
 # Code's own session/transcript under $HOME/.claude — so a run can be inspected and
 # *resumed by a different container* after this one is gone.
@@ -25,10 +26,12 @@ SNAME="A fordism agent task."
 # --- read config (portable, no jq) -----------------------------------------
 jget() { grep -oE "\"$1\"[[:space:]]*:[[:space:]]*\"?[^\",}]*\"?" "$CFG" 2>/dev/null \
          | head -1 | sed -E "s/.*:[[:space:]]*\"?([^\"]*)\"?\$/\1/"; }
-MODEL="$(jget model)";   MODEL="${MODEL:-qwen}"
+MODEL="$(jget model)"
 TIMEOUT="$(jget timeout)"; TIMEOUT="${TIMEOUT:-600}"   # seconds; default 10 min
 MODE="${AGENT_MODE:-work}"
 ATYPE="${AGENT_TYPE:-claude-code}"   # claude-code | qwen-code — which CLI drives the task
+# Each CLI has its own idea of a sane default model, so the fallback is per-tool.
+if [ "$ATYPE" = "qwen-code" ]; then MODEL="${MODEL:-qwen3}"; else MODEL="${MODEL:-sonnet}"; fi
 
 # --- git credentials ------------------------------------------------------
 # A credential helper rather than a file: git invokes it with the environment intact, so a
@@ -94,7 +97,7 @@ if [ "$ATYPE" = "qwen-code" ]; then
   mkdir -p "$WS/.qwen/skills"
   cp -r "$WS"/skills/* "$WS/.qwen/skills/" 2>/dev/null || true
   QP="$PROMPT"; [ "$MODE" = "resume" ] && QP="Continue the task. The human's reply to your question: ${RESUME_PROMPT:-}"
-  timeout "$TIMEOUT" qwen --yolo -p "$QP" >"$WS/result/logs/output.log" 2>"$WS/result/logs/errors.log"; rc=$?
+  timeout "$TIMEOUT" qwen --yolo --model "$MODEL" -p "$QP" >"$WS/result/logs/output.log" 2>"$WS/result/logs/errors.log"; rc=$?
 elif [ "$MODE" = "resume" ]; then
   set_state running '"phase":"resuming"'
   Q="${RESUME_PROMPT:-You are resuming an earlier session in a brand-new container. Continue the task from where you left off.}"

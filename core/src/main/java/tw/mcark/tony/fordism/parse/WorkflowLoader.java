@@ -33,7 +33,7 @@ public final class WorkflowLoader {
     private static final Set<String> STEP_KEYS =
             Set.of("id", "template", "task", "includePreviousResult", "dependsOn", "onFail", "forEach", "when", "config");
     private static final Set<String> CONFIG_KEYS = Set.of("model", "timeoutSeconds", "network", "maxAttempts");
-    private static final Set<String> ON_FAIL_KEYS = Set.of("retry", "maxAttempts", "mode");
+    private static final Set<String> ON_FAIL_KEYS = Set.of("retry", "maxAttempts");
     private static final Set<String> PARAMETER_KEYS = Set.of("name", "label", "type", "required", "default", "help");
     private static final Set<String> PARAMETER_TYPES = Set.of("text", "textarea", "number");
 
@@ -79,6 +79,12 @@ public final class WorkflowLoader {
         Step generator = map.get("generator") instanceof Map<?, ?> gen
                 ? stepFromMap((Map<String, Object>) gen, "generator") : null;
         int maxIterations = asInt(map.get("maxIterations"), 10);
+        if (strategy == Strategy.MAP_REDUCE && steps.size() != 2) {
+            // MapReduceOrchestrator reads exactly steps 0 (map) and 1 (reduce); a third step would
+            // be silently ignored, so refuse the shape here rather than drop work at run time.
+            throw new IllegalArgumentException("map-reduce workflow \"" + name
+                    + "\" must have exactly 2 steps (map, then reduce) — found " + steps.size());
+        }
         validateStepReferences(steps);
         return new Workflow(name, description, strategy, tags, parameters, steps, generator, maxIterations);
     }

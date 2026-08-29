@@ -32,8 +32,8 @@ public final class ConditionalOrchestrator implements Orchestrator {
         }
         switch (planted.get().state) {
             case COLLECTED -> { run.currentStepIndex++; engine.saveRun(run); }
-            case FAILED, REAPED, ASKED -> engine.finishRun(run, WorkflowRunState.FAILED);
-            default -> { /* wait */ }
+            case FAILED, REAPED -> engine.finishRun(run, WorkflowRunState.FAILED);
+            default -> { /* wait. ASKED never reaches here — Engine parks the run first. */ }
         }
     }
 

@@ -20,10 +20,18 @@ services:
       FORDISM_VERSION: ${FORDISM_VERSION:-dev}
       FORDISM_GIT_SHA: ${FORDISM_GIT_SHA:-unknown}
       FORDISM_BUILT_AT: ${FORDISM_BUILT_AT:-unknown}
-      # Identity provider (optional — empty means auth off; network-gate the deployment).
-      FORDISM_AUTH_PUBKEY: ${FORDISM_AUTH_PUBKEY:-}
-      FORDISM_AUTH_ISSUER: ${FORDISM_AUTH_ISSUER:-}
-      FORDISM_AUTH_AUDIENCE: ${FORDISM_AUTH_AUDIENCE:-}
+      # Auth — always on; at least one provider must be enabled (local is the default).
+      # FORDISM_ADMIN_SECRET is consumed once by the first-login bootstrap, then inert.
+      FORDISM_AUTH_LOCAL: ${FORDISM_AUTH_LOCAL:-true}
+      FORDISM_AUTH_GOOGLE_CLIENT_ID: ${FORDISM_AUTH_GOOGLE_CLIENT_ID:-}
+      FORDISM_AUTH_GOOGLE_CLIENT_SECRET: ${FORDISM_AUTH_GOOGLE_CLIENT_SECRET:-}
+      FORDISM_AUTH_GITHUB_CLIENT_ID: ${FORDISM_AUTH_GITHUB_CLIENT_ID:-}
+      FORDISM_AUTH_GITHUB_CLIENT_SECRET: ${FORDISM_AUTH_GITHUB_CLIENT_SECRET:-}
+      FORDISM_AUTH_ALLOWED_EMAILS: ${FORDISM_AUTH_ALLOWED_EMAILS:-}
+      FORDISM_AUTH_ALLOWED_DOMAINS: ${FORDISM_AUTH_ALLOWED_DOMAINS:-}
+      FORDISM_ADMIN_SECRET: ${FORDISM_ADMIN_SECRET:-}
+      FORDISM_PUBLIC_URL: ${FORDISM_PUBLIC_URL:-http://localhost}
+      FORDISM_COOKIE_SECURE: ${FORDISM_COOKIE_SECURE:-false}
       # Launcher. FORDISM_LAUNCHER_NETWORK must name a network the agent can reach core on —
       # the env files point it at this project's `internal` (e.g. uat_internal).
       FORDISM_LAUNCHER_NETWORK: ${FORDISM_LAUNCHER_NETWORK:-}

@@ -1,12 +1,11 @@
-# CI: secret scan + both builds with their gates on every PR and push to main;
-# a v* tag additionally builds and pushes the three images to GHCR.
+# CI: secret scan + both builds with their gates on every PR and push to main.
+# Publishing is release.yml's job alone — a v* tag runs there, gates included.
 name: ci
 
 on:
   pull_request:
   push:
     branches: [main]
-    tags: ['v*']
 
 jobs:
   secret-scan:
@@ -51,26 +50,16 @@ jobs:
         working-directory: app
 
   images:
-    # Compose-build all three images so a Dockerfile break fails the PR;
-    # push to GHCR only when a release tag made it through the other jobs.
+    # Compose-build all three images so a Dockerfile break fails the PR. Nothing is
+    # pushed here; release.yml owns publishing so a tag cannot be pushed twice.
     needs: [secret-scan, core, app]
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
     steps:
       - uses: actions/checkout@v4
       - name: Build images
         run: docker compose --profile build-only build
         env:
           REGISTRY: ghcr.io/${{ github.repository }}
-          TAG: ${{ github.ref_type == 'tag' && github.ref_name || 'ci' }}
+          TAG: ci
           FORDISM_VERSION: ${{ github.ref_name }}
           FORDISM_GIT_SHA: ${{ github.sha }}
-      - name: Push images
-        if: github.ref_type == 'tag'
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-          for image in fordism-core fordism-app fordism-agent; do
-            docker push "ghcr.io/${{ github.repository }}/${image}:${{ github.ref_name }}"
-          done

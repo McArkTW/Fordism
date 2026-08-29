@@ -164,6 +164,36 @@ class ApiShapeTest {
     }
 
     @Test
+    void the_login_screen_reads_the_providers_and_whether_the_install_is_unclaimed() {
+        assertEquals(expect("providers", "bootstrapRequired"),
+                fieldsOf(new Views.AuthProviders(List.of(new Views.Provider("local")), true)));
+        assertEquals(expect("id"), fieldsOf(new Views.Provider("local")));
+    }
+
+    @Test
+    void the_signed_in_user_carries_the_grants_the_app_hides_actions_by() {
+        assertEquals(expect("id", "email", "displayName", "groups", "permissions"),
+                fieldsOf(new Views.Me("u1", "dana@example.com", "Dana", List.of("admins"), List.of("*"))));
+    }
+
+    @Test
+    void a_user_row_lists_the_ways_in_and_never_the_secret_behind_one() {
+        Views.UserSummary user = new Views.UserSummary("u1", "dana@example.com", "Dana",
+                List.of(new Views.Identity("local", "dana@example.com")));
+        assertEquals(expect("id", "email", "displayName", "identities"), fieldsOf(user));
+        assertEquals(expect("provider", "subject"), fieldsOf(new Views.Identity("google", "sub-1")));
+        // There is no field a hash could travel in — that is the point of the record.
+        assertFalse(GSON.toJson(user).contains("pbkdf2"));
+        assertFalse(GSON.toJson(user).contains("password"));
+    }
+
+    @Test
+    void a_group_is_its_members_and_its_grant_patterns() {
+        assertEquals(expect("id", "name", "members", "grants"),
+                fieldsOf(new Views.GroupSummary("g1", "admins", List.of("u1"), List.of("*"))));
+    }
+
+    @Test
     void preflight_and_a_started_run() {
         assertEquals(expect("ready", "problem"), fieldsOf(new Views.Preflight(true, "")));
         assertEquals(expect("runId", "workflow", "state"),

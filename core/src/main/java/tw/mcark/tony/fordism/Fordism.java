@@ -1,6 +1,12 @@
 package tw.mcark.tony.fordism;
 
 import tw.mcark.tony.fordism.agentprofile.AgentProfileStore;
+import tw.mcark.tony.fordism.auth.Accounts;
+import tw.mcark.tony.fordism.auth.AuthConfiguration;
+import tw.mcark.tony.fordism.auth.GroupStore;
+import tw.mcark.tony.fordism.auth.SeededGroups;
+import tw.mcark.tony.fordism.auth.SessionStore;
+import tw.mcark.tony.fordism.auth.UserStore;
 import tw.mcark.tony.fordism.config.FordismConfiguration;
 import tw.mcark.tony.fordism.field.Collector;
 import tw.mcark.tony.fordism.field.CullPolicy;
@@ -68,6 +74,15 @@ public final class Fordism {
         Engine engine = new Engine(configuration, tasks, runs, sessions, dispatcher, collector, reaper,
                 culler, stateStore, secrets);
 
+        // Auth is always on: AuthConfiguration refuses to build an instance nobody could log into,
+        // so a misconfiguration stops the boot here rather than surfacing as a locked-out UI.
+        AuthConfiguration authConfiguration = AuthConfiguration.fromEnvironment();
+        Path authState = Paths.get(configuration.stateDir);
+        GroupStore groups = new GroupStore(authState);
+        SeededGroups.into(groups);
+        Accounts accounts = new Accounts(authConfiguration, new UserStore(authState), groups,
+                new SessionStore(authState));
+
         loadWorkflows(engine, configuration);
         restoreState(stateStore, tasks, runs);
 
@@ -75,7 +90,8 @@ public final class Fordism {
         loop.setDaemon(true);
         loop.start();
 
-        new App(engine, configuration, templates, results, archive, skills, profiles, secrets, credentials).start();
+        new App(engine, configuration, templates, results, archive, skills, profiles, secrets, credentials,
+                accounts).start();
         Logger.info("fordism-core up version={} gitSha={}", configuration.version, configuration.gitSha);
     }
 

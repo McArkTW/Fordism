@@ -103,6 +103,56 @@ class WorkflowLoaderTest {
                 """));
     }
 
+    private static String mapReduce(int stepCount) {
+        StringBuilder yaml = new StringBuilder("""
+                name: mr
+                strategy: map-reduce
+                parameters: [items]
+                steps:
+                """);
+        for (int index = 0; index < stepCount; index++) {
+            yaml.append("  - id: step").append(index).append("\n")
+                    .append("    template: generic\n")
+                    .append("    task: do part ").append(index).append("\n");
+        }
+        return yaml.toString();
+    }
+
+    @Test
+    void a_map_reduce_workflow_must_have_exactly_two_steps() {
+        // MapReduceOrchestrator reads only steps 0 and 1 — a third step would be silently ignored.
+        IllegalArgumentException oneStep =
+                assertThrows(IllegalArgumentException.class, () -> loader.parse(mapReduce(1)));
+        assertTrue(oneStep.getMessage().contains("mr"), oneStep.getMessage());
+        assertTrue(oneStep.getMessage().contains("1"), oneStep.getMessage());
+        IllegalArgumentException threeSteps =
+                assertThrows(IllegalArgumentException.class, () -> loader.parse(mapReduce(3)));
+        assertTrue(threeSteps.getMessage().contains("mr"), threeSteps.getMessage());
+        assertTrue(threeSteps.getMessage().contains("3"), threeSteps.getMessage());
+        assertEquals(2, loader.parse(mapReduce(2)).steps().size());
+    }
+
+    @Test
+    void an_onFail_mode_key_is_refused_rather_than_ignored() {
+        // `mode` was whitelisted but nothing ever read it — a workflow relying on it should learn so.
+        IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class, () -> loader.parse("""
+                name: r
+                strategy: rework
+                steps:
+                  - id: work
+                    template: generic
+                    task: do it
+                  - id: gate
+                    template: generic
+                    task: judge it
+                    onFail:
+                      retry: work
+                      maxAttempts: 3
+                      mode: resume
+                """));
+        assertTrue(thrown.getMessage().contains("mode"), thrown.getMessage());
+    }
+
     @Test
     void an_unknown_strategy_names_the_ones_that_exist() {
         IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class,

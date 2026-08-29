@@ -10,7 +10,9 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import org.tinylog.Logger;
@@ -19,7 +21,8 @@ import org.tinylog.Logger;
  * Lays out the directory a task's agent will run in, and records both paths it is known by: the
  * container path core writes to, and the host path the agent bind-mounts.
  *
- * <p>Workspaces are kept — never garbage-collected — so this only ever creates.
+ * <p>Workspaces are kept — never garbage-collected — and a retried task keeps its id, so staging
+ * has to cope with a directory a previous attempt already wrote to (see {@link #clearResult}).
  */
 public final class WorkspaceStager {
     private final FordismConfiguration configuration;
@@ -31,6 +34,7 @@ public final class WorkspaceStager {
     public Path stage(Task task, TemplateStore templates) throws IOException {
         Path workspace = Paths.get(configuration.workspacesDir, task.id);          // container-side path
         Files.createDirectories(workspace.resolve("task"));
+        clearResult(workspace.resolve("result"));
         Files.createDirectories(workspace.resolve("result"));
         TaskConfiguration config = task.config;
         Files.writeString(workspace.resolve("config.json"),
@@ -83,8 +87,33 @@ public final class WorkspaceStager {
         }
     }
 
-    /** Extract a task.zip into the task/ dir (zip-slip guarded). */
-    private static void unzipInto(Path zip, Path dest) throws IOException {
+    /**
+     * Empty the result directory before the agent starts.
+     *
+     * <p>A reaped task goes back to PENDING under its OWN id, so it re-stages into the workspace the
+     * failed attempt left behind — result.json included. The Collector reads that file on the very
+     * next tick, before the fresh agent has written anything, and harvests the dead attempt's answer
+     * as this attempt's: a retry that reports FINISHED without having run. Logs go with it, or the
+     * task detail view would show the previous attempt's transcript beside the new result.
+     */
+    private static void clearResult(Path result) throws IOException {
+        if (!Files.isDirectory(result)) {
+            return;
+        }
+        try (Stream<Path> walk = Files.walk(result)) {
+            for (Path path : (Iterable<Path>) walk.sorted(Comparator.reverseOrder())::iterator) {
+                Files.deleteIfExists(path);
+            }
+        }
+    }
+
+    /**
+     * Extract a task.zip into the task/ dir (zip-slip guarded).
+     *
+     * <p>Package-private rather than private so the guard itself can be tested: it is the one thing
+     * here that decides whether an uploaded file lands outside the workspace.
+     */
+    static void unzipInto(Path zip, Path dest) throws IOException {
         Files.createDirectories(dest);
         try (ZipInputStream zis = new ZipInputStream(Files.newInputStream(zip))) {
             ZipEntry entry;

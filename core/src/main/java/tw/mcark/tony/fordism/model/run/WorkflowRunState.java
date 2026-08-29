@@ -6,7 +6,7 @@ package tw.mcark.tony.fordism.model.run;
  * snapshot still restores (see {@code TaskState}).
  */
 public enum WorkflowRunState {
-    ACTIVE, WAITING_ON_CHILD, DONE, FAILED, ASKED,
+    ACTIVE, DONE, FAILED, ASKED,
     /** A human stopped it. Deliberately not FAILED — the work did not fail, someone ended it. */
     ABANDONED;
 

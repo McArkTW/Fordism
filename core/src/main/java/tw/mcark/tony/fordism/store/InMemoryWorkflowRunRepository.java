@@ -27,7 +27,7 @@ public final class InMemoryWorkflowRunRepository implements WorkflowRunRepositor
 
     public List<WorkflowRun> active() {
         return runs.values().stream()
-                .filter(r -> r.state == WorkflowRunState.ACTIVE || r.state == WorkflowRunState.WAITING_ON_CHILD)
+                .filter(r -> r.state == WorkflowRunState.ACTIVE)
                 .collect(Collectors.toList());
     }
 }

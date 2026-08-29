@@ -13,8 +13,6 @@ public final class WorkflowRun {
 
     public int currentStepIndex = 0;
     public int iteration = 0;
-    public String parentRunId;
-    public String childRunId;
     public String taskZipPath;               // optional per-run task.zip staged into step 0's task/
     public String workflowSnapshot;          // the workflow YAML as it was at run time
     public volatile WorkflowRunState state = WorkflowRunState.ACTIVE;

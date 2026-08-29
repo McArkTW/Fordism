@@ -1,0 +1,87 @@
+# Release: on a v* tag, run the same gates ci.yml does, then build the three images
+# (amd64), push each as :vX.Y.Z and :latest to GHCR, and cut a GitHub Release whose
+# body is that version's CHANGELOG section. ci.yml never publishes — this is the only
+# workflow that pushes, so a tag is built and pushed exactly once.
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  # The release must not be able to publish something that would have failed CI.
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # gitleaks scans history, not just the tip
+      - name: gitleaks
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz | tar -xz gitleaks
+          ./gitleaks detect --source . -v
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      # banVar + banStyle + all tests ride inside `build`
+      - run: chmod +x gradlew && ./gradlew build --no-daemon
+        working-directory: core
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+        working-directory: app
+      - run: npm run lint
+        working-directory: app
+      - run: npm run test
+        working-directory: app
+
+  release:
+    needs: [gates]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build images
+        run: |
+          echo "FORDISM_BUILT_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+          docker compose --profile build-only build
+        env:
+          REGISTRY: ghcr.io/${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+          FORDISM_VERSION: ${{ github.ref_name }}
+          FORDISM_GIT_SHA: ${{ github.sha }}
+
+      - name: Push images (version + latest)
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          for image in fordism-core fordism-app fordism-agent; do
+            docker tag  "ghcr.io/${{ github.repository }}/${image}:${{ github.ref_name }}" \
+                        "ghcr.io/${{ github.repository }}/${image}:latest"
+            docker push "ghcr.io/${{ github.repository }}/${image}:${{ github.ref_name }}"
+            docker push "ghcr.io/${{ github.repository }}/${image}:latest"
+          done
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # CHANGELOG headings carry no leading v: tag v1.0.0 -> "## 1.0.0 ...".
+          # Take everything between that heading and the next "## ".
+          ver="${GITHUB_REF_NAME#v}"
+          awk -v ver="$ver" '
+            !hit && $0 ~ ("^## " ver "([^0-9.]|$)") { hit = 1; next }
+            hit && /^## / { exit }
+            hit { print }
+          ' CHANGELOG.md > body.md
+          if ! grep -q '[^[:space:]]' body.md; then
+            echo "See [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/CHANGELOG.md)." > body.md
+          fi
+          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file body.md

@@ -3,6 +3,7 @@ import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmInput } from '@spartan-ng/helm/input';
 import { HlmLabel } from '@spartan-ng/helm/label';
 import { HlmSelectImports } from '@spartan-ng/helm/select';
+import { HlmSpinner } from '@spartan-ng/helm/spinner';
 import { apiError } from '../../core/api-error';
 import { AgentProfileView, AgentProfilesService } from '../../core/api/agent-profiles.service';
 import { Icon } from '../../core/icon';
@@ -22,7 +23,7 @@ const TOOL_LABELS: Record<string, string> = {
  */
 @Component({
   selector: 'app-agent-profiles',
-  imports: [Icon, HlmButton, HlmInput, HlmLabel, HlmSelectImports],
+  imports: [Icon, HlmButton, HlmInput, HlmLabel, HlmSelectImports, HlmSpinner],
   templateUrl: './agent-profiles.html',
 })
 export class AgentProfiles {
@@ -39,6 +40,10 @@ export class AgentProfiles {
   readonly tool = signal('claude-code');
   readonly hasKey = signal(false);
   readonly busy = signal(false);
+  /** The first list request is still out — an empty list means nothing yet. */
+  readonly loading = signal(true);
+  /** Why the list could not be read. Rendered instead of the "none yet" empty state. */
+  readonly loadError = signal('');
 
   /** The select stores the raw tool id; the trigger shows the human label via itemToString. */
   readonly toolLabel = (tool: string): string => TOOL_LABELS[tool] ?? tool;
@@ -47,10 +52,23 @@ export class AgentProfiles {
     this.reload();
   }
 
+  /**
+   * A failed list used to leave the column empty, which reads as "no agent profiles yet" — and
+   * that reading is what makes someone create a second profile that already exists. Show the
+   * failure in its place.
+   */
   reload(): void {
+    this.loading.set(true);
     this.service.list().subscribe({
-      next: (list) => this.profiles.set(list),
-      error: (e) => this.toasts.error(apiError(e, 'Could not load agent profiles')),
+      next: (list) => {
+        this.profiles.set(list);
+        this.loadError.set('');
+        this.loading.set(false);
+      },
+      error: (e) => {
+        this.loadError.set(apiError(e, 'Could not load agent profiles'));
+        this.loading.set(false);
+      },
     });
   }
 

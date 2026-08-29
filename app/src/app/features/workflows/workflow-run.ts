@@ -5,7 +5,15 @@ import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmInput } from '@spartan-ng/helm/input';
 import { HlmLabel } from '@spartan-ng/helm/label';
 import { HlmSpinner } from '@spartan-ng/helm/spinner';
-import { HlmTable, HlmTableContainer, HlmTBody, HlmTd, HlmTh, HlmTHead, HlmTr } from '@spartan-ng/helm/table';
+import {
+  HlmTable,
+  HlmTableContainer,
+  HlmTBody,
+  HlmTd,
+  HlmTh,
+  HlmTHead,
+  HlmTr,
+} from '@spartan-ng/helm/table';
 import { HlmTextarea } from '@spartan-ng/helm/textarea';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { apiError } from '../../core/api-error';
@@ -61,6 +69,9 @@ export class WorkflowRun {
   readonly dragging = signal(false);
   readonly busy = signal(false);
   readonly loadError = signal('');
+  /** Why the preflight check itself did not answer — distinct from a check that said "not ready". */
+  readonly preflightError = signal('');
+  readonly recentError = signal('');
 
   protected readonly sv = statusView;
   protected readonly duration = formatDuration;
@@ -75,12 +86,23 @@ export class WorkflowRun {
     return w.parameters.filter((p) => p.required && !this.value(p.name).trim()).map((p) => p.name);
   });
 
+  /**
+   * Run is enabled only once preflight has said yes.
+   *
+   * This used to read `this.preflight()?.ready ?? true`, so a preflight request that FAILED left
+   * the button enabled and the warning hidden — the app looked most confident exactly where it
+   * knew least. An unanswered check is not a pass: while it is in flight or errored, Run stays
+   * disabled, and the page says which of the two it is.
+   */
   readonly canRun = computed(
     () =>
       this.missing().length === 0 &&
       !this.files().some((f) => this.isTaskMd(f.name)) &&
-      (this.preflight()?.ready ?? true),
+      this.preflight()?.ready === true,
   );
+
+  /** The first poll is still out: Run is disabled, but nothing is wrong yet. */
+  readonly checkingPreflight = computed(() => !this.preflight() && !this.preflightError());
 
   /** The name already loaded, so a re-render does not refetch. */
   private loadedFor = signal('');
@@ -104,8 +126,20 @@ export class WorkflowRun {
         },
         error: (e) => this.loadError.set(apiError(e, `Could not load "${name}"`)),
       });
-      this.service.preflight(name).subscribe({ next: (p) => this.preflight.set(p) });
-      this.service.runs(name).subscribe({ next: (list) => this.recent.set(list.slice(0, 10)) });
+      this.service.preflight(name).subscribe({
+        next: (p) => {
+          this.preflight.set(p);
+          this.preflightError.set('');
+        },
+        error: (e) => this.preflightError.set(apiError(e, 'the check did not answer')),
+      });
+      this.service.runs(name).subscribe({
+        next: (list) => {
+          this.recent.set(list.slice(0, 10));
+          this.recentError.set('');
+        },
+        error: (e) => this.recentError.set(apiError(e, 'Could not load recent runs')),
+      });
     });
   }
 

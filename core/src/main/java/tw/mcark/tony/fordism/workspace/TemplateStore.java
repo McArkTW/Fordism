@@ -27,11 +27,16 @@ import java.util.Optional;
  */
 public final class TemplateStore {
     private static final Gson GSON = new Gson();
-    private final FordismConfiguration configuration;
+    private final Path root;
     private final SkillStore skills;
 
     public TemplateStore(FordismConfiguration configuration, SkillStore skills) {
-        this.configuration = configuration;
+        this(Paths.get(configuration.templatesRoot), skills);
+    }
+
+    /** The directory the templates live in — the seam a test writes to a temp dir through. */
+    public TemplateStore(Path root, SkillStore skills) {
+        this.root = root;
         this.skills = skills;
     }
 
@@ -60,7 +65,7 @@ public final class TemplateStore {
     }
 
     private Path root() {
-        return Paths.get(configuration.templatesRoot);
+        return root;
     }
 
     private Path dir(String id) {

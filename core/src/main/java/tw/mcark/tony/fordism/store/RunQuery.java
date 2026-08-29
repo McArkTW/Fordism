@@ -33,8 +33,8 @@ public record RunQuery(String workflow, Set<WorkflowRunState> states, Long since
 
     /** The runs that want attention: in flight, or parked waiting on a human. */
     public static RunQuery live() {
-        return new RunQuery(null, Set.of(WorkflowRunState.ACTIVE, WorkflowRunState.WAITING_ON_CHILD,
-                WorkflowRunState.ASKED), null, null, false, null, DEFAULT_LIMIT);
+        return new RunQuery(null, Set.of(WorkflowRunState.ACTIVE, WorkflowRunState.ASKED),
+                null, null, false, null, DEFAULT_LIMIT);
     }
 
     public boolean matches(WorkflowRun run) {

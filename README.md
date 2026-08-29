@@ -36,48 +36,63 @@ Workflow YAML → Orchestrator (per strategy) → Dispatcher → [Task = agent c
 - **Two agent runtimes, one image.** The agent image bakes both Claude Code and Qwen
   Code; each Agent Profile carries a `baseUrl`, a write-only API key, a model, and the
   `tool` that drives the task. No LLM gateway — agents call providers directly.
+  Same-session resume (human-in-the-loop and the self-heal loop) is claude-code-only
+  for now; a qwen-code agent runs each task one-shot.
 
 ## Repository layout
 
 | Path | What |
 |---|---|
 | `core/` | Java 25 / Javalin — the **workflow engine**: strategy orchestrators, Dispatcher/Collector/Reaper, the container launcher, and the Agent Profile / template / skill stores. |
-| `app/` | Angular 21 + Tailwind 4 + spartan/ui — the operator UI: **Workflows · Runs · Templates · Skills · Agent Profiles · Credentials**. Built to a static SPA; the container is nginx (and the edge, proxying `/api` → core). |
+| `app/` | Angular 21 + Tailwind 4 + spartan/ui — the operator UI: **Workflows · Runs · Templates · Skills · Agent Profiles · Credentials · Users · Groups**. Built to a static SPA; the container is nginx (and the edge, proxying `/api` → core). |
 | `agent/` | The containerized agent runner — one image baking **both agent CLIs** (Claude Code + Qwen Code); the Agent Profile's `tool` selects which drives the task. The launcher runs one disposable container per task over a host-mounted `/workspace`. |
 | `deploy/` | Deploy assets: per-env `*.env.example` templates and `scripts/deploy.sh` (pull + `compose up` + health check). |
 
 ## Quickstart
 
-Everything is containerized — the only requirement is **Docker**.
+Everything is containerized — the only requirement is **Docker** (images are
+amd64-only for now).
 
 ```bash
 git clone https://github.com/mcark/fordism && cd fordism
-cp .env.example .env        # defaults are fine for a local try-out
-docker compose up -d --build
+cp .env.example .env                       # set FORDISM_ADMIN_SECRET; the rest works locally
+docker compose --profile build-only build  # builds core, app, AND the agent image
+docker compose up -d
 ```
 
 Open `http://localhost` (or `WEB_PORT`), then:
 
-1. **Create an Agent Profile** (Agent Profiles page) — e.g. `baseUrl`
+1. **Create the admin account** — the first visit asks for your `FORDISM_ADMIN_SECRET`
+   and an email + password. The secret is consumed by this one bootstrap and is inert
+   afterwards.
+2. **Create an Agent Profile** (Agent Profiles page) — e.g. `baseUrl`
    `https://api.anthropic.com`, your Anthropic API key, model, tool `claude-code`.
    With exactly one profile defined, it is the default for everything.
-2. **Run an example** — Workflows → `linear-example` → Run. Watch it on the Live
+3. **Run an example** — Workflows → `linear-example` → Run. Watch it on the Live
    page; drill into the run for the agent's result files, transcript, and token usage.
+
+From there, the [operator guide](docs/usage.md) covers writing workflows (the full YAML
+reference), the six strategies, the agent's result contract, and the permission model.
 
 There is **no database** — core keeps run/task state in memory behind a `store` port
 and snapshots it to disk under `FORDISM_ROOT`.
 
 ## Security
 
-> **Do not expose Fordism to the internet.** By default the API requires no
-> authentication, core mounts the host Docker socket to spawn agent containers, and
-> agents run with their CLI permission prompts disabled. Run it on a network you
-> trust, for operators you trust.
+> **Do not expose Fordism to the internet.** Auth is always on, but core mounts the
+> host Docker socket to spawn agent containers, and agents run with their CLI
+> permission prompts disabled — an operator account is a powerful thing. Run it on a
+> network you trust, for operators you trust.
 
-- **Auth is optional and pluggable.** Set `FORDISM_AUTH_PUBKEY` (your identity
-  provider's RS256 public key, PEM), `FORDISM_AUTH_ISSUER`, and — recommended —
-  `FORDISM_AUTH_AUDIENCE` to verify Bearer identity tokens. Empty means auth off:
-  network-gate the deployment instead.
+- **Auth is always on.** Sign in with a local account (default), Google, or GitHub —
+  each enabled by its `FORDISM_AUTH_*` config. An OAuth login maps to an existing
+  user or an explicit email/domain allowlist; there is no open registration. The
+  first visit bootstraps the admin account with the one-time `FORDISM_ADMIN_SECRET`.
+- **Permissions are groups of grants.** Every API route requires a dot-named
+  permission (`workflow.run`, `run.answer`, `credential.write`, …); a group holds
+  users and grant patterns, where a trailing `.*` covers all descendants and `*`
+  covers everything. Four editable groups ship seeded: **admins** (`*`),
+  **maintainers**, **operators**, **viewers**.
 - **No secrets live in this repository.** Provider API keys live per Agent Profile
   (write-only in the UI); agent credentials live on the Credentials page and reach a
   container only because an **Agent Template declared the key** — a drafting agent
@@ -89,8 +104,9 @@ and snapshots it to disk under `FORDISM_ROOT`.
   else; `full` really is the open internet.
 
 Enforced rather than described: `CredentialStoreTest` proves an agent receives only
-the keys its template declared, and `ApiShapeTest` proves no endpoint ever serializes
-an API key or a credential value.
+the keys its template declared, `ApiShapeTest` proves no API response shape carries
+an API key or a credential value, and the auth test suite proves every non-exempt
+route rejects the unauthenticated and the under-privileged.
 
 ## Code style
 
@@ -117,6 +133,13 @@ Not gated — applied in review:
 - **Comments say why.** No restatement of the line above, no commented-out code.
 - **Angular:** single-file components — split the template out past ~100 lines or when it needs
   real scoped CSS. Signals, standalone, `@if`/`@for`.
+
+## Roadmap (v1.1)
+
+Microsoft sign-in · API tokens for programmatic access · qwen-code session resume
+and self-heal · `onFail.mode: resume` for rework · orchestrator reconcile tests ·
+arm64 images · skills management from the UI · per-step `network` in the workflow
+editor · finer user/group permissions · child runs for the reconciler strategy.
 
 ## License
 

@@ -1,6 +1,6 @@
 # fordism-app edge.
-#   /api  → fordism-core (no token gate here — run Fordism on a network you trust,
-#           or configure core's FORDISM_AUTH_* token verification)
+#   /api  → fordism-core, which gates every route itself; this proxy only has to be
+#           same-origin so the session cookie rides along without CORS in the way
 #   /     → the static Angular SPA (client-side routing → index.html fallback)
 server {
     listen 80;

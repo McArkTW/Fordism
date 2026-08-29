@@ -55,6 +55,14 @@ export class TemplateEdit {
   readonly profileOptions = signal<AgentProfileOption[]>([]);
   readonly skillOptions = signal<SkillSummary[]>([]);
   readonly credentialOptions = signal<CredentialOption[]>([]);
+  // Per picker, because they are three independent requests: one failing says nothing about the
+  // other two, and an empty picker must never be read as "there are none" until its own answered.
+  readonly profileOptionsLoading = signal(true);
+  readonly skillOptionsLoading = signal(true);
+  readonly credentialOptionsLoading = signal(true);
+  readonly profileOptionsError = signal('');
+  readonly skillOptionsError = signal('');
+  readonly credentialOptionsError = signal('');
   readonly skillFilter = signal('');
   readonly credentialFilter = signal('');
   readonly busy = signal(false);
@@ -93,19 +101,7 @@ export class TemplateEdit {
   private loaded = '';
 
   constructor() {
-    // Option lists fail silently: a picker stays empty but the form still saves.
-    this.service.sources().subscribe({
-      next: (list) => this.profileOptions.set(list),
-      error: () => {},
-    });
-    this.service.skills().subscribe({
-      next: (list) => this.skillOptions.set(list),
-      error: () => {},
-    });
-    this.service.credentials().subscribe({
-      next: (list) => this.credentialOptions.set(list),
-      error: () => {},
-    });
+    this.loadOptions();
     // Routed inputs bind after the constructor, so the record loads in an effect.
     effect(() => {
       const id = this.id();
@@ -119,6 +115,54 @@ export class TemplateEdit {
 
   private markPristine(): void {
     this.pristine.set(this.snapshot());
+  }
+
+  /**
+   * The three pickers' option lists.
+   *
+   * These used to swallow their errors (`error: () => {}`), so an unreachable core produced
+   * three empty pickers under three confident sentences: no profiles, no skills, no credentials —
+   * "add one on the X page". That sends an operator off to recreate things that already exist. A
+   * failure now names itself under the picker it belongs to; the form still saves either way,
+   * which is why this never blocked the page and still does not.
+   */
+  private loadOptions(): void {
+    this.profileOptionsLoading.set(true);
+    this.service.sources().subscribe({
+      next: (list) => {
+        this.profileOptions.set(list);
+        this.profileOptionsError.set('');
+        this.profileOptionsLoading.set(false);
+      },
+      error: (e) => {
+        this.profileOptionsError.set(apiError(e, 'Could not load agent profiles'));
+        this.profileOptionsLoading.set(false);
+      },
+    });
+    this.skillOptionsLoading.set(true);
+    this.service.skills().subscribe({
+      next: (list) => {
+        this.skillOptions.set(list);
+        this.skillOptionsError.set('');
+        this.skillOptionsLoading.set(false);
+      },
+      error: (e) => {
+        this.skillOptionsError.set(apiError(e, 'Could not load the skills library'));
+        this.skillOptionsLoading.set(false);
+      },
+    });
+    this.credentialOptionsLoading.set(true);
+    this.service.credentials().subscribe({
+      next: (list) => {
+        this.credentialOptions.set(list);
+        this.credentialOptionsError.set('');
+        this.credentialOptionsLoading.set(false);
+      },
+      error: (e) => {
+        this.credentialOptionsError.set(apiError(e, 'Could not load credentials'));
+        this.credentialOptionsLoading.set(false);
+      },
+    });
   }
 
   private load(id: string): void {

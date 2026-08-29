@@ -1,12 +1,13 @@
-# The Fordism agent — Claude Code over a host-mounted workspace. The launcher runs one
-# container per task; it reads task/task.md, does the work, writes result/, and exits.
-# The model backend is chosen at run time by env: ANTHROPIC_BASE_URL points straight at the
-# resolved LLM source's endpoint (e.g. api.anthropic.com for real Claude) — no gateway.
+# The Fordism agent — a one-shot CLI agent (claude-code or qwen-code, chosen at run time by
+# AGENT_TYPE) over a host-mounted workspace. The launcher runs one container per task; it
+# reads task/task.md, does the work, writes result/, and exits.
+# The model backend is chosen at run time by env: ANTHROPIC_BASE_URL (or OPENAI_BASE_URL for
+# qwen-code) points straight at the resolved LLM source's endpoint — no gateway.
 FROM node:22-slim
 
-# openssh-client is REQUIRED: the access-uut-ssh / access-site-server-ssh skills shell out to
-# `ssh`/`scp`, so without it the UUT-collection stage of atc-job-debug / action-healer silently
-# degrades to API-only (`ssh: command not found`). unzip lets agents open downloaded log bundles.
+# openssh-client is REQUIRED: skills that reach remote machines shell out to `ssh`/`scp`, so
+# without it a workflow's log-collection steps silently degrade to API-only
+# (`ssh: command not found`). unzip lets agents open downloaded log bundles.
 # gh is here so an agent can open a pull request. Without it a workflow whose job ends in a
 # change can only ever describe the diff it would have applied.
 #
@@ -25,7 +26,7 @@ RUN apt-get update \
 # take the marker off rather than making every one of them discover --break-system-packages.
 RUN rm -f /usr/lib/python3*/EXTERNALLY-MANAGED
 
-# uv, because that is what the vCosmos repos' own scripts/ wrappers call (conv-project-build-tooling).
+# uv, because that is what many projects' own scripts/ wrappers call to build and test.
 # An agent that pip-installs by hand is not running the project's tests, it is running its own.
 RUN curl -fsSL https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh \
     && uv --version
@@ -45,7 +46,7 @@ RUN curl -fsSL https://github.com/PowerShell/PowerShell/releases/download/v7.4.6
 #   claude-code -> Anthropic dialect (ANTHROPIC_BASE_URL) ; qwen-code -> OpenAI-chat (OPENAI_BASE_URL).
 RUN curl -fsSL https://github.com/cli/cli/releases/download/v2.62.0/gh_2.62.0_linux_amd64.tar.gz     | tar xz -C /usr/local --strip-components=1 gh_2.62.0_linux_amd64/bin/gh     && gh --version
 
-RUN npm install -g @anthropic-ai/claude-code@latest @qwen-code/qwen-code@latest
+RUN npm install -g @anthropic-ai/claude-code@2.1.251 @qwen-code/qwen-code@0.22.3
 
 COPY entrypoint.sh /usr/local/bin/fordism-agent
 COPY CLAUDE.md      /doctrine/CLAUDE.md

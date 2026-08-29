@@ -43,8 +43,8 @@ public final class ReconcilerOrchestrator implements Orchestrator {
                     engine.saveRun(run);
                 }
             }
-            case FAILED, REAPED, ASKED -> engine.finishRun(run, WorkflowRunState.FAILED);
-            default -> { /* wait */ }
+            case FAILED, REAPED -> engine.finishRun(run, WorkflowRunState.FAILED);
+            default -> { /* wait. ASKED never reaches here — Engine parks the run first. */ }
         }
     }
 }

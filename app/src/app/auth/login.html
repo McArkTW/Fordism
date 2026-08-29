@@ -1,0 +1,84 @@
+<div class="flex min-h-[80vh] items-center justify-center">
+  <div class="w-full max-w-sm">
+    <div class="mb-6 flex items-center justify-center gap-2.5">
+      <img src="favicon.svg" alt="" class="h-8 w-8" />
+      <span class="text-xl font-semibold tracking-tight">Fordism</span>
+    </div>
+
+    <div class="border-border bg-card rounded-xl border p-6">
+      <h1 class="text-lg font-semibold">Sign in</h1>
+
+      @if (message(); as m) {
+        <div class="bg-destructive/10 text-destructive mt-3 rounded-lg px-3 py-2 text-sm">{{ m }}</div>
+      }
+
+      @if (loadFailed()) {
+        <p class="text-muted-foreground mt-3 text-sm">
+          Could not reach the server to see how sign-in works here. Reload to try again.
+        </p>
+      } @else if (info(); as i) {
+        @if (i.local) {
+          <form class="mt-4 flex flex-col gap-3" (submit)="$event.preventDefault(); submit()">
+            <div class="flex flex-col gap-1.5">
+              <label hlmLabel for="login-email">Email</label>
+              <input
+                hlmInput
+                id="login-email"
+                type="email"
+                autocomplete="email"
+                [value]="email()"
+                (input)="email.set($any($event.target).value)"
+              />
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label hlmLabel for="login-password">Password</label>
+              <input
+                hlmInput
+                id="login-password"
+                type="password"
+                autocomplete="current-password"
+                [value]="password()"
+                (input)="password.set($any($event.target).value)"
+              />
+            </div>
+            <button hlmBtn type="submit" class="mt-1 w-full" [disabled]="busy()">
+              @if (busy()) {
+                <app-icon name="loader" class="animate-spin" />
+              }
+              Sign in
+            </button>
+          </form>
+        }
+
+        @if (i.local && i.oauth.length > 0) {
+          <div class="text-muted-foreground my-4 flex items-center gap-3 text-xs uppercase">
+            <span class="border-border flex-1 border-t"></span>
+            or
+            <span class="border-border flex-1 border-t"></span>
+          </div>
+        }
+
+        @if (i.oauth.length > 0) {
+          <div class="mt-4 flex flex-col gap-2">
+            @for (id of i.oauth; track id) {
+              <button hlmBtn variant="outline" class="w-full" (click)="startOauth(id)">
+                {{ providerLabel(id) }}
+              </button>
+            }
+          </div>
+        }
+
+        @if (!i.local && i.oauth.length === 0) {
+          <p class="text-muted-foreground mt-3 text-sm">
+            No sign-in methods are enabled on this instance.
+          </p>
+        }
+      } @else {
+        <div class="text-muted-foreground mt-4 flex items-center gap-2 text-sm">
+          <app-icon name="loader" class="animate-spin" />
+          Loading…
+        </div>
+      }
+    </div>
+  </div>
+</div>

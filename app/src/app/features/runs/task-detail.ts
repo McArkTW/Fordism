@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, input, signal } from '@angular/core';
+import { Component, OnDestroy, computed, effect, inject, input, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { HlmButton } from '@spartan-ng/helm/button';
@@ -13,6 +13,12 @@ import { Icon } from '../../core/icon';
 import { formatDuration, formatSize, statusView } from '../../core/status';
 import { Toasts } from '../../core/toast';
 import { Markdown } from '../../shared/markdown';
+
+/** Matches run-detail: a live page refreshes on the same beat the run list does. */
+const REFRESH_MS = 5_000;
+
+/** Nothing more will be written for a task in one of these — the poll has nothing left to ask for. */
+const TERMINAL = ['COLLECTED', 'FAILED', 'REAPED'];
 
 /** One parsed transcript record — role + best-effort text + any tools it invoked. */
 type TxEntry = { role: string; text: string; tools: string[] };
@@ -42,13 +48,14 @@ type FileView = { name: string; size: number; binary: boolean; markdown: boolean
   host: { class: 'block' },
   templateUrl: './task-detail.html',
 })
-export class TaskDetailPage {
+export class TaskDetailPage implements OnDestroy {
   readonly id = input.required<string>();
   readonly taskId = input.required<string>();
 
   private service = inject(RunsService);
   private toasts = inject(Toasts);
   private router = inject(Router);
+  private timer: ReturnType<typeof setInterval>;
 
   readonly run = signal<RunDetail | null>(null);
   readonly error = signal<string>('');
@@ -79,6 +86,12 @@ export class TaskDetailPage {
     return (t?.secretsRequested ?? []).filter((name) => (t?.secretsHeld ?? []).includes(name));
   });
 
+  /** A finished task never changes again; anything else is still being written to. */
+  readonly isLive = computed(() => {
+    const state = this.task()?.state;
+    return !!state && !TERMINAL.includes(state);
+  });
+
   private loaded = '';
 
   constructor() {
@@ -91,8 +104,21 @@ export class TaskDetailPage {
       this.loaded = key;
       this.load(this.id(), this.taskId());
     });
+    // Without this the page froze at whatever the task had written when it was opened: a RUNNING
+    // task's transcript stopped growing on screen and only a manual reload moved it, which reads
+    // as an agent that has stalled. Same beat as run-detail; it stops itself once the task is done.
+    this.timer = setInterval(() => {
+      if (this.isLive()) {
+        this.fetch(this.id(), this.taskId());
+      }
+    }, REFRESH_MS);
   }
 
+  ngOnDestroy(): void {
+    clearInterval(this.timer);
+  }
+
+  /** Open a different task: clear what is on screen first, since none of it belongs to this one. */
   private load(id: string, taskId: string): void {
     this.run.set(null);
     this.error.set('');
@@ -100,19 +126,35 @@ export class TaskDetailPage {
     this.resultError.set('');
     this.transcript.set(null);
     this.transcriptPending.set(true);
+    this.fetch(id, taskId);
+  }
 
+  /**
+   * Read the task again, in place. A failed poll leaves what is already rendered alone — the
+   * transcript on screen was true when it arrived, and blanking it would be a bigger lie than
+   * showing it a few seconds stale.
+   */
+  private fetch(id: string, taskId: string): void {
     this.service.get(id).subscribe({
-      next: (detail) => this.run.set(detail),
+      next: (detail) => {
+        this.run.set(detail);
+        this.error.set('');
+      },
       error: (e) => this.error.set(apiError(e, 'Could not load the run')),
     });
     this.service.result(taskId).subscribe({
       next: (result) => {
+        const firstAnswer = this.files() === null;
         this.files.set(result.files.map((f) => this.toView(f)));
-        // First file open by default: the common case is one result file you came here to read.
-        this.openFiles.set(new Set(result.files.length ? [result.files[0].name] : []));
+        this.resultError.set('');
+        if (firstAnswer) {
+          // First file open by default: the common case is one result file you came here to read.
+          // Only on the first answer — a poll must not reopen what the reader collapsed.
+          this.openFiles.set(new Set(result.files.length ? [result.files[0].name] : []));
+        }
       },
       error: (e) => {
-        this.files.set([]);
+        this.files.set(this.files() ?? []);
         this.resultError.set(apiError(e, 'Could not load result files'));
       },
     });

@@ -6,10 +6,10 @@ const ICONS = [
   'activity', 'alert-triangle', 'arrow-left', 'book-open', 'check', 'chevron-down',
   'chevron-left', 'chevron-right', 'circle-check', 'circle-dot', 'circle-slash', 'circle-x',
   'clock', 'copy', 'cpu', 'download', 'external-link', 'file', 'folder', 'git-branch',
-  'history', 'info', 'key', 'layers', 'list', 'loader', 'menu',
+  'history', 'info', 'key', 'layers', 'list', 'loader', 'log-out', 'menu',
   'message-circle-question-mark', 'moon', 'pencil', 'play', 'plus', 'radio', 'refresh-cw',
-  'save', 'search', 'server', 'sparkles', 'square-pen', 'sun', 'trash-2', 'upload',
-  'workflow', 'x',
+  'save', 'search', 'server', 'shield', 'sparkles', 'square-pen', 'sun', 'trash-2', 'upload',
+  'users', 'workflow', 'x',
 ];
 
 const symbols = ICONS.map((name) => {

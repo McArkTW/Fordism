@@ -3,6 +3,7 @@ import { Component, inject, signal } from '@angular/core';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmInput } from '@spartan-ng/helm/input';
 import { HlmLabel } from '@spartan-ng/helm/label';
+import { HlmSpinner } from '@spartan-ng/helm/spinner';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { apiError } from '../../core/api-error';
 import { CredentialView, CredentialsService } from '../../core/api/credentials.service';
@@ -21,7 +22,7 @@ type Draft = { key: string; value: string; note: string };
  */
 @Component({
   selector: 'app-credentials',
-  imports: [DatePipe, Icon, HlmButton, HlmInput, HlmLabel, HlmTooltip],
+  imports: [DatePipe, Icon, HlmButton, HlmInput, HlmLabel, HlmSpinner, HlmTooltip],
   templateUrl: './credentials.html',
 })
 export class Credentials {
@@ -33,15 +34,32 @@ export class Credentials {
   readonly draft = signal<Draft | null>(null);
   readonly editing = signal(false);
   readonly busy = signal(false);
+  /** The first list request is still out — an empty table means nothing yet. */
+  readonly loading = signal(true);
+  /** Why the list could not be read. Rendered instead of the "none stored" empty state. */
+  readonly loadError = signal('');
 
   constructor() {
     this.refresh();
   }
 
+  /**
+   * A failed list used to leave the table empty, which the page explained as "No credentials
+   * stored" — the one reading an operator must not be given, because it invites re-entering
+   * secrets that are already there. Show the failure instead.
+   */
   refresh(): void {
+    this.loading.set(true);
     this.service.list().subscribe({
-      next: (list) => this.items.set(list),
-      error: (e) => this.toasts.error(apiError(e, 'Could not load credentials')),
+      next: (list) => {
+        this.items.set(list);
+        this.loadError.set('');
+        this.loading.set(false);
+      },
+      error: (e) => {
+        this.loadError.set(apiError(e, 'Could not load credentials'));
+        this.loading.set(false);
+      },
     });
   }
 
@@ -101,7 +119,12 @@ export class Credentials {
     const warning = c.usedBy.length
       ? ` It is still granted by: ${c.usedBy.join(', ')} — runs from those templates will lose it.`
       : '';
-    const ok = await this.confirm.ask('Delete credential', `Delete ${c.key}?${warning}`, 'Delete', true);
+    const ok = await this.confirm.ask(
+      'Delete credential',
+      `Delete ${c.key}?${warning}`,
+      'Delete',
+      true,
+    );
     if (!ok) {
       return;
     }
