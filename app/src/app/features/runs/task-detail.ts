@@ -3,6 +3,7 @@ import { DatePipe } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { Router, RouterLink } from '@angular/router';
 import { apiError } from '../../core/api-error';
 import { ResultFile, RunDetail, RunsService, TaskView } from '../../core/api/runs.service';
@@ -24,7 +25,7 @@ type FileView = { name: string; size: number; binary: boolean; markdown: boolean
  */
 @Component({
   selector: 'app-task-detail',
-  imports: [RouterLink, Icon, DatePipe, Markdown, MatButtonModule, MatFormFieldModule, MatInputModule],
+  imports: [RouterLink, Icon, DatePipe, Markdown, MatButtonModule, MatFormFieldModule, MatInputModule, MatTooltipModule],
   host: { class: 'block' },
   templateUrl: './task-detail.html',
 })

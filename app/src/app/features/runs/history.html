@@ -17,9 +17,9 @@
 
   <!-- search -->
   <div class="relative mt-5">
-    <app-icon name="search" class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted" />
+    <app-icon name="search" class="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-muted" />
     <input
-      class="input pl-9"
+      class="input pl-8"
       [value]="search()"
       (input)="onSearch($any($event.target).value)"
       (keydown.enter)="flushSearch()"

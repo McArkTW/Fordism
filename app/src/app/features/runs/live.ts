@@ -1,5 +1,6 @@
 import { Component, OnDestroy, computed, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 import { apiError } from '../../core/api-error';
 import { RunSummary, RunsService } from '../../core/api/runs.service';
@@ -22,7 +23,7 @@ const REFRESH_MS = 10_000;
  */
 @Component({
   selector: 'app-live',
-  imports: [RouterLink, Icon, MatButtonModule],
+  imports: [RouterLink, Icon, MatButtonModule, MatTooltipModule],
   host: { class: 'block' },
   template: `
     <div class="mx-auto w-full max-w-5xl">
@@ -57,7 +58,7 @@ const REFRESH_MS = 10_000;
       }
 
       @if (asked().length) {
-        <div class="mt-6 text-[11px] font-semibold tracking-wide text-muted uppercase">Waiting on you · longest first</div>
+        <div class="mt-6 text-sm font-semibold tracking-wide text-muted uppercase">Waiting on you · longest first</div>
         <div class="mt-2 space-y-2">
           @for (r of asked(); track r.id) {
             <a
@@ -69,7 +70,7 @@ const REFRESH_MS = 10_000;
               <span class="font-mono text-[11px] text-muted">{{ r.id }}</span>
               <span class="flex-auto"></span>
               <span class="text-xs text-amber-500">asked {{ ago(r.createdAt) }}</span>
-              <button matIconButton type="button" title="Stop this run" (click)="abandon(r, $event)">
+              <button matIconButton type="button" matTooltip="Stop this run" (click)="abandon(r, $event)">
                 <app-icon name="circle-slash" />
               </button>
             </a>
@@ -78,7 +79,7 @@ const REFRESH_MS = 10_000;
       }
 
       @if (running().length) {
-        <div class="mt-6 text-[11px] font-semibold tracking-wide text-muted uppercase">Running · newest first</div>
+        <div class="mt-6 text-sm font-semibold tracking-wide text-muted uppercase">Running · newest first</div>
         <div class="card mt-2 divide-y divide-edge">
           @for (r of running(); track r.id) {
             @let v = view(r.state);
@@ -94,7 +95,7 @@ const REFRESH_MS = 10_000;
               <span class="font-mono text-[11px] text-muted">{{ r.id }}</span>
               <span class="flex-auto"></span>
               <span class="text-xs text-muted">started {{ ago(r.createdAt) }}</span>
-              <button matIconButton type="button" title="Stop this run" (click)="abandon(r, $event)">
+              <button matIconButton type="button" matTooltip="Stop this run" (click)="abandon(r, $event)">
                 <app-icon name="circle-slash" />
               </button>
             </a>

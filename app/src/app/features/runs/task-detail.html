@@ -24,7 +24,7 @@
     <div class="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
       <span class="flex items-center gap-1.5 font-mono text-[11px]">
         task id: {{ t.taskId }}
-        <button matIconButton type="button" title="Copy task id" (click)="copy(t.taskId)">
+        <button matIconButton type="button" matTooltip="Copy task id" (click)="copy(t.taskId)">
           <app-icon name="copy" />
         </button>
       </span>
@@ -111,7 +111,7 @@
 
     <!-- Summary -->
     <section class="mt-6">
-      <div class="mb-1.5 text-xs font-semibold tracking-wide text-muted uppercase">Summary</div>
+      <div class="mb-1.5 text-sm font-semibold tracking-wide text-muted uppercase">Summary</div>
       @if (t.summary) {
         <div class="card p-3">
           <app-markdown [source]="t.summary" />
@@ -123,7 +123,7 @@
 
     <!-- Result files -->
     <section class="mt-6">
-      <div class="mb-1.5 text-xs font-semibold tracking-wide text-muted uppercase">
+      <div class="mb-1.5 text-sm font-semibold tracking-wide text-muted uppercase">
         Result files @if (files(); as fs) { · {{ fs.length }} }
       </div>
       @if (files(); as fs) {
@@ -175,7 +175,7 @@
       <button
         matButton
         type="button"
-        class="text-xs font-semibold tracking-wide uppercase"
+        class="text-sm font-semibold tracking-wide uppercase"
         (click)="showTranscript.set(!showTranscript())"
       >
         <app-icon [name]="showTranscript() ? 'chevron-down' : 'chevron-right'" />

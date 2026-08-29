@@ -1,6 +1,7 @@
 import { DatePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { apiError } from '../../core/api-error';
 import {
   SkillDetail,
@@ -19,7 +20,7 @@ import { Markdown } from '../../shared/markdown';
  */
 @Component({
   selector: 'app-skills',
-  imports: [DatePipe, Icon, Markdown, MatSlideToggleModule],
+  imports: [DatePipe, Icon, Markdown, MatSlideToggleModule, MatTooltipModule],
   templateUrl: './skills.html',
 })
 export class Skills {

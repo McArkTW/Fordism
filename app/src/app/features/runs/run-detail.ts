@@ -1,6 +1,7 @@
 import { Component, OnDestroy, computed, effect, inject, input, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 import { apiError } from '../../core/api-error';
 import { RunDetail, RunsService, TaskView } from '../../core/api/runs.service';
@@ -21,7 +22,7 @@ const TERMINAL = ['DONE', 'FAILED', 'ABANDONED'];
  */
 @Component({
   selector: 'app-run-detail',
-  imports: [RouterLink, Icon, DatePipe, MatButtonModule],
+  imports: [RouterLink, Icon, DatePipe, MatButtonModule, MatTooltipModule],
   host: { class: 'block' },
   templateUrl: './run-detail.html',
   styles: `

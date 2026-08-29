@@ -3,6 +3,7 @@ import { Component, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { apiError } from '../../core/api-error';
 import { CredentialView, CredentialsService } from '../../core/api/credentials.service';
 import { Icon } from '../../core/icon';
@@ -20,7 +21,7 @@ type Draft = { key: string; value: string; note: string };
  */
 @Component({
   selector: 'app-credentials',
-  imports: [DatePipe, Icon, MatButtonModule, MatFormFieldModule, MatInputModule],
+  imports: [DatePipe, Icon, MatButtonModule, MatFormFieldModule, MatInputModule, MatTooltipModule],
   templateUrl: './credentials.html',
 })
 export class Credentials {

@@ -37,7 +37,7 @@
 
     <div class="mt-1.5 flex items-center gap-1.5 font-mono text-[11px] text-muted">
       run id: {{ d.id }}
-      <button matIconButton type="button" title="Copy run id" (click)="copy(d.id)">
+      <button matIconButton type="button" matTooltip="Copy run id" (click)="copy(d.id)">
         <app-icon name="copy" />
       </button>
     </div>

@@ -3,6 +3,7 @@ import { Component, computed, effect, inject, input, signal } from '@angular/cor
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { Router, RouterLink } from '@angular/router';
 import { apiError } from '../../core/api-error';
 import { RunSummary } from '../../core/api/runs.service';
@@ -21,7 +22,7 @@ import { Toasts } from '../../core/toast';
  */
 @Component({
   selector: 'app-workflow-run',
-  imports: [RouterLink, Icon, DatePipe, MatButtonModule, MatFormFieldModule, MatInputModule],
+  imports: [RouterLink, Icon, DatePipe, MatButtonModule, MatFormFieldModule, MatInputModule, MatTooltipModule],
   host: { class: 'block' },
   templateUrl: './workflow-run.html',
 })

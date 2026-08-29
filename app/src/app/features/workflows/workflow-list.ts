@@ -13,86 +13,90 @@ import { Toasts } from '../../core/toast';
   imports: [RouterLink, Icon, MatButtonModule],
   host: { class: 'block' },
   template: `
-    <div class="mx-auto w-full max-w-6xl p-6">
+    <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
       <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 class="page-h">Workflows</h1>
-          <p class="mt-1 text-sm text-muted">What the agents run, and how their steps are ordered.</p>
+          <p class="text-sm text-muted">What the agents run, and how their steps are ordered.</p>
         </div>
         <a matButton="filled" routerLink="/workflows/new"><app-icon name="plus" />New workflow</a>
       </div>
 
-      <div class="relative mt-5">
-        <app-icon name="search" class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted" />
-        <input
-          class="input pl-9"
-          placeholder="Filter by name, description, tag, strategy or template…"
-          [value]="filter()"
-          (input)="filter.set($any($event.target).value)"
-        />
-      </div>
-
-      @if (tags().length) {
-        <div class="mt-3 flex flex-wrap gap-2">
-          @for (t of tags(); track t) {
-            <button
-              type="button"
-              (click)="toggleTag(t)"
-              class="rounded-full border px-2.5 py-1 text-xs transition"
-              [class]="filter().includes(t) ? 'border-accent bg-accent/15 text-accent' : 'border-edge bg-panel text-muted hover:text-ink'"
-            >
-              {{ t }}
-            </button>
-          }
-        </div>
-      }
-
-      @if (loading()) {
-        <div class="mt-10 flex justify-center text-muted"><app-icon name="loader" class="spin text-xl" /></div>
-      } @else {
-        <div class="mt-4 text-xs text-muted">{{ shown().length }} of {{ all().length }}</div>
-
-        <div class="mt-2 grid grid-cols-1 gap-3 lg:grid-cols-2">
-          @for (w of shown(); track w.name) {
-            <section class="card p-4 transition hover:border-muted">
-              <div class="flex flex-wrap items-center gap-2">
-                <a class="font-medium hover:underline" [routerLink]="['/workflows', w.name, 'edit']">{{ w.name }}</a>
-                <span class="badge-muted">{{ w.strategy }}</span>
-                <span class="text-xs text-muted">{{ w.steps }} {{ w.steps === 1 ? 'step' : 'steps' }}</span>
-                <span class="flex-auto"></span>
-                <!-- Outlined, not filled: a filled Run in every card would drown the page's one primary action. -->
-                <a matButton="outlined" [routerLink]="['/workflows', w.name, 'run']"><app-icon name="play" />Run</a>
-                <a matButton="outlined" [routerLink]="['/workflows', w.name, 'edit']"><app-icon name="pencil" />Edit</a>
-              </div>
-              @if (w.description) {
-                <p class="mt-1.5 line-clamp-2 text-sm text-muted">{{ w.description }}</p>
-              }
-              @if (w.tags.length || w.templates.length) {
-                <div class="mt-2 flex flex-wrap items-center gap-1.5">
-                  @for (t of w.tags; track t) {
-                    <span class="rounded-full bg-ink/10 px-2 py-0.5 text-[11px]">{{ t }}</span>
-                  }
-                  @for (t of w.templates; track t) {
-                    <span class="rounded bg-ink/5 px-1.5 py-0.5 font-mono text-[11px] text-muted">{{ t }}</span>
-                  }
-                </div>
-              }
-            </section>
-          }
+      <div class="flex flex-col gap-3">
+        <div class="relative">
+          <app-icon name="search" class="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-muted" />
+          <input
+            class="input pl-8"
+            placeholder="Filter by name, description, tag, strategy or template…"
+            [value]="filter()"
+            (input)="filter.set($any($event.target).value)"
+          />
         </div>
 
-        @if (shown().length === 0) {
-          <div class="card mt-4 border-dashed px-6 py-16 text-center">
-            @if (all().length === 0) {
-              <p class="text-sm text-muted">
-                No workflows yet. A workflow is the YAML that tells the agents what to run and in what order.
-              </p>
-              <a matButton="filled" class="mt-4" routerLink="/workflows/new"><app-icon name="plus" />Create your first workflow</a>
-            } @else {
-              <p class="text-sm text-muted">Nothing matches "{{ filter() }}".</p>
+        @if (tags().length) {
+          <div class="flex flex-wrap gap-2">
+            @for (t of tags(); track t) {
+              <button
+                type="button"
+                (click)="toggleTag(t)"
+                class="cursor-pointer rounded-full border px-2.5 py-1 text-xs transition"
+                [class]="filter().includes(t) ? 'border-accent bg-accent/15 text-accent' : 'border-edge bg-panel text-muted hover:text-ink'"
+              >
+                {{ t }}
+              </button>
             }
           </div>
         }
+      </div>
+
+      @if (loading()) {
+        <div class="flex justify-center py-10 text-muted"><app-icon name="loader" class="spin text-xl" /></div>
+      } @else {
+        <div class="flex flex-col gap-2">
+          <div class="text-xs text-muted">{{ shown().length }} of {{ all().length }}</div>
+
+          <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            @for (w of shown(); track w.name) {
+              <section class="card p-4 transition hover:border-muted">
+                <div class="flex flex-wrap items-center gap-2">
+                  <a class="font-medium hover:underline" [routerLink]="['/workflows', w.name, 'edit']">{{ w.name }}</a>
+                  <span class="badge-muted">{{ w.strategy }}</span>
+                  <span class="text-xs text-muted">{{ w.steps }} {{ w.steps === 1 ? 'step' : 'steps' }}</span>
+                  <span class="flex-auto"></span>
+                  <!-- Outlined, not filled: a filled Run in every card would drown the page's one primary action. -->
+                  <a matButton="outlined" [routerLink]="['/workflows', w.name, 'run']"><app-icon name="play" />Run</a>
+                  <a matButton="outlined" [routerLink]="['/workflows', w.name, 'edit']"><app-icon name="pencil" />Edit</a>
+                </div>
+                @if (w.description) {
+                  <p class="mt-1.5 line-clamp-2 text-sm text-muted">{{ w.description }}</p>
+                }
+                @if (w.tags.length || w.templates.length) {
+                  <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                    @for (t of w.tags; track t) {
+                      <span class="rounded-full bg-ink/10 px-2 py-0.5 text-[11px]">{{ t }}</span>
+                    }
+                    @for (t of w.templates; track t) {
+                      <span class="rounded bg-ink/5 px-1.5 py-0.5 font-mono text-[11px] text-muted">{{ t }}</span>
+                    }
+                  </div>
+                }
+              </section>
+            }
+          </div>
+
+          @if (shown().length === 0) {
+            <div class="card mt-2 border-dashed px-6 py-16 text-center">
+              @if (all().length === 0) {
+                <p class="text-sm text-muted">
+                  No workflows yet. A workflow is the YAML that tells the agents what to run and in what order.
+                </p>
+                <a matButton="outlined" class="mt-4" routerLink="/workflows/new"><app-icon name="plus" />Create your first workflow</a>
+              } @else {
+                <p class="text-sm text-muted">Nothing matches "{{ filter() }}".</p>
+              }
+            </div>
+          }
+        </div>
       }
     </div>
   `,

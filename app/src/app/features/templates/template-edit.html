@@ -1,4 +1,4 @@
-<div class="mx-auto max-w-3xl">
+<div class="mx-auto flex max-w-3xl flex-col gap-6">
   <div class="flex flex-wrap items-center gap-3">
     <a matButton routerLink="/templates"><app-icon name="arrow-left" />Agent Templates</a>
     <h1 class="page-h">{{ isNew() ? 'New template' : name() || 'Template' }}</h1>
@@ -8,7 +8,7 @@
     }
   </div>
 
-  <div class="card mt-6 p-5">
+  <div class="card p-5">
     <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full">
       <mat-label>Name</mat-label>
       <input
@@ -21,7 +21,7 @@
       />
     </mat-form-field>
 
-    <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <div class="mt-4 grid grid-cols-1 items-start gap-x-6 gap-y-5 sm:grid-cols-2">
       <div>
         <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full">
           <mat-label>Agent profile</mat-label>
@@ -63,22 +63,21 @@
 
     <div class="mt-6">
       <div class="flex items-center justify-between">
-        <div class="text-sm font-medium">
-          Skills the agent may use <span class="text-muted">· {{ skills().length }} selected</span>
+        <div class="text-sm font-semibold tracking-wide text-muted uppercase">
+          Skills the agent may use
+          <span class="font-normal tracking-normal normal-case">· {{ skills().length }} selected</span>
         </div>
         @if (skills().length) {
-          <button type="button" class="cursor-pointer text-xs text-muted hover:text-ink" (click)="skills.set([])">
-            Clear all
-          </button>
+          <button matButton type="button" (click)="skills.set([])">Clear all</button>
         }
       </div>
       @if (skillOptions().length === 0) {
         <p class="mt-2 text-xs text-muted">No skills in the library yet — sync them on the Skills page.</p>
       } @else {
         <div class="relative mt-2">
-          <app-icon name="search" class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted" />
+          <app-icon name="search" class="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-muted" />
           <input
-            class="input pl-9"
+            class="input pl-8"
             placeholder="Filter skills…"
             [value]="skillFilter()"
             (input)="skillFilter.set($any($event.target).value)"
@@ -123,23 +122,21 @@
 
     <div class="mt-6">
       <div class="flex items-center justify-between">
-        <div class="text-sm font-medium">
+        <div class="text-sm font-semibold tracking-wide text-muted uppercase">
           Credentials the agent receives
-          <span class="text-muted">· {{ credentials().length }} granted</span>
+          <span class="font-normal tracking-normal normal-case">· {{ credentials().length }} granted</span>
         </div>
         @if (credentials().length) {
-          <button type="button" class="cursor-pointer text-xs text-muted hover:text-ink" (click)="credentials.set([])">
-            Clear all
-          </button>
+          <button matButton type="button" (click)="credentials.set([])">Clear all</button>
         }
       </div>
       @if (credentialOptions().length === 0) {
         <p class="mt-2 text-xs text-muted">No credentials stored — add one on the Credentials page.</p>
       } @else {
         <div class="relative mt-2">
-          <app-icon name="search" class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted" />
+          <app-icon name="search" class="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-muted" />
           <input
-            class="input pl-9"
+            class="input pl-8"
             placeholder="Filter credentials…"
             [value]="credentialFilter()"
             (input)="credentialFilter.set($any($event.target).value)"

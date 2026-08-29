@@ -1,4 +1,5 @@
 import { Component, inject } from '@angular/core';
+import { MatButtonModule } from '@angular/material/button';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { Attention } from './core/attention';
@@ -22,7 +23,7 @@ const CONFIGURE: NavItem[] = [
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, Icon],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, Icon, MatButtonModule],
   templateUrl: './app.html',
 })
 export class App {

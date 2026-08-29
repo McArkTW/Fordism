@@ -11,11 +11,11 @@ import { Toasts } from '../../core/toast';
   selector: 'app-template-list',
   imports: [RouterLink, Icon, MatButtonModule],
   template: `
-    <div class="mx-auto max-w-4xl">
+    <div class="mx-auto flex max-w-4xl flex-col gap-6">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 class="page-h">Agent Templates</h1>
-          <p class="mt-1 text-sm text-muted">
+          <p class="text-sm text-muted">
             Reusable presets a workflow step runs with. Each one picks a profile, skills,
             credentials and standing instructions.
           </p>
@@ -24,23 +24,23 @@ import { Toasts } from '../../core/toast';
       </div>
 
       @if (loading()) {
-        <div class="card mt-6 flex items-center justify-center gap-2 p-10 text-sm text-muted">
+        <div class="card flex items-center justify-center gap-2 p-10 text-sm text-muted">
           <app-icon name="loader" class="spin" />Loading…
         </div>
       } @else if (templates().length === 0) {
-        <div class="card mt-6 flex flex-col items-center px-6 py-16 text-center">
+        <div class="card flex flex-col items-center px-6 py-16 text-center">
           <app-icon name="layers" class="text-3xl text-muted" />
           <div class="mt-3 text-sm font-medium">No templates yet.</div>
           <p class="mt-1 max-w-md text-sm text-muted">
             A template bundles an agent profile, the skills the agent may use, the credentials it
             receives and standing instructions. Workflow steps run with a template.
           </p>
-          <a matButton="filled" routerLink="/templates/new" class="mt-5">
+          <a matButton="outlined" routerLink="/templates/new" class="mt-5">
             <app-icon name="plus" />Create the first template
           </a>
         </div>
       } @else {
-        <div class="card mt-6 overflow-hidden">
+        <div class="card overflow-x-auto">
           <table class="w-full">
             <thead>
               <tr>

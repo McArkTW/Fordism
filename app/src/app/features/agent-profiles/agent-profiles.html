@@ -1,15 +1,15 @@
-<div class="mx-auto max-w-6xl">
+<div class="mx-auto flex max-w-6xl flex-col gap-6">
   <div class="flex flex-wrap items-center justify-between gap-3">
     <div>
       <h1 class="page-h">Agent Profiles</h1>
-      <p class="mt-1 text-sm text-muted">
+      <p class="text-sm text-muted">
         A model backend + the agent tool that drives it. Templates pick a profile by name.
       </p>
     </div>
-    <button matButton="filled" (click)="startNew()"><app-icon name="plus" />New profile</button>
+    <button matButton="outlined" (click)="startNew()"><app-icon name="plus" />New profile</button>
   </div>
 
-  <div class="card mt-4 flex items-start gap-2.5 p-3 text-xs text-muted">
+  <div class="card flex items-start gap-2.5 p-3 text-xs text-muted">
     <app-icon name="info" class="mt-0.5 shrink-0" />
     <p>
       API keys are write-only: a stored key is never shown again — type one only to set or replace
@@ -17,7 +17,7 @@
     </p>
   </div>
 
-  <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
+  <div class="grid grid-cols-1 gap-6 lg:grid-cols-12">
     <div class="card overflow-hidden lg:col-span-5">
       @if (profiles().length === 0) {
         <div class="px-4 py-16 text-center text-sm text-muted">No agent profiles yet.</div>
@@ -53,11 +53,11 @@
 
     <div class="lg:col-span-7">
       <div class="card p-5">
-        <div class="text-sm font-medium">
+        <h2 class="text-sm font-semibold tracking-wide text-muted uppercase">
           {{ selected() ? 'Edit “' + name() + '”' : 'New profile' }}
-        </div>
+        </h2>
 
-        <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div class="mt-4 grid grid-cols-1 items-start gap-x-6 gap-y-5 sm:grid-cols-2">
           <mat-form-field appearance="outline" subscriptSizing="dynamic" class="w-full">
             <mat-label>Profile name</mat-label>
             <input
