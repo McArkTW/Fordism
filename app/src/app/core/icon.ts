@@ -9,7 +9,9 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `<svg class="lucide" aria-hidden="true"><use [attr.href]="'#' + name()" /></svg>`,
   styles: `
-    :host { display: inline-flex; line-height: 1; }
+    /* Sit on the text's optical center, not the baseline — otherwise the icon
+       rides high beside button labels. */
+    :host { display: inline-flex; line-height: 1; vertical-align: -0.125em; }
     .lucide {
       width: 1em; height: 1em;
       fill: none; stroke: currentColor;
