@@ -17,7 +17,7 @@ jobs:
   gates:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # gitleaks scans history, not just the tip
       - name: gitleaks
@@ -47,7 +47,7 @@ jobs:
     needs: [gates]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Both of these get their own step: $GITHUB_ENV reaches the NEXT step, not the one
       # that writes it, so a build reading them here would see neither. REGISTRY is

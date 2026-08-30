@@ -11,7 +11,7 @@ jobs:
   secret-scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # gitleaks scans history, not just the tip
       - name: gitleaks
@@ -22,7 +22,7 @@ jobs:
   core:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -34,7 +34,7 @@ jobs:
   app:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -55,7 +55,7 @@ jobs:
     # so a byte diff would fail on whitespace alone.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Vectors match
         run: |
           node -e "
@@ -72,7 +72,7 @@ jobs:
     needs: [secret-scan, core, app, vectors]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # GHCR namespaces are lowercase and docker refuses a tag that is not, so
       # github.repository (McArkTW/fordism) cannot be used verbatim.
       - name: Registry name
