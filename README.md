@@ -192,9 +192,10 @@ is enforced, not argued.
 
 ## Commercial support
 
-Fordism is built and maintained by [Tony](https://github.com/tony19907051). If you want help
-deploying, hardening, or extending it — or a feature prioritized — reach out at
-<tony19907051@gmail.com>.
+Fordism is for teams that need to run coding agents on their own infrastructure — self-hosted,
+inside your network, pointed at whatever model endpoint you choose (including a local one, so it
+can run air-gapped). If you're evaluating it for that, or want help deploying, hardening, or
+extending it — or a feature prioritized — reach out at <tony19907051@gmail.com>.
 
 ## License
 
