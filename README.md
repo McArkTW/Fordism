@@ -54,7 +54,7 @@ Everything is containerized — the only requirement is **Docker** (images are
 amd64-only for now).
 
 ```bash
-git clone https://github.com/mcark/fordism && cd fordism
+git clone https://github.com/McArkTW/fordism && cd fordism
 cp .env.example .env                       # set FORDISM_ADMIN_SECRET; the rest works locally
 docker compose --profile build-only build  # builds core, app, AND the agent image
 docker compose up -d
@@ -145,4 +145,4 @@ permissions · child runs for the reconciler strategy.
 
 Apache-2.0 — see [LICENSE](./LICENSE). Copyright 2026 The Fordism Authors.
 Created and maintained by Tony ([tony19907051](https://github.com/tony19907051)),
-published under the [mcark](https://github.com/mcark) organization.
+published under the [McArkTW](https://github.com/McArkTW) organization.

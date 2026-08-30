@@ -49,12 +49,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build images
+      # Both of these get their own step: $GITHUB_ENV reaches the NEXT step, not the one
+      # that writes it, so a build reading them here would see neither. REGISTRY is
+      # lowercased because GHCR namespaces are and docker refuses a tag that is not —
+      # github.repository is McArkTW/fordism.
+      - name: Image identity
         run: |
+          echo "REGISTRY=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
           echo "FORDISM_BUILT_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
-          docker compose --profile build-only build
+
+      - name: Build images
+        run: docker compose --profile build-only build
         env:
-          REGISTRY: ghcr.io/${{ github.repository }}
           TAG: ${{ github.ref_name }}
           FORDISM_VERSION: ${{ github.ref_name }}
           FORDISM_GIT_SHA: ${{ github.sha }}
@@ -63,10 +69,10 @@ jobs:
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
           for image in fordism-core fordism-app fordism-agent; do
-            docker tag  "ghcr.io/${{ github.repository }}/${image}:${{ github.ref_name }}" \
-                        "ghcr.io/${{ github.repository }}/${image}:latest"
-            docker push "ghcr.io/${{ github.repository }}/${image}:${{ github.ref_name }}"
-            docker push "ghcr.io/${{ github.repository }}/${image}:latest"
+            docker tag  "${REGISTRY}/${image}:${{ github.ref_name }}" \
+                        "${REGISTRY}/${image}:latest"
+            docker push "${REGISTRY}/${image}:${{ github.ref_name }}"
+            docker push "${REGISTRY}/${image}:latest"
           done
 
       - name: Create GitHub Release

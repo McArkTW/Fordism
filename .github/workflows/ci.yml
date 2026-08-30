@@ -73,10 +73,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # GHCR namespaces are lowercase and docker refuses a tag that is not, so
+      # github.repository (McArkTW/fordism) cannot be used verbatim.
+      - name: Registry name
+        run: echo "REGISTRY=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
       - name: Build images
         run: docker compose --profile build-only build
         env:
-          REGISTRY: ghcr.io/${{ github.repository }}
           TAG: ci
           FORDISM_VERSION: ${{ github.ref_name }}
           FORDISM_GIT_SHA: ${{ github.sha }}

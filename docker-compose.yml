@@ -14,7 +14,7 @@ name: fordism
 
 services:
   fordism-core:
-    image: ${REGISTRY:-ghcr.io/mcark/fordism}/fordism-core:${TAG:-latest}
+    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-core:${TAG:-latest}
     environment:
       # Build identity — stamped by CI at deploy; surfaced at /api/version.
       FORDISM_VERSION: ${FORDISM_VERSION:-dev}
@@ -66,7 +66,7 @@ services:
 
   # Static Angular SPA served by nginx; also the edge (proxies /api → core).
   fordism-app:
-    image: ${REGISTRY:-ghcr.io/mcark/fordism}/fordism-app:${TAG:-latest}
+    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-app:${TAG:-latest}
     ports:
       - "${WEB_PORT:-80}:80"
     depends_on: [fordism-core]
@@ -77,7 +77,7 @@ services:
   # same REGISTRY/TAG as the others. The launcher runs one of these per task; nothing
   # long-lived. Behind a profile so `up` never starts it.
   fordism-agent:
-    image: ${REGISTRY:-ghcr.io/mcark/fordism}/fordism-agent:${TAG:-latest}
+    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent:${TAG:-latest}
     profiles: ["build-only"]
 
 networks:
