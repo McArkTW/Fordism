@@ -156,6 +156,23 @@ class SkillPluginStoreTest {
     }
 
     /**
+     * A GitHub archive URL ends in the ref, not the repo, so the last segment would name the
+     * plugin {@code main} — and that URL is what GitHub's "Download ZIP" button hands out.
+     */
+    @Test
+    void a_github_archive_zip_is_named_after_the_repo_not_the_ref() {
+        assertEquals("skills", SkillPluginStore.folderName(
+                "https://github.com/anthropics/skills/archive/refs/heads/main.zip"));
+        assertEquals("toolkit", SkillPluginStore.folderName(
+                "https://github.com/acme/toolkit/archive/refs/tags/v1.0.0.zip"));
+        assertEquals("toolkit", SkillPluginStore.folderName(
+                "https://github.com/acme/toolkit/archive/9f2a1c.zip"));
+        // Anything that is not a GitHub archive still reads its name off the last segment.
+        assertEquals("skills", SkillPluginStore.folderName("https://example.com/build/skills.zip"));
+        assertEquals("toolkit", SkillPluginStore.folderName("https://github.com/acme/toolkit"));
+    }
+
+    /**
      * A URL that can never resolve leaves nothing behind. It used to be registered anyway — {@code
      * add} persisted the plugin and let the first {@code sync} record the failure as {@code
      * lastError}, which is right for a 404 that may pass on retry but wrong for a URL shape that

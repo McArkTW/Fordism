@@ -19,6 +19,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.tinylog.Logger;
 
@@ -38,6 +40,9 @@ import org.tinylog.Logger;
 public final class SkillPluginStore {
     private static final Gson GSON = new Gson();
     private static final Duration TIMEOUT = Duration.ofSeconds(60);
+    /** {@code https://github.com/<owner>/<repo>/archive/<ref…>} — group 1 stops after the repo. */
+    private static final Pattern GITHUB_ARCHIVE =
+            Pattern.compile("(https?://(?:www[.])?github[.]com/[^/]+/[^/]+)/archive/.*");
 
     private final Path file;
     private final Path skillsRoot;
@@ -216,10 +221,22 @@ public final class SkillPluginStore {
         return "https://codeload.github.com/" + path + "/zip/" + ref;
     }
 
-    /** {@code <plugin>} in the library — the repo name, with anything path-unsafe dropped. */
+    /**
+     * {@code <plugin>} in the library — the repo name, with anything path-unsafe dropped.
+     *
+     * <p>Normally that is the URL's last segment, which is the repo. A GitHub archive URL ends in
+     * the <em>ref</em> instead ({@code …/skills/archive/refs/heads/main.zip}), so the last segment
+     * would install 19 skills under {@code main/}. That URL is what GitHub's own "Download ZIP"
+     * button hands out, so it is the likeliest direct zip anyone pastes; the repo is read out of
+     * the path instead.
+     */
     static String folderName(String url) {
         String cleaned = url.trim().replaceFirst("[.]zip$", "").replaceFirst("[.]git$", "")
                 .replaceAll("/+$", "");
+        Matcher archive = GITHUB_ARCHIVE.matcher(cleaned);
+        if (archive.matches()) {
+            cleaned = archive.group(1);
+        }
         String last = cleaned.substring(cleaned.lastIndexOf('/') + 1);
         last = last.substring(last.lastIndexOf(':') + 1);
         String safe = last.replaceAll("[^A-Za-z0-9._-]", "-").replaceAll("^[.-]+", "");
