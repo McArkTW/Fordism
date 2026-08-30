@@ -11,7 +11,6 @@ import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -25,8 +24,9 @@ import org.tinylog.Logger;
 
 /**
  * The plugins the skills library mirrors. Each plugin owns one folder under the library
- * ({@code <skillsDir>/<plugin>/}); adding, syncing and removing only ever touch that folder, so a
- * hand-written skill is never in reach of a sync.
+ * ({@code <skillsDir>/<plugin>/}); adding, syncing and removing only ever touch that folder. The
+ * folder name comes from the repo, so it can collide with a hand-written skill — {@link #add} refuses
+ * that rather than taking the folder over, because a sync would then replace skills no plugin wrote.
  *
  * <p>The repo arrives as a zip over HTTPS rather than a clone: the core image carries curl and
  * ca-certificates but no git, and {@link SkillStore#extractZip} already unpacks an untrusted
@@ -82,12 +82,33 @@ public final class SkillPluginStore {
                 }
             }
         }
+        // No plugin owns that folder, so any skill sitting there was hand-written — and a plugin
+        // owns its folder outright: the first sync would replace it and removing the plugin would
+        // delete it, both reported as success. Refuse instead of taking it over.
+        //
+        // Emptiness is the test, not existence. Deleting the last skill under `skills/` leaves the
+        // empty `skills/` directory behind, and a leftover directory the UI does not even show must
+        // not lock a plugin name out for good.
+        if (holdsAnyFile(skillsRoot.resolve(name))) {
+            throw new IllegalArgumentException("the library already has a \"" + name
+                    + "\" folder — rename those skills, or the plugin would replace them");
+        }
         SkillPlugin plugin = new SkillPlugin(UUID.randomUUID().toString(), name, trimmed,
                 ref == null || ref.isBlank() ? "HEAD" : ref.trim(), "", "");
         put(plugin);
         return sync(plugin.id());
     }
 
+
+    /** Whether a directory holds any file at all, at any depth. */
+    private static boolean holdsAnyFile(Path dir) throws IOException {
+        if (!Files.isDirectory(dir)) {
+            return Files.exists(dir);
+        }
+        try (Stream<Path> walk = Files.walk(dir)) {
+            return walk.anyMatch(Files::isRegularFile);
+        }
+    }
     /** Re-pull a plugin: its folder is replaced wholesale, so an upstream deletion propagates. */
     public SkillPlugin sync(String id) throws IOException {
         SkillPlugin plugin = get(id);
@@ -103,7 +124,7 @@ public final class SkillPluginStore {
             }
             SkillStore.deleteTree(target);
             for (Path skill : skills) {
-                copyTree(skill, target.resolve(skill.getFileName().toString()));
+                SkillStore.copyTree(skill, target.resolve(skill.getFileName().toString()));
             }
             SkillPlugin synced = plugin.synced(Instant.now().toString());
             put(synced);
@@ -230,19 +251,6 @@ public final class SkillPluginStore {
         return dir;
     }
 
-    private static void copyTree(Path from, Path to) throws IOException {
-        try (Stream<Path> walk = Files.walk(from)) {
-            for (Path p : (Iterable<Path>) walk::iterator) {
-                Path target = to.resolve(from.relativize(p).toString());
-                if (Files.isDirectory(p)) {
-                    Files.createDirectories(target);
-                } else {
-                    Files.createDirectories(target.getParent());
-                    Files.copy(p, target, StandardCopyOption.REPLACE_EXISTING);
-                }
-            }
-        }
-    }
 
     private void load() {
         try {

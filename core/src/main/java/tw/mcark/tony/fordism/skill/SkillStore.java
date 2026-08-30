@@ -102,29 +102,53 @@ public final class SkillStore {
 
     /**
      * Replace a skill's folder with an uploaded one: the browser sends each file's path relative
-     * to the picked folder alongside its content. The folder is cleared first, so a file the user
-     * deleted upstream does not survive the re-upload.
+     * to the picked folder alongside its content.
+     *
+     * <p>The upload is assembled in a staging directory and only swapped in once it is known to be
+     * a skill. Clearing the folder first — the obvious way to make a re-upload drop a file the user
+     * deleted upstream — meant a refused upload took the skill it was replacing with it: the caller
+     * got a correct "must contain SKILL.md" and an empty library. Nothing the user already has is
+     * deleted until there is something valid to put in its place.
      */
     public void writeFolder(String name, List<String> paths, List<InputStream> contents) throws IOException {
         if (paths.size() != contents.size()) {
             throw new IllegalArgumentException("each file needs a path");
         }
         Path dir = resolve(name);
-        delete(name);
-        Files.createDirectories(dir);
-        for (int i = 0; i < paths.size(); i++) {
-            Path target = safeChild(dir, paths.get(i));
-            if (target == null) {
-                continue;
+        Path staging = Files.createTempDirectory("fordism-skill-");
+        try {
+            for (int i = 0; i < paths.size(); i++) {
+                Path target = safeChild(staging, paths.get(i));
+                if (target == null) {
+                    continue;
+                }
+                Files.createDirectories(target.getParent());
+                try (OutputStream os = Files.newOutputStream(target)) {
+                    contents.get(i).transferTo(os);
+                }
             }
-            Files.createDirectories(target.getParent());
-            try (OutputStream os = Files.newOutputStream(target)) {
-                contents.get(i).transferTo(os);
+            if (!Files.isRegularFile(staging.resolve("SKILL.md"))) {
+                throw new IllegalArgumentException("the folder must contain SKILL.md");
             }
+            deleteTree(dir);
+            copyTree(staging, dir);
+        } finally {
+            deleteTree(staging);
         }
-        if (!Files.isRegularFile(dir.resolve("SKILL.md"))) {
-            delete(name);
-            throw new IllegalArgumentException("the folder must contain SKILL.md");
+    }
+
+    /** Copy a whole directory tree, creating {@code to} and every parent it needs. */
+    public static void copyTree(Path from, Path to) throws IOException {
+        try (Stream<Path> walk = Files.walk(from)) {
+            for (Path p : (Iterable<Path>) walk::iterator) {
+                Path target = to.resolve(from.relativize(p).toString());
+                if (Files.isDirectory(p)) {
+                    Files.createDirectories(target);
+                } else {
+                    Files.createDirectories(target.getParent());
+                    Files.copy(p, target, StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
         }
     }
 
