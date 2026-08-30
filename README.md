@@ -190,6 +190,12 @@ Build gates, the code-style bar, and the PR rules live in [CONTRIBUTING.md](./CO
 The short version: `banVar` / `banStyle` and `ng lint` + Prettier fail the build, so the style
 is enforced, not argued.
 
+## Commercial support
+
+Fordism is built and maintained by [Tony](https://github.com/tony19907051). If you want help
+deploying, hardening, or extending it — or a feature prioritized — reach out at
+<tony19907051@gmail.com>.
+
 ## License
 
 Apache-2.0 — see [LICENSE](./LICENSE). Copyright 2026 The Fordism Authors.
