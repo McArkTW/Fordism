@@ -189,6 +189,11 @@ public final class SkillPluginStore {
     static String archiveUrl(String url, String ref) {
         String cleaned = url.trim();
         if (cleaned.toLowerCase(Locale.ROOT).endsWith(".zip")) {
+            // https only: the javadoc promises it, and without the check a skill.write holder
+            // could point the server at an http:// address on the network it is running in.
+            if (!cleaned.toLowerCase(Locale.ROOT).startsWith("https://")) {
+                throw new IllegalArgumentException("a direct .zip URL must be https");
+            }
             return cleaned;
         }
         String path = cleaned

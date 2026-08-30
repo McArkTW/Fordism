@@ -27,23 +27,22 @@ public final class SkillController {
         try {
             ctx.contentType("application/json").result(Json.write(skills.read(ctx.pathParam("name"))));
         } catch (IllegalArgumentException e) {
-            ctx.status(400).contentType("application/json").result("{\"error\":\"" + e.getMessage() + "\"}");
+            Api.fail(ctx, 400, e.getMessage());
         } catch (Exception e) {
-            ctx.status(500).contentType("application/json").result("{\"error\":\"read failed\"}");
+            Api.fail(ctx, 500, "read failed");
         }
     }
 
     public void save(Context ctx) {
         try {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> body = GSON.fromJson(ctx.body(), Map.class);
-            String name = str(body.get("name"));
-            skills.write(name, str(body.get("content")));
-            ctx.status(200).contentType("application/json").result("{\"name\":\"" + name + "\"}");
+            Map<String, Object> body = Api.body(ctx);
+            String name = Api.string(body.get("name"));
+            skills.write(name, Api.string(body.get("content")));
+            Api.ok(ctx, "name", name);
         } catch (IllegalArgumentException e) {
-            ctx.status(400).contentType("application/json").result("{\"error\":\"" + e.getMessage() + "\"}");
+            Api.fail(ctx, 400, e.getMessage());
         } catch (Exception e) {
-            ctx.status(400).contentType("application/json").result("{\"error\":\"save failed\"}");
+            Api.fail(ctx, 400, "save failed");
         }
     }
 
@@ -51,8 +50,11 @@ public final class SkillController {
         try {
             skills.delete(ctx.pathParam("name"));
             ctx.status(204);
+        } catch (IllegalArgumentException e) {
+            // A name the store refuses is the caller's mistake, not the server's.
+            Api.fail(ctx, 400, e.getMessage());
         } catch (Exception e) {
-            ctx.status(500).contentType("application/json").result("{\"error\":\"delete failed\"}");
+            Api.fail(ctx, 500, "delete failed");
         }
     }
 
@@ -125,9 +127,5 @@ public final class SkillController {
             out.add(file.filename());
         }
         return out;
-    }
-
-    private static String str(Object value) {
-        return value == null ? "" : value.toString();
     }
 }

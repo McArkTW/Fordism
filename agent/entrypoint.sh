@@ -78,6 +78,9 @@ echo "[agent] type=$ATYPE mode=$MODE model=$MODEL timeout=${TIMEOUT}s session=$S
 # stages into /workspace/skills, which is neither: without this mirror the library is on disk but
 # never registered, so nothing is model-invocable and the doctrine's "read skills/" is all that
 # makes it work. Same fix as the qwen-code mirror below.
+# Rebuilt, not merged: on resume the volume already holds the previous run's mirror, and cp -r
+# over it would leave a skill the library has since dropped in place for the model to find.
+rm -rf "$WS/.claude/skills"
 mkdir -p "$WS/.claude/skills"
 cp -r "$WS"/skills/* "$WS/.claude/skills/" 2>/dev/null || true
 
@@ -102,6 +105,7 @@ if [ "$ATYPE" = "qwen-code" ]; then
   # Qwen Code discovers skills under $HOME/.qwen/skills (HOME=/workspace) and invokes them by
   # description; it does not read /workspace/skills, where the Template stages them. Without this
   # mirror the library is on disk but not model-invocable, and the agent invents what it never read.
+  rm -rf "$WS/.qwen/skills"
   mkdir -p "$WS/.qwen/skills"
   cp -r "$WS"/skills/* "$WS/.qwen/skills/" 2>/dev/null || true
   QP="$PROMPT"; [ "$MODE" = "resume" ] && QP="Continue the task. The human's reply to your question: ${RESUME_PROMPT:-}"
@@ -134,7 +138,12 @@ if [ "$ATYPE" != "qwen-code" ]; then
   RESUME_COUNT=0
   while [ "$rc" -eq 0 ]; do
     case "$(rstate)" in finished|asked|failed) break ;; esac
-    sleep 60
+    # The budget is checked BEFORE the pacing sleep as well as after: a run that exits clean
+    # with its budget already spent used to idle a full minute to learn there was nothing left
+    # to resume into. The sleep is also capped at what remains, for the same reason.
+    BUDGET_LEFT=$(( EPOCH_DEADLINE - $(date +%s) ))
+    [ "$BUDGET_LEFT" -le 0 ] && break
+    if [ "$BUDGET_LEFT" -lt 60 ]; then sleep "$BUDGET_LEFT"; else sleep 60; fi
     BUDGET_LEFT=$(( EPOCH_DEADLINE - $(date +%s) ))
     [ "$BUDGET_LEFT" -le 0 ] && break
     RESUME_COUNT=$((RESUME_COUNT + 1))

@@ -155,6 +155,15 @@ class SkillPluginStoreTest {
                 SkillPluginStore.archiveUrl("https://example.com/build/skills.zip", "HEAD"));
     }
 
+    /** The class javadoc says the repo arrives over HTTPS; this is what makes that true. */
+    @Test
+    void a_plain_http_zip_url_is_refused() {
+        assertThrows(IllegalArgumentException.class,
+                () -> SkillPluginStore.archiveUrl("http://169.254.169.254/latest.zip", "HEAD"));
+        assertThrows(IllegalArgumentException.class,
+                () -> SkillPluginStore.archiveUrl("http://localhost:8090/api/tasks/1/workspace.zip", "HEAD"));
+    }
+
     @Test
     void a_url_that_is_neither_a_github_repo_nor_a_zip_is_refused() {
         assertThrows(IllegalArgumentException.class,
