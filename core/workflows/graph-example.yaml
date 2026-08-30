@@ -1,0 +1,15 @@
+name: graph-example
+description: Steps run as a DAG; each step waits for its dependsOn to collect, so steps with no shared dependency run in parallel.
+strategy: graph
+parameters: [topic]
+steps:
+  - id: research-pros
+    template: generic
+    task: Research the pros of ${topic} and save a short bullet list.
+  - id: research-cons
+    template: generic
+    task: Research the cons of ${topic} and save a short bullet list.
+  - id: synthesize
+    template: generic
+    task: Weigh the pros and cons of ${topic} and give a recommendation.
+    dependsOn: [research-pros, research-cons]

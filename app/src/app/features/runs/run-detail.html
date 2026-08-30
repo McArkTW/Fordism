@@ -1,0 +1,168 @@
+<div class="mx-auto w-full max-w-6xl">
+  @if (error()) {
+    <div class="border-destructive/40 bg-destructive/10 text-destructive mb-4 rounded-xl border px-3 py-2 text-sm">
+      {{ error() }}
+    </div>
+  }
+
+  @if (detail(); as d) {
+    @let v = view(d.state);
+    <div class="flex flex-wrap items-center gap-3">
+      <a hlmBtn variant="outline" size="sm" routerLink="/live">
+        <app-icon name="arrow-left" />
+        Live
+      </a>
+      <a hlmBtn variant="outline" size="sm" routerLink="/runs">
+        <app-icon name="history" />
+        History
+      </a>
+      <span [class]="v.badge">
+        <app-icon [name]="v.icon" [class.spin]="v.icon === 'loader'" />
+        {{ v.label }}
+      </span>
+      <h1 class="page-h">{{ d.workflow }}</h1>
+      <span class="text-muted-foreground text-xs">
+        {{ d.strategy }} · {{ d.createdAt | date: 'MMM d, HH:mm:ss' }}
+      </span>
+      <span class="flex-auto"></span>
+      @if (isLive()) {
+        <button hlmBtn variant="destructive" type="button" [disabled]="abandoning()" (click)="abandon()">
+          <app-icon name="circle-slash" />
+          Stop this run
+        </button>
+      }
+      @if (d.workflowSnapshot) {
+        <button hlmBtn variant="ghost" type="button" (click)="showSnapshot.set(!showSnapshot())">
+          <app-icon name="workflow" />
+          {{ showSnapshot() ? 'Hide' : 'Show' }} snapshot
+        </button>
+      }
+    </div>
+
+    <div class="text-muted-foreground mt-1.5 flex items-center gap-1.5 font-mono text-[11px]">
+      run id: {{ d.id }}
+      <button hlmBtn variant="ghost" size="icon-xs" type="button" hlmTooltip="Copy run id" (click)="copy(d.id)">
+        <app-icon name="copy" />
+      </button>
+    </div>
+
+    @if (d.parentRunId) {
+      <div class="text-muted-foreground mt-1.5 flex items-center gap-1.5 text-xs">
+        <app-icon name="arrow-left" />
+        started by
+        <a class="text-primary hover:underline" [routerLink]="['/runs', d.parentRunId]">
+          the run above it
+        </a>
+      </div>
+    }
+
+    @if (showSnapshot() && d.workflowSnapshot) {
+      <pre
+        class="border-border bg-card text-muted-foreground mt-3 max-h-72 overflow-auto rounded-xl border p-3 font-mono text-xs whitespace-pre-wrap"
+      >{{ d.workflowSnapshot }}</pre>
+    }
+
+    <!-- A stopped-to-ask step outranks the table: it is the one thing on this page that needs a person. -->
+    @for (t of askedTasks(); track t.taskId) {
+      <section class="mt-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
+        <div class="flex items-center gap-2 text-sm font-medium text-amber-600 dark:text-amber-400">
+          <app-icon name="message-circle-question-mark" />
+          Step {{ t.step }} · {{ t.template }} stopped to ask
+        </div>
+        @if (t.question) {
+          <div class="mt-2 text-sm whitespace-pre-wrap">{{ t.question }}</div>
+        }
+        <a hlmBtn class="mt-3" [routerLink]="['/runs', d.id, 'tasks', t.taskId]">
+          <app-icon name="pencil" />
+          Answer
+        </a>
+      </section>
+    }
+
+    <div hlmTableContainer class="border-border bg-card mt-6 rounded-xl border">
+      <table hlmTable>
+        <thead hlmTHead>
+          <tr hlmTr>
+            <th hlmTh class="text-muted-foreground px-3 text-xs font-semibold tracking-wide uppercase">Step</th>
+            <th hlmTh class="text-muted-foreground px-3 text-xs font-semibold tracking-wide uppercase">State</th>
+            <th hlmTh class="text-muted-foreground px-3 text-xs font-semibold tracking-wide uppercase">Template</th>
+            <th hlmTh class="text-muted-foreground px-3 text-xs font-semibold tracking-wide uppercase">Attempt</th>
+            <th hlmTh class="text-muted-foreground px-3 text-xs font-semibold tracking-wide uppercase">Duration</th>
+            <th hlmTh class="text-muted-foreground px-3 text-xs font-semibold tracking-wide uppercase">Tokens</th>
+            <th hlmTh class="text-muted-foreground px-3 text-xs font-semibold tracking-wide uppercase">Summary</th>
+          </tr>
+        </thead>
+        <tbody hlmTBody>
+          @for (t of sortedTasks(); track t.taskId) {
+            @let tv = view(t.state);
+            <tr hlmTr [routerLink]="['/runs', d.id, 'tasks', t.taskId]" class="cursor-pointer">
+              <td hlmTd class="text-muted-foreground px-3">{{ t.step }}</td>
+              <td hlmTd class="px-3">
+                <span [class]="tv.badge">
+                  <app-icon [name]="tv.icon" [class.spin]="tv.icon === 'loader'" />
+                  {{ tv.label }}
+                </span>
+              </td>
+              <td hlmTd class="px-3 font-mono text-xs">{{ t.template }}</td>
+              <td hlmTd class="text-muted-foreground px-3">{{ t.attempt }}</td>
+              <td hlmTd class="text-muted-foreground px-3">{{ dur(t.durationMs) }}</td>
+              <td hlmTd class="text-muted-foreground px-3">{{ t.usage?.total ?? '—' }}</td>
+              <td hlmTd class="text-muted-foreground px-3">
+                <div class="max-w-96 truncate">{{ oneLine(t.summary) }}</div>
+              </td>
+            </tr>
+          } @empty {
+            <tr hlmTr>
+              <td hlmTd class="text-muted-foreground px-3 py-8 text-center" colspan="7">
+                No steps have been planted yet.
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    <!-- A reconciler can delegate a whole workflow rather than doing the work in its own task,
+         so its steps read as "I delegated this" and the runs below are where the work happened. -->
+    @if (d.children.length) {
+      <h2 class="page-h mt-6 text-base">Runs this one started</h2>
+      <div hlmTableContainer class="border-border bg-card mt-2 rounded-xl border">
+        <table hlmTable>
+          <thead hlmTHead>
+            <tr hlmTr>
+              <th hlmTh class="text-muted-foreground px-3 text-xs font-semibold tracking-wide uppercase">State</th>
+              <th hlmTh class="text-muted-foreground px-3 text-xs font-semibold tracking-wide uppercase">Workflow</th>
+              <th hlmTh class="text-muted-foreground px-3 text-xs font-semibold tracking-wide uppercase">Started</th>
+              <th hlmTh class="text-muted-foreground px-3 text-xs font-semibold tracking-wide uppercase">Duration</th>
+            </tr>
+          </thead>
+          <tbody hlmTBody>
+            @for (c of d.children; track c.id) {
+              @let cv = view(c.state);
+              <tr hlmTr [routerLink]="['/runs', c.id]" class="cursor-pointer">
+                <td hlmTd class="px-3">
+                  <span [class]="cv.badge">
+                    <app-icon [name]="cv.icon" [class.spin]="cv.icon === 'loader'" />
+                    {{ cv.label }}
+                  </span>
+                </td>
+                <td hlmTd class="px-3 font-mono text-xs">{{ c.workflow }}</td>
+                <td hlmTd class="text-muted-foreground px-3">{{ c.createdAt | date: 'MMM d, HH:mm:ss' }}</td>
+                <td hlmTd class="text-muted-foreground px-3">{{ dur(c.durationMs) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  } @else if (!error()) {
+    <!-- Sketch the header row and the step table while the first fetch is in flight. -->
+    <div class="space-y-4">
+      <div class="flex items-center gap-3">
+        <div hlmSkeleton class="h-9 w-20"></div>
+        <div hlmSkeleton class="h-9 w-24"></div>
+        <div hlmSkeleton class="h-7 w-56"></div>
+      </div>
+      <div hlmSkeleton class="h-48 w-full rounded-xl"></div>
+    </div>
+  }
+</div>

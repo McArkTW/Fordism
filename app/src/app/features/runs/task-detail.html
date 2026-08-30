@@ -1,0 +1,255 @@
+<div class="mx-auto w-full max-w-5xl">
+  @if (error()) {
+    <div class="border-destructive/40 bg-destructive/10 text-destructive mb-4 rounded-xl border px-3 py-2 text-sm">
+      {{ error() }}
+    </div>
+  }
+
+  @if (task(); as t) {
+    @let v = view(t.state);
+    <div class="flex flex-wrap items-center gap-3">
+      <a hlmBtn variant="outline" size="sm" [routerLink]="['/runs', id()]">
+        <app-icon name="arrow-left" />
+        Back to run
+      </a>
+      <span [class]="v.badge">
+        <app-icon [name]="v.icon" [class.spin]="v.icon === 'loader'" />
+        {{ v.label }}
+      </span>
+      <h1 class="page-h font-mono">{{ t.template }}</h1>
+      <span class="text-muted-foreground text-xs">
+        step {{ t.step }} · attempt {{ t.attempt }} · {{ dur(t.durationMs) }} ·
+        {{ t.createdAt | date: 'MMM d, HH:mm:ss' }}
+      </span>
+    </div>
+
+    <!-- Usage strip: identity and cost of this task at a glance. -->
+    <div class="text-muted-foreground mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+      <span class="flex items-center gap-1.5 font-mono text-[11px]">
+        task id: {{ t.taskId }}
+        <button
+          hlmBtn
+          variant="ghost"
+          size="icon-xs"
+          type="button"
+          hlmTooltip="Copy task id"
+          (click)="copy(t.taskId)"
+        >
+          <app-icon name="copy" />
+        </button>
+      </span>
+      @if (t.usage; as u) {
+        <span class="inline-flex items-center gap-1.5">
+          <app-icon name="cpu" />
+          {{ u.input_tokens }} in · {{ u.output_tokens }} out · {{ u.total }} total · {{ u.turns }} turns
+        </span>
+      }
+    </div>
+
+    <!-- Answer form: the whole reason this page gets urgent visits. -->
+    @if (t.state === 'ASKED') {
+      <section class="mt-5 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
+        <div class="flex items-center gap-2 text-sm font-medium text-amber-600 dark:text-amber-400">
+          <app-icon name="message-circle-question-mark" />
+          The agent stopped to ask you something.
+        </div>
+        @if (t.question) {
+          <div class="border-border bg-card mt-3 rounded-lg border p-3">
+            <app-markdown [source]="t.question" />
+          </div>
+        }
+        @if (t.secretsRequested.length) {
+          <div class="border-border bg-card mt-3 rounded-lg border p-3">
+            <div class="text-muted-foreground flex items-center gap-1.5 text-xs font-medium">
+              <app-icon name="key" />
+              Credentials requested
+            </div>
+            <p class="text-muted-foreground mt-1 text-xs">
+              Injected as environment variables into this run's containers, held in core's memory
+              only — they never reach the transcript, the workspace, or the state snapshot.
+            </p>
+            @if (heldSecrets().length) {
+              <p class="text-muted-foreground mt-2 text-xs">
+                Already held from an earlier answer:
+                @for (name of heldSecrets(); track name) {
+                  <span class="bg-foreground/10 ml-1 rounded px-1.5 py-0.5 font-mono text-[11px]">{{ name }}</span>
+                }
+              </p>
+            }
+            @for (name of neededSecrets(); track name) {
+              <div class="mt-3">
+                <label hlmLabel class="font-mono text-xs" [for]="'secret-' + name">{{ name }}</label>
+                <input
+                  hlmInput
+                  [id]="'secret-' + name"
+                  type="password"
+                  autocomplete="off"
+                  spellcheck="false"
+                  class="mt-1 font-mono"
+                  [value]="secret(name)"
+                  (input)="setSecret(name, $any($event.target).value)"
+                  placeholder="paste value"
+                />
+              </div>
+            }
+          </div>
+        }
+        <p class="text-muted-foreground mt-3 text-xs">
+          Reply, then Answer — the agent continues the <em>same session</em> with your message.
+        </p>
+        <textarea
+          hlmTextarea
+          rows="4"
+          class="bg-card mt-2"
+          [value]="reply()"
+          (input)="reply.set($any($event.target).value)"
+          placeholder="Your reply to the agent…"
+        ></textarea>
+        <button hlmBtn class="mt-2" type="button" [disabled]="answering() || !canSend()" (click)="send()">
+          <app-icon name="play" />
+          Answer
+        </button>
+      </section>
+    }
+
+    @if (t.error) {
+      <div class="border-destructive/40 bg-destructive/10 text-destructive mt-5 rounded-xl border px-3 py-2 text-sm">
+        <span class="font-medium">Error:</span> {{ t.error }}
+      </div>
+    }
+
+    <!-- Summary -->
+    <section class="mt-6">
+      <div class="text-muted-foreground mb-1.5 text-sm font-semibold tracking-wide uppercase">Summary</div>
+      @if (t.summary) {
+        <div class="border-border bg-card rounded-xl border p-3">
+          <app-markdown [source]="t.summary" />
+        </div>
+      } @else {
+        <div class="text-muted-foreground text-sm italic">No summary reported.</div>
+      }
+    </section>
+
+    <!-- Result files -->
+    <section class="mt-6">
+      <div class="text-muted-foreground mb-1.5 text-sm font-semibold tracking-wide uppercase">
+        Result files @if (files(); as fs) { · {{ fs.length }} }
+      </div>
+      @if (files(); as fs) {
+        @if (resultError()) {
+          <div class="text-destructive text-sm">{{ resultError() }}</div>
+        } @else if (!fs.length) {
+          <div class="text-muted-foreground text-sm italic">No result files.</div>
+        } @else {
+          <div class="space-y-2">
+            @for (f of fs; track f.name) {
+              <div class="border-border bg-card overflow-hidden rounded-xl border">
+                <button
+                  type="button"
+                  class="hover:bg-foreground/5 flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left transition"
+                  (click)="toggleFile(f.name)"
+                >
+                  <app-icon
+                    [name]="openFiles().has(f.name) ? 'chevron-down' : 'chevron-right'"
+                    class="text-muted-foreground shrink-0"
+                  />
+                  <app-icon name="file" class="text-muted-foreground shrink-0" />
+                  <span class="min-w-0 flex-auto truncate font-mono text-xs">{{ f.name }}</span>
+                  @if (f.binary) {
+                    <span class="text-muted-foreground shrink-0 text-[11px]">(binary)</span>
+                  }
+                  <span class="text-muted-foreground shrink-0 text-[11px]">{{ sizeOf(f.size) }}</span>
+                </button>
+                @if (openFiles().has(f.name)) {
+                  @if (f.binary) {
+                    <div class="border-border text-muted-foreground border-t px-3 py-2 text-xs">
+                      Binary file — download the result bundle below to get it.
+                    </div>
+                  } @else if (f.markdown) {
+                    <div class="border-border border-t p-3">
+                      <app-markdown [source]="f.content" />
+                    </div>
+                  } @else {
+                    <pre class="border-border max-h-80 overflow-x-auto border-t p-3 text-xs whitespace-pre-wrap">{{ f.content }}</pre>
+                  }
+                }
+              </div>
+            }
+          </div>
+        }
+      } @else {
+        <div class="space-y-2">
+          <div hlmSkeleton class="h-9 w-full rounded-xl"></div>
+          <div hlmSkeleton class="h-9 w-full rounded-xl"></div>
+        </div>
+      }
+    </section>
+
+    <!-- Transcript -->
+    <section class="mt-6">
+      <button
+        hlmBtn
+        variant="ghost"
+        type="button"
+        class="text-muted-foreground text-sm font-semibold tracking-wide uppercase"
+        (click)="showTranscript.set(!showTranscript())"
+      >
+        <app-icon [name]="showTranscript() ? 'chevron-down' : 'chevron-right'" />
+        Transcript @if (transcript(); as tx) { · {{ tx.length }} events }
+      </button>
+      @if (showTranscript()) {
+        @if (transcript(); as tx) {
+          @if (tx.length) {
+            <div class="border-border bg-card mt-2 max-h-[28rem] space-y-1.5 overflow-y-auto rounded-xl border p-2">
+              @for (e of tx; track $index) {
+                <div class="bg-foreground/5 rounded-md px-3 py-2">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span [class]="roleBadge(e.role)">{{ e.role }}</span>
+                    @for (tool of e.tools; track $index) {
+                      <span class="text-muted-foreground font-mono text-[11px]">{{ tool }}</span>
+                    }
+                  </div>
+                  @if (e.text) {
+                    <div class="mt-1 font-mono text-xs break-words whitespace-pre-wrap">{{ clip(e.text) }}</div>
+                  }
+                </div>
+              }
+            </div>
+          } @else {
+            <div class="text-muted-foreground mt-2 text-sm italic">Empty transcript.</div>
+          }
+        } @else if (transcriptPending()) {
+          <div class="text-muted-foreground mt-2 text-sm">Loading transcript…</div>
+        } @else {
+          <div class="text-muted-foreground mt-2 text-sm italic">No transcript for this task.</div>
+        }
+      }
+    </section>
+
+    <!-- Downloads -->
+    <div class="border-border mt-6 flex flex-wrap items-center gap-2 border-t pt-4">
+      <a hlmBtn variant="outline" [href]="resultZip()" download>
+        <app-icon name="download" />
+        Download result
+      </a>
+      <a hlmBtn variant="outline" [href]="workspaceZip()" download>
+        <app-icon name="folder" />
+        Download workspace
+      </a>
+    </div>
+  } @else if (run()) {
+    <div class="text-muted-foreground py-16 text-center text-sm">
+      Task {{ taskId() }} is not part of this run.
+      <a class="text-primary underline" [routerLink]="['/runs', id()]">Back to the run</a>
+    </div>
+  } @else if (!error()) {
+    <!-- Sketch the header and summary card while the run fetch is in flight. -->
+    <div class="space-y-4">
+      <div class="flex items-center gap-3">
+        <div hlmSkeleton class="h-8 w-28"></div>
+        <div hlmSkeleton class="h-7 w-64"></div>
+      </div>
+      <div hlmSkeleton class="h-32 w-full rounded-xl"></div>
+    </div>
+  }
+</div>
