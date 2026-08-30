@@ -1,0 +1,31 @@
+name: Bug report
+description: Something broke.
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: From /api/version, or the image tag you run.
+      placeholder: 0.8.0
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you got.
+    validations:
+      required: true
+  - type: textarea
+    id: workflow-yaml
+    attributes:
+      label: Workflow YAML
+      description: If a workflow is involved, paste it (strip anything secret).
+      render: yaml
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant core or agent logs.
+      render: text

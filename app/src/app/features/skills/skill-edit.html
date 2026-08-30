@@ -1,0 +1,120 @@
+<div class="mx-auto flex max-w-4xl flex-col gap-6">
+  @if (creating()) {
+    <a
+      class="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1.5 text-sm"
+      [routerLink]="listPath"
+    >
+      <app-icon name="chevron-left" />Skills
+    </a>
+  } @else {
+    <a
+      class="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1.5 text-sm"
+      [routerLink]="viewPath"
+      [queryParams]="{ name: name() }"
+    >
+      <app-icon name="chevron-left" />{{ name() }}
+    </a>
+  }
+
+  <div>
+    <h1 class="page-h">{{ creating() ? 'New skill' : 'Edit skill' }}</h1>
+    <p class="text-muted-foreground text-sm">
+      A skill is a folder holding a SKILL.md. Write it here, or upload the whole folder to bring its
+      scripts and references with it.
+    </p>
+  </div>
+
+  @if (loadError()) {
+    <div
+      class="border-destructive/40 bg-destructive/10 text-destructive rounded-xl border px-3 py-2 text-sm"
+    >
+      {{ loadError() }}
+    </div>
+  }
+
+  @if (loading()) {
+    <div class="text-muted-foreground flex items-center justify-center gap-2 py-16 text-sm">
+      <hlm-spinner class="text-xl" />
+      Loading {{ name() }}…
+    </div>
+  } @else {
+    <div class="border-border bg-card rounded-xl border p-5">
+      <div class="flex flex-wrap items-end gap-3">
+        <div class="min-w-0 flex-auto">
+          <label hlmLabel for="skill-name">Name</label>
+          <input
+            hlmInput
+            id="skill-name"
+            class="mt-1 w-full font-mono"
+            placeholder="access/github"
+            [readOnly]="!creating()"
+            [ngModel]="name()"
+            (ngModelChange)="name.set($event)"
+          />
+          <p class="text-muted-foreground mt-1 text-xs">
+            Namespaced — the part before the slash groups related skills, and a plugin owns the
+            whole namespace it installs under.
+          </p>
+        </div>
+        <!-- webkitdirectory: the browser hands back every file in the picked folder, each
+             carrying its folder-relative path, so a skill with scripts/ survives intact.
+             A real <button> rather than a <label for>: hlmBtn's selector is
+             button[hlmBtn], a[hlmBtn], so a label carrying it renders unstyled. -->
+        <button
+          hlmBtn
+          variant="outline"
+          type="button"
+          class="shrink-0"
+          [disabled]="saving()"
+          (click)="folderPicker.click()"
+        >
+          <app-icon name="folder" />Upload folder
+        </button>
+        <input
+          #folderPicker
+          id="skill-folder"
+          type="file"
+          class="hidden"
+          webkitdirectory
+          multiple
+          (change)="uploadFolder($event)"
+        />
+      </div>
+
+      @if (owner()) {
+        <p class="text-muted-foreground mt-3 text-xs">
+          Installed by the <span class="font-mono">{{ owner() }}</span> plugin — this edit is undone
+          the next time it syncs.
+        </p>
+      }
+
+      <label hlmLabel class="mt-4 block" for="skill-content">SKILL.md</label>
+      <!-- hlmTextarea, not hlmInput: hlmInput carries a fixed h-9, which collapses a
+           textarea to one line however many rows it asks for. -->
+      <textarea
+        hlmTextarea
+        id="skill-content"
+        rows="24"
+        class="mt-1 max-h-[65vh] min-h-[28rem] w-full font-mono text-[13px]"
+        [ngModel]="content()"
+        (ngModelChange)="content.set($event)"
+      ></textarea>
+
+      <div class="mt-4 flex items-center gap-2">
+        <button hlmBtn [disabled]="saving()" (click)="save()">
+          @if (saving()) {
+            <hlm-spinner class="text-base" />
+          }
+          Save
+        </button>
+        @if (creating()) {
+          <button hlmBtn variant="outline" [routerLink]="listPath">Cancel</button>
+        } @else {
+          <button hlmBtn variant="outline" [routerLink]="viewPath" [queryParams]="{ name: name() }">
+            Cancel
+          </button>
+        }
+      </div>
+    </div>
+  }
+</div>

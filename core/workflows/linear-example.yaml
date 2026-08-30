@@ -1,0 +1,16 @@
+name: linear-example
+description: Run steps in order, one at a time; a step can receive the previous step's workspace.
+strategy: linear
+parameters: [requirement]
+steps:
+  - id: draft
+    template: generic
+    task: |
+      Draft a user story for this requirement:
+      ${requirement}
+  - id: review
+    template: generic
+    task: |
+      Review the user story in task/previous-result/answer_work.txt against
+      INVEST and acceptance criteria. Answer pass or fail with reasons.
+    includePreviousResult: true

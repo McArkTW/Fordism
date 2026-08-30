@@ -1,0 +1,418 @@
+<div class="mx-auto flex max-w-7xl flex-col gap-5">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div class="min-w-0">
+      <h1 class="page-h">Skills</h1>
+      <p class="text-muted-foreground mt-0.5 text-xs">
+        Capabilities agents load on demand.
+        @if (source().repo) {
+          <a
+            [href]="repoUrl()"
+            target="_blank"
+            rel="noopener"
+            class="text-primary hover:underline"
+            >{{ repoLabel() }}</a
+          >
+          pinned {{ source().tag || '—' }}
+          @if (source().syncedAt) {
+            · synced {{ source().syncedAt | date: 'MMM d, h:mm a' }}
+          }
+        }
+      </p>
+    </div>
+    <div class="flex shrink-0 items-center gap-2">
+      <button hlmBtn variant="outline" size="sm" [routerLink]="pluginsPath">
+        <app-icon name="download" />Plugins
+        @if (plugins().length) {
+          <span class="text-muted-foreground ml-1 tabular-nums">{{ plugins().length }}</span>
+        }
+      </button>
+      <button hlmBtn size="sm" [routerLink]="newPath">
+        <app-icon name="plus" />New skill
+      </button>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="text-muted-foreground flex items-center justify-center gap-2 py-16 text-sm">
+      <hlm-spinner class="text-xl" />
+      Loading skills…
+    </div>
+  } @else if (loadError()) {
+    <!-- Never the empty state on a failure: "nothing synced" is a fact about the library, and a
+         request that did not answer establishes no facts about it. -->
+    <div
+      class="border-destructive/40 bg-destructive/10 flex flex-col items-center rounded-xl border px-6 py-16 text-center"
+    >
+      <app-icon name="circle-x" class="text-destructive text-3xl" />
+      <div class="mt-3 text-sm font-medium">Could not load skills.</div>
+      <p class="text-muted-foreground mt-1 max-w-md text-sm">{{ loadError() }}</p>
+      <button hlmBtn variant="outline" size="sm" class="mt-4" (click)="reload()">Try again</button>
+    </div>
+  } @else if (skills().length === 0) {
+    <div
+      class="border-border bg-card flex flex-col items-center rounded-xl border px-6 py-16 text-center"
+    >
+      <app-icon name="sparkles" class="text-muted-foreground text-3xl" />
+      <div class="mt-3 text-sm font-medium">No skills yet.</div>
+      <p class="text-muted-foreground mt-1 max-w-md text-sm">
+        Create one with New skill, upload a folder that holds a SKILL.md, or install a plugin.
+        Skills here can then be granted on Agent Templates.
+      </p>
+      <div class="mt-4 flex items-center gap-2">
+        <button hlmBtn size="sm" [routerLink]="newPath">New skill</button>
+        <button hlmBtn variant="outline" size="sm" [routerLink]="pluginsPath">Add a plugin</button>
+      </div>
+    </div>
+  } @else {
+    <div class="border-border bg-card overflow-hidden rounded-xl border">
+      <div class="border-border flex flex-wrap items-center gap-2 border-b p-2.5">
+        <!-- Capped: the query is a handful of characters, and the width it used to take was width
+             the controls beside it needed. -->
+        <div class="relative w-full max-w-sm min-w-48">
+          <app-icon
+            name="search"
+            class="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2"
+          />
+          <input
+            hlmInput
+            class="h-8 w-full pl-8"
+            placeholder="Search skills…"
+            [value]="filter()"
+            (input)="setFilter($any($event.target).value)"
+          />
+        </div>
+        <!-- One library, two ways to read it. Both share the selection. -->
+        <div class="border-border flex shrink-0 rounded-md border p-0.5">
+          <button
+            type="button"
+            class="cursor-pointer rounded px-2 py-1 text-xs font-medium"
+            [class]="view() === 'skill' ? 'bg-foreground/10' : 'text-muted-foreground'"
+            (click)="view.set('skill')"
+          >
+            By skill
+          </button>
+          <button
+            type="button"
+            class="cursor-pointer rounded px-2 py-1 text-xs font-medium"
+            [class]="view() === 'plugin' ? 'bg-foreground/10' : 'text-muted-foreground'"
+            (click)="view.set('plugin')"
+          >
+            By plugin
+          </button>
+        </div>
+
+        <div class="flex-auto"></div>
+
+        @if (checkedNames().length) {
+          <span class="text-xs font-medium">{{ checkedNames().length }} selected</span>
+          <button hlmBtn variant="ghost" size="sm" class="h-8" (click)="clearChecked()">
+            Clear
+          </button>
+          <button
+            hlmBtn
+            variant="destructive"
+            size="sm"
+            class="h-8"
+            [disabled]="deleting()"
+            (click)="removeChecked()"
+          >
+            @if (deleting()) {
+              <hlm-spinner class="text-base" />
+            } @else {
+              <app-icon name="trash-2" />
+            }
+            Delete {{ checkedNames().length }}
+          </button>
+        } @else {
+          <span class="text-muted-foreground text-xs tabular-nums">
+            {{ filtered().length }} of {{ skills().length }}
+          </span>
+        }
+      </div>
+
+      @if (view() === 'skill') {
+        <!-- Header and rows share one grid template, so a column header sits over its own data.
+             Sort/paginate client-side: the whole library is already in hand, and "select every
+             skill this search matches" has to mean the matches, not the page. -->
+        <div
+          class="border-border text-muted-foreground grid items-center gap-3 border-b px-3 py-1.5 text-[11px] font-medium tracking-wide uppercase"
+          [class]="columns()"
+        >
+          <span class="inline-flex" hlmTooltip="Select every skill the search matches">
+            <hlm-checkbox
+              aria-label="Select all matching skills"
+              [checked]="allFilteredChecked()"
+              (checkedChange)="checkAllFiltered($any($event))"
+            />
+          </span>
+          <button
+            type="button"
+            class="hover:text-foreground cursor-pointer text-left"
+            (click)="sortOn('name')"
+          >
+            Name <span class="inline-block w-2">{{ arrow('name') }}</span>
+          </button>
+          <span>Description</span>
+          @if (showOwner()) {
+            <button
+              type="button"
+              class="hover:text-foreground cursor-pointer text-left"
+              (click)="sortOn('owner')"
+            >
+              Owner <span class="inline-block w-2">{{ arrow('owner') }}</span>
+            </button>
+          }
+          <button
+            type="button"
+            class="hover:text-foreground cursor-pointer text-right"
+            (click)="sortOn('fileCount')"
+          >
+            <span class="inline-block w-2">{{ arrow('fileCount') }}</span> Files
+          </button>
+          <button
+            type="button"
+            class="hover:text-foreground cursor-pointer text-right"
+            (click)="sortOn('updatedAt')"
+          >
+            <span class="inline-block w-2">{{ arrow('updatedAt') }}</span> Updated
+          </button>
+          <button
+            type="button"
+            class="hover:text-foreground cursor-pointer text-right"
+            (click)="sortOn('enabled')"
+          >
+            <span class="inline-block w-2">{{ arrow('enabled') }}</span> On
+          </button>
+        </div>
+
+        <div class="divide-border/60 divide-y">
+          @for (s of paged(); track s.name) {
+            <div
+              class="group hover:bg-foreground/5 even:bg-foreground/[0.02] grid items-center gap-3 px-3 py-1.5"
+              [class]="columns()"
+            >
+              <span class="inline-flex">
+                <hlm-checkbox
+                  [aria-label]="'Select ' + s.name"
+                  [checked]="isChecked(s.name)"
+                  (checkedChange)="check(s.name, $any($event))"
+                />
+              </span>
+              <!-- The namespace repeats on every skill a plugin installed; the leaf is what the
+                   eye is actually scanning for, so only the leaf carries weight. -->
+              <a
+                class="min-w-0 truncate font-mono text-[13px]"
+                [routerLink]="viewPath"
+                [queryParams]="{ name: s.name }"
+                [title]="s.name"
+              >
+                <span class="text-muted-foreground/70">{{ namespaceOf(s.name) }}</span
+                ><span
+                  class="text-foreground font-medium"
+                  [class.text-muted-foreground]="!s.enabled"
+                  [class.line-through]="!s.enabled"
+                  >{{ leafOf(s.name) }}</span
+                >
+              </a>
+              <div class="text-muted-foreground min-w-0 truncate text-xs" [title]="s.description">
+                {{ s.description || '—' }}
+              </div>
+              @if (showOwner()) {
+                <div class="text-muted-foreground truncate text-xs">{{ s.owner || 'yours' }}</div>
+              }
+              <div class="text-muted-foreground text-right text-xs tabular-nums">
+                {{ s.fileCount }}
+              </div>
+              <div
+                class="text-muted-foreground text-right text-xs tabular-nums"
+                [title]="s.updatedAt"
+              >
+                {{ ago(s.updatedAt) }}
+              </div>
+              <div class="flex items-center justify-end gap-1">
+                <!-- One action per row, revealed on hover: sixteen always-on Edit buttons were
+                     chrome competing with the content for the same band. -->
+                <a
+                  class="text-muted-foreground hover:text-foreground rounded p-1 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                  [routerLink]="editPath"
+                  [queryParams]="{ name: s.name }"
+                  [attr.aria-label]="'Edit ' + s.name"
+                  [title]="'Edit ' + s.name"
+                >
+                  <app-icon name="pencil" />
+                </a>
+                <!-- Tooltip sits on a real box; the switch host renders display:contents.
+                     Desaturated on purpose: every skill is enabled by default, so full-strength
+                     brand colour on sixteen identical switches spends the page's loudest signal
+                     on its least varying column. -->
+                <span
+                  class="inline-flex"
+                  [hlmTooltip]="
+                    s.enabled ? 'Enabled — switch off to skip it in future runs' : 'Disabled'
+                  "
+                >
+                  <hlm-switch
+                    size="sm"
+                    class="data-checked:bg-foreground/40"
+                    [aria-label]="'Enable ' + s.name"
+                    [checked]="s.enabled"
+                    (checkedChange)="toggle(s, $event)"
+                  />
+                </span>
+              </div>
+            </div>
+          } @empty {
+            <div class="text-muted-foreground px-4 py-10 text-center text-sm">
+              No skills match “{{ filter() }}”.
+            </div>
+          }
+        </div>
+
+        @if (filtered().length) {
+          <div
+            class="border-border text-muted-foreground flex flex-wrap items-center gap-2 border-t px-3 py-2 text-xs"
+          >
+            <span class="tabular-nums">Page {{ page() + 1 }} of {{ pageCount() }}</span>
+            <div class="flex-auto"></div>
+            <label class="text-muted-foreground" for="page-size">Rows</label>
+            <hlm-select
+              id="page-size"
+              [value]="pageSize() + ''"
+              (valueChange)="setPageSize($any($event))"
+            >
+              <hlm-select-trigger class="h-7 w-16" size="sm">
+                <hlm-select-value />
+              </hlm-select-trigger>
+              <hlm-select-content *hlmSelectPortal>
+                <hlm-select-item value="10">10</hlm-select-item>
+                <hlm-select-item value="25">25</hlm-select-item>
+                <hlm-select-item value="50">50</hlm-select-item>
+                <hlm-select-item value="100">100</hlm-select-item>
+              </hlm-select-content>
+            </hlm-select>
+            <button
+              hlmBtn
+              variant="outline"
+              size="sm"
+              class="h-7"
+              [disabled]="page() === 0"
+              (click)="turnPage(-1)"
+            >
+              Prev
+            </button>
+            <button
+              hlmBtn
+              variant="outline"
+              size="sm"
+              class="h-7"
+              [disabled]="page() + 1 >= pageCount()"
+              (click)="turnPage(1)"
+            >
+              Next
+            </button>
+          </div>
+        }
+      } @else {
+        <!-- By plugin: every skill in exactly one group, with a final "yours" group so the view
+             accounts for the whole library instead of hiding what no plugin owns. Adding, syncing
+             and removing the plugins themselves lives on the Plugins page. -->
+        <div class="divide-border divide-y">
+          @for (g of grouped(); track g.plugin?.id ?? 'mine') {
+            <div>
+              <div class="bg-foreground/5 flex flex-wrap items-center gap-2 px-3 py-2">
+                <span class="inline-flex shrink-0">
+                  <hlm-checkbox
+                    [aria-label]="'Select all in ' + (g.plugin?.name ?? 'yours')"
+                    [checked]="groupChecked(g)"
+                    (checkedChange)="checkGroup(g, $any($event))"
+                  />
+                </span>
+                <div class="min-w-0 flex-auto">
+                  <div class="truncate font-mono text-[13px] font-medium">
+                    {{ g.plugin?.name ?? 'yours' }}
+                    <span class="text-muted-foreground ml-1 text-xs tabular-nums"
+                      >{{ g.skills.length }}</span
+                    >
+                  </div>
+                  <div class="text-muted-foreground truncate text-xs">
+                    @if (g.plugin; as p) {
+                      {{ p.url }}
+                      @if (p.lastSyncedAt) {
+                        · synced {{ ago(p.lastSyncedAt) }} ago
+                      }
+                    } @else {
+                      Skills you wrote or uploaded — no plugin owns them
+                    }
+                  </div>
+                  @if (g.plugin?.lastError) {
+                    <div class="text-destructive mt-0.5 text-xs">{{ g.plugin?.lastError }}</div>
+                  }
+                </div>
+                @if (g.plugin) {
+                  <button hlmBtn variant="ghost" size="sm" class="h-7" [routerLink]="pluginsPath">
+                    Manage
+                  </button>
+                }
+              </div>
+              <div class="divide-border/60 divide-y">
+                @for (s of g.skills; track s.name) {
+                  <div
+                    class="group hover:bg-foreground/5 flex items-center gap-3 py-1.5 pr-3 pl-9"
+                  >
+                    <span class="inline-flex shrink-0">
+                      <hlm-checkbox
+                        [aria-label]="'Select ' + s.name"
+                        [checked]="isChecked(s.name)"
+                        (checkedChange)="check(s.name, $any($event))"
+                      />
+                    </span>
+                    <a
+                      class="w-52 shrink-0 truncate font-mono text-[13px] font-medium"
+                      [routerLink]="viewPath"
+                      [queryParams]="{ name: s.name }"
+                      [class.text-muted-foreground]="!s.enabled"
+                      [class.line-through]="!s.enabled"
+                      [title]="s.name"
+                    >
+                      {{ leafOf(s.name) }}
+                    </a>
+                    <div
+                      class="text-muted-foreground min-w-0 flex-auto truncate text-xs"
+                      [title]="s.description"
+                    >
+                      {{ s.description || '—' }}
+                    </div>
+                    <span class="text-muted-foreground shrink-0 text-xs tabular-nums">
+                      {{ s.fileCount }}
+                    </span>
+                    <span class="inline-flex shrink-0">
+                      <hlm-switch
+                        size="sm"
+                        class="data-checked:bg-foreground/40"
+                        [aria-label]="'Enable ' + s.name"
+                        [checked]="s.enabled"
+                        (checkedChange)="toggle(s, $event)"
+                      />
+                    </span>
+                  </div>
+                } @empty {
+                  <div class="text-muted-foreground px-9 py-3 text-xs">
+                    @if (filter().trim()) {
+                      Nothing here matches “{{ filter() }}”.
+                    } @else {
+                      This plugin installed nothing.
+                    }
+                  </div>
+                }
+              </div>
+            </div>
+          } @empty {
+            <div class="text-muted-foreground px-4 py-10 text-center text-sm">
+              No skills match “{{ filter() }}”.
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+</div>

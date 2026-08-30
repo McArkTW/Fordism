@@ -1,0 +1,174 @@
+<div class="mx-auto w-full max-w-5xl">
+  <div class="flex flex-wrap items-center gap-3">
+    <h1 class="page-h">API tokens</h1>
+    <span class="flex-auto"></span>
+    @if (!draft()) {
+      <button hlmBtn type="button" (click)="startCreate()">
+        <app-icon name="plus" />
+        New token
+      </button>
+    }
+  </div>
+
+  <p class="text-muted-foreground mt-1.5 max-w-3xl text-sm">
+    A token calls this API without a browser — a script, a CI job, a cron. It can only ever do
+    <em>less</em> than your account: what it may do is the overlap between its grants and yours, so
+    a token is a way to hand out fewer permissions, never more. Tokens are yours alone; nobody
+    else's are listed here, and a token cannot create or revoke another.
+  </p>
+
+  <!-- Shown once, and only in memory. The server stores a hash, so there is no second chance. -->
+  @if (minted(); as m) {
+    <div class="border-primary/40 bg-primary/10 mt-4 rounded-xl border p-4">
+      <div class="flex items-center gap-2 text-sm font-medium">
+        <app-icon name="key" />
+        “{{ m.name }}” is ready — copy it now
+      </div>
+      <p class="text-muted-foreground mt-1 text-xs">
+        This is the only time it will be shown. It is not stored anywhere it can be read back; if
+        you lose it, revoke it and make another.
+      </p>
+      <div class="mt-3 flex flex-wrap items-center gap-2">
+        <code class="border-border bg-card min-w-0 flex-1 overflow-x-auto rounded-lg border px-3 py-2 font-mono text-xs">{{ m.value }}</code>
+        <button hlmBtn variant="outline" type="button" (click)="copy(m.value)">
+          <app-icon name="copy" />
+          Copy
+        </button>
+        <button hlmBtn variant="ghost" type="button" (click)="dismissMinted()">Done</button>
+      </div>
+    </div>
+  }
+
+  @if (draft(); as d) {
+    <div class="border-border bg-card mt-4 rounded-xl border p-4">
+      <div class="grid gap-4 md:grid-cols-2">
+        <div>
+          <label hlmLabel for="token-name">Name</label>
+          <input
+            hlmInput
+            id="token-name"
+            class="mt-1 w-full"
+            placeholder="nightly deploy"
+            [value]="d.name"
+            (input)="patch({ name: $any($event.target).value })"
+          />
+          <p class="text-muted-foreground mt-1 text-xs">How you will recognise it in this list.</p>
+        </div>
+        <div>
+          <label hlmLabel for="token-expiry">Expires in (days)</label>
+          <input
+            hlmInput
+            id="token-expiry"
+            class="mt-1 w-full"
+            placeholder="blank = never"
+            [value]="d.expiresInDays"
+            (input)="patch({ expiresInDays: $any($event.target).value })"
+          />
+          <p class="text-muted-foreground mt-1 text-xs">Up to 365. Blank means it never expires.</p>
+        </div>
+      </div>
+
+      <div class="mt-4">
+        <label hlmLabel for="token-grants">Grants</label>
+        <input
+          hlmInput
+          id="token-grants"
+          class="mt-1 w-full font-mono text-xs"
+          placeholder="workflow.read run.read — blank means everything your account can do"
+          [value]="d.grants"
+          (input)="patch({ grants: $any($event.target).value })"
+        />
+        <p class="text-muted-foreground mt-1 text-xs">
+          Space- or comma-separated. A trailing <code>.*</code> covers a whole subtree. Blank means
+          the token is no narrower than your account — which is still bounded by it.
+        </p>
+        <!-- What the pattern actually covers, before it is saved: a typo here is a token that
+             silently does nothing, and every call it makes reads like a permissions problem. -->
+        @for (pattern of d.grants.split(' '); track pattern) {
+          @if (pattern.trim()) {
+            <div class="mt-1.5 flex flex-wrap items-baseline gap-1.5 text-[11px]">
+              <span class="font-mono">{{ pattern }}</span>
+              @if (covered(pattern).length) {
+                <span class="text-muted-foreground">covers {{ covered(pattern).join(', ') }}</span>
+              } @else {
+                <span class="badge-warn">matches no permission</span>
+              }
+            </div>
+          }
+        }
+      </div>
+
+      <div class="mt-4 flex items-center gap-2">
+        <button hlmBtn type="button" [disabled]="busy()" (click)="create()">
+          @if (busy()) {
+            <hlm-spinner class="size-4" />
+          }
+          Create token
+        </button>
+        <button hlmBtn variant="ghost" type="button" (click)="cancel()">Cancel</button>
+        <span class="text-muted-foreground text-xs">
+          Your account holds: <span class="font-mono">{{ myGrants().join(' ') }}</span>
+        </span>
+      </div>
+    </div>
+  }
+
+  @if (loadError()) {
+    <div class="border-destructive/40 bg-destructive/10 text-destructive mt-4 rounded-xl border px-3 py-2 text-sm">
+      {{ loadError() }}
+    </div>
+  } @else if (loading()) {
+    <div class="text-muted-foreground mt-6 flex items-center gap-2 text-sm">
+      <hlm-spinner class="size-4" />
+      Loading…
+    </div>
+  } @else {
+    <div hlmTableContainer class="border-border bg-card mt-6 rounded-xl border">
+      <table hlmTable>
+        <thead hlmTHead>
+          <tr hlmTr>
+            <th hlmTh class="text-muted-foreground px-3 text-xs font-semibold tracking-wide uppercase">Name</th>
+            <th hlmTh class="text-muted-foreground px-3 text-xs font-semibold tracking-wide uppercase">Grants</th>
+            <th hlmTh class="text-muted-foreground px-3 text-xs font-semibold tracking-wide uppercase">Created</th>
+            <th hlmTh class="text-muted-foreground px-3 text-xs font-semibold tracking-wide uppercase">Expires</th>
+            <th hlmTh class="text-muted-foreground px-3 text-xs font-semibold tracking-wide uppercase">Last used</th>
+            <th hlmTh class="px-3"></th>
+          </tr>
+        </thead>
+        <tbody hlmTBody>
+          @for (t of items(); track t.id) {
+            <tr hlmTr>
+              <td hlmTd class="px-3">{{ t.name }}</td>
+              <td hlmTd class="px-3 font-mono text-xs">{{ t.grants.join(' ') }}</td>
+              <td hlmTd class="text-muted-foreground px-3">{{ t.createdAt | date: 'MMM d, y' }}</td>
+              <td hlmTd class="text-muted-foreground px-3">
+                {{ t.expiresAt ? (t.expiresAt | date: 'MMM d, y') : 'never' }}
+              </td>
+              <td hlmTd class="text-muted-foreground px-3">
+                {{ t.lastUsedAt ? (t.lastUsedAt | date: 'MMM d, HH:mm') : 'never' }}
+              </td>
+              <td hlmTd class="px-3 text-right">
+                <button
+                  hlmBtn
+                  variant="ghost"
+                  size="icon-xs"
+                  type="button"
+                  hlmTooltip="Revoke this token"
+                  (click)="revoke(t)"
+                >
+                  <app-icon name="trash-2" />
+                </button>
+              </td>
+            </tr>
+          } @empty {
+            <tr hlmTr>
+              <td hlmTd class="text-muted-foreground px-3 py-8 text-center" colspan="6">
+                You have no API tokens.
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>
