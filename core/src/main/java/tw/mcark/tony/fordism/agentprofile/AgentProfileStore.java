@@ -1,6 +1,7 @@
 package tw.mcark.tony.fordism.agentprofile;
 
 import com.google.gson.Gson;
+import tw.mcark.tony.fordism.store.PrivateFile;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -17,7 +18,8 @@ import java.util.Optional;
 /**
  * Agent Profiles, one JSON file per profile at {@code <agentProfilesDir>/<uuid>.json}. Identity is
  * the UUID (so a rename is an in-place field edit, never a new record); {@code name} is a mutable,
- * unique label. API keys are stored on disk but stripped from every browser-facing view.
+ * unique label. API keys are stored on disk — owner-readable only, replaced whole or not at all
+ * (see {@link tw.mcark.tony.fordism.store.PrivateFile}) — and stripped from every browser-facing view.
  */
 public final class AgentProfileStore {
     private static final Gson GSON = new Gson();
@@ -141,9 +143,15 @@ public final class AgentProfileStore {
         Files.deleteIfExists(file(id));
     }
 
+    /**
+     * A profile carries an {@code apiKey}, so it goes to disk the way the other secret store's
+     * records do: whole or not at all, and readable only by the account that wrote it. Written in
+     * place, a stop mid-write left a half-file that {@link #get} reads as "no such profile" — and
+     * every task pointed at it then falls back to the default backend rather than failing.
+     */
     private void write(AgentProfile profile) throws IOException {
         Files.createDirectories(root());
-        Files.writeString(file(profile.id()), GSON.toJson(profile));
+        PrivateFile.write(file(profile.id()), GSON.toJson(profile));
     }
 
     private void requireUniqueName(String name, String exceptId) {

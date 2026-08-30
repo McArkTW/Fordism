@@ -57,6 +57,11 @@ public final class CredentialController {
             Api.ok(ctx, "key", key);
         } catch (IllegalArgumentException e) {
             Api.fail(ctx, 400, e.getMessage());
+        } catch (IllegalStateException e) {
+            // The stored record is in a state this save cannot safely build on — refused with the
+            // reason, because "save failed" would leave an operator unable to tell a refusal that
+            // protected their secret from one that lost it.
+            Api.fail(ctx, 409, e.getMessage());
         } catch (Exception e) {
             Api.fail(ctx, 500, "save failed");
         }

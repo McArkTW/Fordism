@@ -2,11 +2,11 @@ package tw.mcark.tony.fordism.credential;
 
 import com.google.gson.Gson;
 import tw.mcark.tony.fordism.config.FordismConfiguration;
+import tw.mcark.tony.fordism.store.PrivateFile;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -131,32 +131,45 @@ public final class CredentialStore {
      * editing the note does not require re-typing the secret.
      */
     public void save(String key, String value, String note) throws IOException {
-        String kept = value != null && !value.isBlank()
-                ? value
-                : get(key).map(Credential::value).orElse(value);
+        String kept = value != null && !value.isBlank() ? value : keptValueOf(key, value);
         if (kept != null && (kept.indexOf('\n') >= 0 || kept.indexOf('\r') >= 0)) {
             // The launcher's --env-file writer turns a newline into a space, which would corrupt a
             // token into one that fails authentication for reasons no log explains. Refuse instead.
             throw new IllegalArgumentException("value for " + key + " contains a line break");
         }
-        Files.createDirectories(root());
-        Path path = file(key);
-        Files.writeString(path, GSON.toJson(new Credential(
+        PrivateFile.write(file(key), GSON.toJson(new Credential(
                 key, kept == null ? "" : kept, note == null ? "" : note.trim(), System.currentTimeMillis())));
-        restrictPermissions(path);
         Logger.info("credential {} saved", key);
+    }
+
+    /**
+     * The stored value a blank save is asking to keep.
+     *
+     * <p>{@link #get} answers "unreadable" and "absent" the same way, which is right for listing —
+     * one broken file must not take the page down — and wrong here. Editing the note of a
+     * credential whose file could not be parsed would carry the blank straight through and write
+     * an empty value over a secret that may exist nowhere else. A file that is there but
+     * unreadable is refused; only a file that genuinely is not there reads as nothing to keep.
+     */
+    private String keptValueOf(String key, String blank) {
+        Path path = file(key);
+        if (!Files.isRegularFile(path)) {
+            return blank;
+        }
+        Optional<Credential> stored = get(key);
+        if (stored.isEmpty()) {
+            // Logged with the path, because the operator's answer is to look at the file; the
+            // message that reaches them says what to do without naming the server's layout.
+            Logger.warn("refused a blank save over {} — it exists but could not be read, and writing "
+                    + "the blank through would replace its value with nothing", path);
+            throw new IllegalStateException("the stored " + key + " could not be read, so there is no "
+                    + "value to keep — send the value again, or delete the credential and re-create it");
+        }
+        return stored.get().value();
     }
 
     public void delete(String key) throws IOException {
         Files.deleteIfExists(file(key));
         Logger.info("credential {} deleted", key);
-    }
-
-    private static void restrictPermissions(Path path) {
-        try {
-            Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("rw-------"));
-        } catch (UnsupportedOperationException | IOException e) {
-            // non-POSIX filesystem (dev on Windows) — the directory is already user-scoped
-        }
     }
 }

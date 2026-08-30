@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -86,4 +87,26 @@ class CredentialStoreTest {
         assertTrue(CredentialStore.isValidKey("_OK2"));
         assertThrows(IllegalArgumentException.class, () -> credentials.save("not-a-var", "x", ""));
     }
+
+    @Test
+    void a_blank_save_over_an_unreadable_file_is_refused_rather_than_blanking_the_secret() throws IOException {
+        // The reachable shape of the bug PrivateFile now prevents: a credential file that got
+        // truncated reads as "no such credential", and a blank value means "keep what is stored".
+        // Carrying the blank through would write an empty value over a secret nothing else holds.
+        Files.writeString(directory.resolve("GITHUB_TOKEN.json"), "{\"value\":\"ghp-re");
+
+        assertThrows(IllegalStateException.class, () -> credentials.save("GITHUB_TOKEN", "", "just fixing the note"));
+        assertEquals("{\"value\":\"ghp-re", Files.readString(directory.resolve("GITHUB_TOKEN.json")),
+                "a refused save rewrote the file it refused to touch");
+    }
+
+    @Test
+    void a_credential_that_was_never_stored_still_saves_with_a_blank_value() throws IOException {
+        // The other side of the guard above: absent is not the same as unreadable, and an operator
+        // creating a placeholder to fill in later must still be able to.
+        credentials.save("NEW_TOKEN", "", "to be filled in");
+        assertTrue(credentials.read("NEW_TOKEN").isPresent());
+        assertFalse(credentials.read("NEW_TOKEN").get().hasValue());
+    }
+
 }
