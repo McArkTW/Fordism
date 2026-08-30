@@ -68,12 +68,20 @@ public final class SkillPluginStore {
         return new ArrayList<>(plugins.values());
     }
 
-    /** Register a plugin and pull it in. A failed first sync leaves the entry with its error. */
+    /**
+     * Register a plugin and pull it in. A failed first sync leaves the entry with its error, so it
+     * can be retried with Sync — but a URL that can never resolve is refused outright rather than
+     * persisted, because there is nothing to retry and the row would sit in the registry forever
+     * under a folder name derived from whatever the URL ended in.
+     */
     public SkillPlugin add(String url, String ref) throws IOException {
         String trimmed = url == null ? "" : url.trim();
         if (trimmed.isEmpty()) {
             throw new IllegalArgumentException("a git URL is required");
         }
+        // Resolve before registering, not inside the first sync: this is the malformed-URL and
+        // non-HTTPS check, and both are permanent.
+        archiveUrl(trimmed, ref == null || ref.isBlank() ? "HEAD" : ref.trim());
         String name = folderName(trimmed);
         synchronized (this) {
             for (SkillPlugin existing : plugins.values()) {

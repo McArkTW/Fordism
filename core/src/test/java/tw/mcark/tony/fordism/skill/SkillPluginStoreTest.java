@@ -155,6 +155,36 @@ class SkillPluginStoreTest {
                 SkillPluginStore.archiveUrl("https://example.com/build/skills.zip", "HEAD"));
     }
 
+    /**
+     * A URL that can never resolve leaves nothing behind. It used to be registered anyway — {@code
+     * add} persisted the plugin and let the first {@code sync} record the failure as {@code
+     * lastError}, which is right for a 404 that may pass on retry but wrong for a URL shape that
+     * never will: the registry filled with unusable rows named after whatever the URL ended in
+     * ({@code HEAD}, {@code zip}, {@code anything}), each needing a manual Remove.
+     */
+    @Test
+    void a_url_that_can_never_resolve_is_refused_rather_than_registered() {
+        SkillPluginStore plugins = store();
+
+        assertThrows(IllegalArgumentException.class,
+                () -> plugins.add("https://codeload.github.com/acme/toolkit/zip/HEAD", "HEAD"));
+        assertThrows(IllegalArgumentException.class,
+                () -> plugins.add("http://127.0.0.1:8080/anything.zip", "HEAD"));
+
+        assertTrue(plugins.list().isEmpty(), "a refused URL must not reach the registry");
+    }
+
+    /** A fetch that could pass on a retry still registers, so Sync has something to retry. */
+    @Test
+    void a_resolvable_url_that_fails_to_fetch_is_registered_with_its_error() throws Exception {
+        http.answerWithStatus(404);
+
+        SkillPlugin added = store().add("acme/toolkit", "HEAD");
+
+        assertEquals("", added.lastSyncedAt());
+        assertTrue(added.lastError().contains("404"), added.lastError());
+    }
+
     /** The class javadoc says the repo arrives over HTTPS; this is what makes that true. */
     @Test
     void a_plain_http_zip_url_is_refused() {
