@@ -1,0 +1,14 @@
+Fordism
+Copyright 2026 The Fordism Authors
+
+Created and maintained by Tony (https://github.com/tony19907051),
+published under the McArkTW organization (https://github.com/McArkTW).
+
+This product includes software developed at the above project
+(https://github.com/McArkTW/Fordism), licensed under the Apache License,
+Version 2.0.
+
+Bundled third-party assets:
+- Lucide icons (embedded SVG sprite generated from lucide-static) — ISC License
+- spartan/ui helm components (vendored into app/src/app/ui via @spartan-ng/cli) — MIT License,
+  Copyright (c) 2023 Robin Goetz

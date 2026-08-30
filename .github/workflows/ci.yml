@@ -1,0 +1,98 @@
+# CI: secret scan + both builds with their gates on every PR and push to main.
+# Publishing is release.yml's job alone — a v* tag runs there, gates included.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # gitleaks scans history, not just the tip
+      - name: gitleaks
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz | tar -xz gitleaks
+          ./gitleaks detect --source . -v
+
+  core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      # banVar + banStyle + all tests ride inside `build`
+      - run: chmod +x gradlew && ./gradlew build --no-daemon
+        working-directory: core
+
+  app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+        working-directory: app
+      - run: npm run lint
+        working-directory: app
+      - run: npm run test
+        working-directory: app
+      - run: npm run build
+        working-directory: app
+
+  vectors:
+    # The permission-matcher vectors and the permission vocabulary are both duplicated,
+    # because the Java and Angular builds cannot share a file. Compare the PARSED JSON —
+    # the app copies are Prettier-formatted, so a byte diff would fail on whitespace alone.
+    #
+    # The other half of each check is in core: PermissionMatcherTest drives the matcher from
+    # the vectors, and PermissionLeavesTest pins the leaves file to the Permission enum. So
+    # "core's copy is right" and "the two copies agree" are both enforced.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Vectors match
+        run: |
+          node -e "
+            const assert = require('assert');
+            const a = require('./core/src/test/resources/permission-matcher-vectors.json');
+            const b = require('./app/src/app/auth/permission-matcher-vectors.json');
+            assert.deepStrictEqual(a, b, 'permission-matcher-vectors.json has drifted between core/ and app/');
+            console.log('vectors identical (' + a.length + ' cases)');
+          "
+      - name: Permission leaves match
+        run: |
+          node -e "
+            const assert = require('assert');
+            const a = require('./core/src/test/resources/permission-leaves.json');
+            const b = require('./app/src/app/auth/permission-leaves.json');
+            assert.deepStrictEqual(a, b, 'permission-leaves.json has drifted between core/ and app/');
+            console.log('leaves identical (' + a.length + ' permissions)');
+          "
+
+  images:
+    # Compose-build all three images so a Dockerfile break fails the PR. Nothing is
+    # pushed here; release.yml owns publishing so a tag cannot be pushed twice.
+    needs: [secret-scan, core, app, vectors]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # GHCR namespaces are lowercase and docker refuses a tag that is not, so
+      # github.repository (McArkTW/Fordism) cannot be used verbatim.
+      - name: Registry name
+        run: echo "REGISTRY=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+      - name: Build images
+        run: docker compose --profile build-only build
+        env:
+          TAG: ci
+          FORDISM_VERSION: ${{ github.ref_name }}
+          FORDISM_GIT_SHA: ${{ github.sha }}

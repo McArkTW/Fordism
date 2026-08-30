@@ -1,0 +1,135 @@
+<div class="mx-auto flex max-w-5xl flex-col gap-6">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h1 class="page-h">Users</h1>
+      <p class="text-muted-foreground text-sm">
+        Who may sign in. What each account may do comes from its groups — an account in no group
+        can sign in and see nothing.
+      </p>
+    </div>
+    <button hlmBtn [variant]="draft() ? 'outline' : 'default'" (click)="startCreate()">
+      <app-icon name="plus" />Add user
+    </button>
+  </div>
+
+  @if (draft(); as d) {
+    <section class="border-primary/40 bg-card rounded-xl border p-4">
+      <h2 class="text-muted-foreground text-sm font-semibold tracking-wide uppercase">New user</h2>
+
+      <div class="mt-3 grid gap-3 sm:grid-cols-2">
+        <div class="flex flex-col gap-1.5">
+          <label hlmLabel for="user-email">Email</label>
+          <input
+            hlmInput
+            id="user-email"
+            type="email"
+            autocomplete="off"
+            [value]="d.email"
+            (input)="patch({ email: $any($event.target).value })"
+          />
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <label hlmLabel for="user-name">Display name</label>
+          <input
+            hlmInput
+            id="user-name"
+            autocomplete="off"
+            placeholder="Ada Lovelace"
+            [value]="d.displayName"
+            (input)="patch({ displayName: $any($event.target).value })"
+          />
+        </div>
+      </div>
+
+      <div class="mt-3 flex flex-col gap-1.5">
+        <label hlmLabel for="user-password">Password — leave blank for a provider-only account</label>
+        <input
+          hlmInput
+          id="user-password"
+          type="password"
+          autocomplete="new-password"
+          [value]="d.password"
+          (input)="patch({ password: $any($event.target).value })"
+        />
+      </div>
+
+      <div class="mt-4 flex items-center gap-2">
+        <button hlmBtn [disabled]="busy()" (click)="save()"><app-icon name="save" />Create</button>
+        <button hlmBtn variant="outline" (click)="cancel()">Cancel</button>
+      </div>
+    </section>
+  }
+
+  @if (loadError(); as e) {
+    <div class="border-destructive/40 bg-destructive/5 flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3">
+      <app-icon name="alert-triangle" class="text-destructive" />
+      <span class="text-sm">{{ e }}</span>
+      <button hlmBtn variant="outline" size="sm" class="ml-auto" (click)="refresh()">
+        <app-icon name="refresh-cw" />Retry
+      </button>
+    </div>
+  }
+
+  @if (users(); as list) {
+    @if (list.length === 0) {
+      <div class="border-border bg-card flex flex-col items-center rounded-xl border px-6 py-16 text-center">
+        <app-icon name="users" class="text-muted-foreground text-3xl" />
+        <div class="mt-3 text-sm font-medium">No accounts yet.</div>
+        <p class="text-muted-foreground mt-1 text-sm">Add one to let somebody else in.</p>
+      </div>
+    } @else {
+      <div class="border-border bg-card overflow-x-auto rounded-xl border">
+        <table class="w-full">
+          <thead>
+            <tr>
+              <th class="text-muted-foreground px-3 py-2 text-left text-xs font-semibold tracking-wide uppercase">Email</th>
+              <th class="text-muted-foreground px-3 py-2 text-left text-xs font-semibold tracking-wide uppercase">Name</th>
+              <th class="text-muted-foreground px-3 py-2 text-left text-xs font-semibold tracking-wide uppercase">Signs in with</th>
+              <th class="text-muted-foreground px-3 py-2 text-left text-xs font-semibold tracking-wide uppercase"></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (u of list; track u.id) {
+              <tr class="hover:bg-foreground/5">
+                <td class="border-border border-t px-3 py-2 text-sm font-medium">{{ u.email }}</td>
+                <td class="border-border text-muted-foreground border-t px-3 py-2 text-sm">
+                  {{ u.displayName || '—' }}
+                </td>
+                <td class="border-border border-t px-3 py-2 text-sm">
+                  @if (u.identities.length === 0) {
+                    <span class="badge-warn">no way in</span>
+                  } @else {
+                    <span class="flex flex-wrap gap-1">
+                      @for (label of identityLabel(u); track label) {
+                        <span class="badge-muted">{{ label }}</span>
+                      }
+                    </span>
+                  }
+                </td>
+                <td class="border-border border-t px-3 py-2 text-sm">
+                  <span class="flex justify-end">
+                    <button
+                      hlmBtn
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Delete"
+                      title="Delete"
+                      (click)="remove(u)"
+                    >
+                      <app-icon name="trash-2" />
+                    </button>
+                  </span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  } @else if (!loadError()) {
+    <div class="text-muted-foreground flex items-center gap-2 text-sm">
+      <app-icon name="loader" class="animate-spin" />
+      Loading users…
+    </div>
+  }
+</div>

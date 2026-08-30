@@ -1,0 +1,23 @@
+name: conditional-example
+description: Run a step only when a predicate over an earlier step's result holds; skip it otherwise.
+strategy: conditional
+parameters: [change]
+steps:
+  - id: classify
+    template: generic
+    task: |
+      Does this change touch security-sensitive code? Answer exactly "yes"
+      or "no":
+      ${change}
+  - id: security-review
+    template: generic
+    when: classify.result == 'yes'
+    task: |
+      Perform a security review of this change and list any findings:
+      ${change}
+  - id: summary
+    template: generic
+    task: |
+      Briefly summarize this change and note whether a security review was
+      needed:
+      ${change}

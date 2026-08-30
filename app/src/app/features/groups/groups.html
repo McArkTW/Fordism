@@ -1,0 +1,239 @@
+<div class="mx-auto flex max-w-5xl flex-col gap-6">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h1 class="page-h">Groups</h1>
+      <p class="text-muted-foreground text-sm">
+        Permissions live here, not on accounts. A grant is a pattern — <code class="font-mono">*</code>,
+        <code class="font-mono">run.*</code>, or one permission — and a user gets the union of
+        every group they are in.
+      </p>
+    </div>
+    <button hlmBtn [variant]="draft() ? 'outline' : 'default'" (click)="startCreate()">
+      <app-icon name="plus" />Add group
+    </button>
+  </div>
+
+  @if (loadError(); as e) {
+    <div class="border-destructive/40 bg-destructive/5 flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3">
+      <app-icon name="alert-triangle" class="text-destructive" />
+      <span class="text-sm">{{ e }}</span>
+      <button hlmBtn variant="outline" size="sm" class="ml-auto" (click)="refresh()">
+        <app-icon name="refresh-cw" />Retry
+      </button>
+    </div>
+  }
+
+  @if (actionError(); as e) {
+    <div class="border-destructive/40 bg-destructive/5 rounded-xl border px-4 py-3 text-sm">
+      {{ e }}
+    </div>
+  }
+
+  @if (draft(); as d) {
+    <section class="border-primary/40 bg-card flex flex-col gap-4 rounded-xl border p-4">
+      <h2 class="text-muted-foreground text-sm font-semibold tracking-wide uppercase">
+        {{ d.id ? 'Edit ' + d.name : 'New group' }}
+      </h2>
+
+      <div class="flex flex-col gap-1.5">
+        <label hlmLabel for="group-name">Name</label>
+        <input
+          hlmInput
+          id="group-name"
+          autocomplete="off"
+          placeholder="Operators"
+          [value]="d.name"
+          (input)="patch({ name: $any($event.target).value })"
+        />
+      </div>
+
+      <!-- Members -->
+      <div class="flex flex-col gap-1.5">
+        <div class="flex items-center justify-between gap-3">
+          <span class="text-sm font-medium">Members</span>
+          <span class="text-muted-foreground text-xs">{{ d.members.length }} selected</span>
+        </div>
+        <input
+          hlmInput
+          aria-label="Filter users"
+          placeholder="Filter users…"
+          [value]="memberFilter()"
+          (input)="memberFilter.set($any($event.target).value)"
+        />
+        @if (candidates().length === 0) {
+          <p class="text-muted-foreground text-sm">
+            No users to pick from{{ memberFilter() ? ' for that filter' : '' }}.
+          </p>
+        } @else {
+          <div class="divide-border border-border max-h-64 divide-y overflow-y-auto rounded-lg border">
+            @for (u of candidates(); track u.id) {
+              <div class="hover:bg-foreground/5 flex items-center gap-3 px-3 py-2">
+                <hlm-checkbox
+                  [aria-label]="'Member ' + u.email"
+                  [checked]="isMember(u.id)"
+                  (checkedChange)="toggleMember(u.id)"
+                />
+                <!-- The label toggles too — one handler each, so no double-fire. -->
+                <button
+                  type="button"
+                  class="min-w-0 flex-auto cursor-pointer text-left"
+                  (click)="toggleMember(u.id)"
+                >
+                  <span class="block truncate text-sm">{{ u.displayName || u.email }}</span>
+                  <span class="text-muted-foreground block truncate text-xs">{{ u.email }}</span>
+                </button>
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <!-- Grants -->
+      <div class="flex flex-col gap-1.5">
+        <span class="text-sm font-medium">Grants</span>
+        <form class="flex gap-2" (submit)="$event.preventDefault(); addGrant()">
+          <input
+            hlmInput
+            class="flex-1 font-mono"
+            aria-label="Grant pattern"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="run.* — or * for everything"
+            [value]="newGrant()"
+            (input)="newGrant.set($any($event.target).value)"
+          />
+          <button hlmBtn type="submit" variant="outline"><app-icon name="plus" />Add</button>
+        </form>
+
+        @if (d.grants.length === 0) {
+          <p class="text-muted-foreground text-sm">
+            No grants — members of this group could sign in and do nothing.
+          </p>
+        } @else {
+          <div class="divide-border border-border divide-y rounded-lg border">
+            @for (p of preview(); track p.pattern) {
+              <div class="flex items-start gap-3 px-3 py-2">
+                <span class="mt-0.5 font-mono text-sm font-medium">{{ p.pattern }}</span>
+                <span class="min-w-0 flex-auto">
+                  @if (p.leaves.length === 0) {
+                    <!-- The trap this preview exists for: `*.read` and friends match nothing. -->
+                    <span class="badge-warn">matches no known permission</span>
+                  } @else {
+                    <span class="flex flex-wrap gap-1">
+                      @for (leaf of p.leaves; track leaf) {
+                        <span class="badge-muted font-mono">{{ leaf }}</span>
+                      }
+                    </span>
+                  }
+                </span>
+                <button
+                  hlmBtn
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Remove grant"
+                  title="Remove grant"
+                  (click)="removeGrant(p.pattern)"
+                >
+                  <app-icon name="x" />
+                </button>
+              </div>
+            }
+          </div>
+          <p class="text-muted-foreground text-xs">
+            Covers {{ covered().length }} of {{ leaves.length }} known permissions.
+          </p>
+        }
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button hlmBtn [disabled]="busy()" (click)="save()">
+          <app-icon name="save" />{{ d.id ? 'Save' : 'Create' }}
+        </button>
+        <button hlmBtn variant="outline" (click)="cancel()">Cancel</button>
+      </div>
+    </section>
+  }
+
+  @if (groups(); as list) {
+    @if (list.length === 0) {
+      <div class="border-border bg-card flex flex-col items-center rounded-xl border px-6 py-16 text-center">
+        <app-icon name="shield" class="text-muted-foreground text-3xl" />
+        <div class="mt-3 text-sm font-medium">No groups yet.</div>
+        <p class="text-muted-foreground mt-1 text-sm">
+          Until there is one, nobody but the first administrator can do anything.
+        </p>
+      </div>
+    } @else {
+      <div class="border-border bg-card overflow-x-auto rounded-xl border">
+        <table class="w-full">
+          <thead>
+            <tr>
+              <th class="text-muted-foreground px-3 py-2 text-left text-xs font-semibold tracking-wide uppercase">Group</th>
+              <th class="text-muted-foreground px-3 py-2 text-left text-xs font-semibold tracking-wide uppercase">Members</th>
+              <th class="text-muted-foreground px-3 py-2 text-left text-xs font-semibold tracking-wide uppercase">Grants</th>
+              <th class="text-muted-foreground px-3 py-2 text-left text-xs font-semibold tracking-wide uppercase"></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (g of list; track g.id) {
+              <tr class="hover:bg-foreground/5">
+                <td class="border-border border-t px-3 py-2 text-sm font-medium">{{ g.name }}</td>
+                <td class="border-border border-t px-3 py-2 text-sm">
+                  @if (g.members.length === 0) {
+                    <span class="text-muted-foreground">nobody</span>
+                  } @else {
+                    <span class="flex flex-wrap gap-1">
+                      @for (id of g.members; track id) {
+                        <span class="badge-muted">{{ memberName(id) }}</span>
+                      }
+                    </span>
+                  }
+                </td>
+                <td class="border-border border-t px-3 py-2 text-sm">
+                  @if (g.grants.length === 0) {
+                    <span class="badge-warn">grants nothing</span>
+                  } @else {
+                    <span class="flex flex-wrap gap-1">
+                      @for (grant of g.grants; track grant) {
+                        <span class="badge-muted font-mono">{{ grant }}</span>
+                      }
+                    </span>
+                  }
+                </td>
+                <td class="border-border border-t px-3 py-2 text-sm">
+                  <span class="flex justify-end gap-1.5">
+                    <button
+                      hlmBtn
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Edit"
+                      title="Edit"
+                      (click)="startEdit(g)"
+                    >
+                      <app-icon name="pencil" />
+                    </button>
+                    <button
+                      hlmBtn
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Delete"
+                      title="Delete"
+                      (click)="remove(g)"
+                    >
+                      <app-icon name="trash-2" />
+                    </button>
+                  </span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  } @else if (!loadError()) {
+    <div class="text-muted-foreground flex items-center gap-2 text-sm">
+      <app-icon name="loader" class="animate-spin" />
+      Loading groups…
+    </div>
+  }
+</div>

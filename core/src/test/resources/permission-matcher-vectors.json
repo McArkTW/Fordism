@@ -1,0 +1,13 @@
+[
+  { "grant": "*",             "required": "workflow.read",         "expected": true  },
+  { "grant": "admin.*",       "required": "admin.a",               "expected": true  },
+  { "grant": "admin.*",       "required": "admin.a.b",             "expected": true  },
+  { "grant": "admin.*",       "required": "admin.b",               "expected": true  },
+  { "grant": "admin.*",       "required": "admin",                 "expected": false },
+  { "grant": "admin.*",       "required": "administrator.x",       "expected": false },
+  { "grant": "workflow.read", "required": "workflow.read",         "expected": true  },
+  { "grant": "workflow.read", "required": "workflow.write",        "expected": false },
+  { "grant": "run.*",         "required": "run.workspace.download", "expected": true  },
+  { "grant": "run",           "required": "run.read",              "expected": false },
+  { "grant": "*.read",        "required": "workflow.read",         "expected": false }
+]
