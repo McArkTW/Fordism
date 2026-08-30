@@ -1,0 +1,77 @@
+<div class="mx-auto w-full max-w-2xl">
+  <h1 class="page-h">Security</h1>
+
+  <div class="border-border bg-card mt-4 rounded-xl border p-5">
+    <div class="flex items-center gap-2">
+      <app-icon name="shield" />
+      <h2 class="text-base font-semibold">Two-factor authentication</h2>
+      @if (enabled()) {
+        <span class="badge-ok">on</span>
+      } @else {
+        <span class="badge-muted">off</span>
+      }
+    </div>
+    <p class="text-muted-foreground mt-1.5 text-sm">
+      A code from an authenticator app, required at sign-in on top of your password. It needs no
+      network — the app and the server derive the same code from a shared secret and the clock.
+    </p>
+
+    <!-- Shown once, after enrolment. The server keeps only hashes; these cannot be shown again. -->
+    @if (recoveryCodes(); as codes) {
+      <div class="border-primary/40 bg-primary/10 mt-4 rounded-lg border p-4">
+        <div class="flex items-center gap-2 text-sm font-medium">
+          <app-icon name="key" />
+          Save your recovery codes
+        </div>
+        <p class="text-muted-foreground mt-1 text-xs">
+          Each works once, if you lose your authenticator. This is the only time they are shown.
+        </p>
+        <div class="mt-3 grid grid-cols-2 gap-1.5 font-mono text-sm">
+          @for (c of codes; track c) {
+            <div class="border-border bg-card rounded px-2 py-1">{{ c }}</div>
+          }
+        </div>
+        <button hlmBtn class="mt-3" (click)="dismissRecovery()">I have saved these</button>
+      </div>
+    } @else if (enrolling(); as e) {
+      <div class="border-border mt-4 rounded-lg border p-4">
+        <p class="text-sm">
+          Add this secret to your authenticator app, then enter the 6-digit code it shows.
+        </p>
+        <code class="border-border bg-card mt-2 block overflow-x-auto rounded px-3 py-2 font-mono text-sm">{{ e.secret }}</code>
+        <p class="text-muted-foreground mt-1 text-[11px] break-all">{{ e.otpauthUri }}</p>
+        <div class="mt-3 flex flex-col gap-1.5">
+          <label hlmLabel for="mfa-code">Code from the app</label>
+          <input
+            hlmInput
+            id="mfa-code"
+            inputmode="numeric"
+            placeholder="6-digit code"
+            [value]="code()"
+            (input)="code.set($any($event.target).value)"
+          />
+        </div>
+        <div class="mt-3 flex items-center gap-2">
+          <button hlmBtn [disabled]="busy()" (click)="confirm2fa()">
+            @if (busy()) {
+              <hlm-spinner class="size-4" />
+            }
+            Turn on
+          </button>
+          <button hlmBtn variant="ghost" (click)="cancelEnrol()">Cancel</button>
+        </div>
+      </div>
+    } @else if (enabled()) {
+      <button hlmBtn variant="destructive" class="mt-4" [disabled]="busy()" (click)="disable()">
+        Turn off two-factor
+      </button>
+    } @else {
+      <button hlmBtn class="mt-4" [disabled]="busy()" (click)="begin()">
+        @if (busy()) {
+          <hlm-spinner class="size-4" />
+        }
+        Set up two-factor
+      </button>
+    }
+  </div>
+</div>

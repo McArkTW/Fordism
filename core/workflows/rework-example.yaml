@@ -1,0 +1,21 @@
+name: rework-example
+description: A gate step re-seeds the work step (continuing from its last workspace) until it passes; once maxAttempts is spent the run finishes FAILED.
+strategy: rework
+parameters: [requirement]
+steps:
+  - id: work
+    template: generic
+    task: |
+      Write a Python function that satisfies this requirement, and save it
+      to answer_work.txt:
+      ${requirement}
+  - id: gate
+    template: generic
+    task: |
+      Review the function in task/previous-result/answer_work.txt.
+      If it fully meets the requirement, answer "pass". Otherwise answer
+      "fail" and explain what to fix.
+    includePreviousResult: true
+    onFail:
+      retry: work
+      maxAttempts: 3

@@ -1,0 +1,85 @@
+# The Fordism — full stack. `docker compose up -d` on any Docker host (GPU-free).
+# Images are PULLED from the registry here; docker-compose.override.yml adds
+# `build:` for local development.
+#
+# Ollama is EXTERNAL (not managed here) — set OLLAMA_BASE_URL to a GPU host.
+# No gateway: each Agent Profile carries its own baseUrl and agents call the provider
+# DIRECTLY (Claude → api.anthropic.com, qwen → Ollama's OpenAI endpoint).
+#
+# Two services run: core and app. There is no database — core keeps run/task state in
+# memory behind the `store` port and snapshots it to disk, so a Postgres container was
+# running with nothing ever connecting to it (core ships no JDBC driver). Add it back
+# alongside a real store implementation, not before.
+name: fordism
+
+services:
+  fordism-core:
+    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-core:${TAG:-latest}
+    environment:
+      # Build identity — stamped by CI at deploy; surfaced at /api/version.
+      FORDISM_VERSION: ${FORDISM_VERSION:-dev}
+      FORDISM_GIT_SHA: ${FORDISM_GIT_SHA:-unknown}
+      FORDISM_BUILT_AT: ${FORDISM_BUILT_AT:-unknown}
+      # Auth — always on; at least one provider must be enabled (local is the default).
+      # FORDISM_ADMIN_SECRET is consumed once by the first-login bootstrap, then inert.
+      FORDISM_AUTH_LOCAL: ${FORDISM_AUTH_LOCAL:-true}
+      FORDISM_AUTH_GOOGLE_CLIENT_ID: ${FORDISM_AUTH_GOOGLE_CLIENT_ID:-}
+      FORDISM_AUTH_GOOGLE_CLIENT_SECRET: ${FORDISM_AUTH_GOOGLE_CLIENT_SECRET:-}
+      FORDISM_AUTH_GITHUB_CLIENT_ID: ${FORDISM_AUTH_GITHUB_CLIENT_ID:-}
+      FORDISM_AUTH_GITHUB_CLIENT_SECRET: ${FORDISM_AUTH_GITHUB_CLIENT_SECRET:-}
+      FORDISM_AUTH_ALLOWED_EMAILS: ${FORDISM_AUTH_ALLOWED_EMAILS:-}
+      FORDISM_AUTH_ALLOWED_DOMAINS: ${FORDISM_AUTH_ALLOWED_DOMAINS:-}
+      FORDISM_ADMIN_SECRET: ${FORDISM_ADMIN_SECRET:-}
+      FORDISM_PUBLIC_URL: ${FORDISM_PUBLIC_URL:-http://localhost}
+      FORDISM_COOKIE_SECURE: ${FORDISM_COOKIE_SECURE:-false}
+      # Launcher. FORDISM_LAUNCHER_NETWORK must name a network the agent can reach core on —
+      # the env files point it at this project's `internal` (e.g. uat_internal).
+      FORDISM_LAUNCHER_NETWORK: ${FORDISM_LAUNCHER_NETWORK:-}
+      FORDISM_AGENT_IMAGE: ${FORDISM_AGENT_IMAGE:-}
+      FORDISM_LAUNCHER_MAX: ${FORDISM_LAUNCHER_MAX:-4}
+      # The gid the agent image runs as; a staged workspace is handed to this group.
+      FORDISM_AGENT_GID: ${FORDISM_AGENT_GID:-1001}
+      # No gateway — the default backend when a task resolves no Agent Profile.
+      LLM_BASE_URL: ${OLLAMA_BASE_URL:-http://localhost:11434}
+      AGENT_MODEL: ${AGENT_MODEL:-qwen3}
+      # Clean per-env root mounted at /fordism, with flat siblings:
+      #   /fordism/{workspaces, workflows, state, templates, skills, agent-profiles}
+      FORDISM_WORKSPACES_DIR: /fordism/workspaces
+      FORDISM_WORKSPACES_HOST: ${FORDISM_ROOT:-/var/lib/fordism}/workspaces
+      FORDISM_STATE_DIR: /fordism/state
+      FORDISM_USER_WORKFLOWS_DIR: /fordism/workflows
+      FORDISM_SKILLS_DIR: /fordism/skills
+      FORDISM_AGENT_PROFILES_DIR: /fordism/agent-profiles
+      AGENT_TEMPLATES: /fordism/templates
+    # The launcher shells the docker CLI against this host socket to spawn agents; the whole
+    # per-env fordism root is mounted so state/workflows/templates/workspaces all persist.
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${FORDISM_ROOT:-/var/lib/fordism}:/fordism
+    networks: [internal, edge]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # Static Angular SPA served by nginx; also the edge (proxies /api → core).
+  fordism-app:
+    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-app:${TAG:-latest}
+    ports:
+      - "${WEB_PORT:-80}:80"
+    depends_on: [fordism-core]
+    networks: [edge]
+    restart: unless-stopped
+
+  # Not a service — the recipe for the agent image, so `compose build` produces it under the
+  # same REGISTRY/TAG as the others. The launcher runs one of these per task; nothing
+  # long-lived. Behind a profile so `up` never starts it.
+  fordism-agent:
+    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent:${TAG:-latest}
+    profiles: ["build-only"]
+
+networks:
+  edge:      # nginx ↔ app ↔ core (public-facing)
+  internal:  # core ↔ the agent containers the launcher spawns

@@ -1,0 +1,15 @@
+name: map-reduce-example
+description: Fan the map step out over each item in a list parameter (one task per item), then reduce the results into one.
+strategy: map-reduce
+parameters: [items]
+steps:
+  - id: map
+    template: generic
+    forEach: ${items}
+    task: |
+      Write a two-sentence summary of the topic: ${item}
+  - id: reduce
+    template: generic
+    task: |
+      Combine the per-topic summaries into a single short overview.
+    includePreviousResult: true

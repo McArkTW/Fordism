@@ -1,0 +1,54 @@
+<div class="mx-auto w-full max-w-5xl">
+  <h1 class="page-h">Audit log</h1>
+  <p class="text-muted-foreground mt-1.5 text-sm">
+    Every sign-in and every change, newest first — who, from where, and whether it was allowed.
+  </p>
+
+  @if (loadError()) {
+    <div class="border-destructive/40 bg-destructive/10 text-destructive mt-4 rounded-xl border px-3 py-2 text-sm">
+      {{ loadError() }}
+    </div>
+  } @else if (loading()) {
+    <div class="text-muted-foreground mt-6 flex items-center gap-2 text-sm">
+      <hlm-spinner class="size-4" />
+      Loading…
+    </div>
+  } @else {
+    <div hlmTableContainer class="border-border bg-card mt-4 rounded-xl border">
+      <table hlmTable>
+        <thead hlmTHead>
+          <tr hlmTr>
+            <th hlmTh class="text-muted-foreground px-3 text-xs font-semibold tracking-wide uppercase">When</th>
+            <th hlmTh class="text-muted-foreground px-3 text-xs font-semibold tracking-wide uppercase">Who</th>
+            <th hlmTh class="text-muted-foreground px-3 text-xs font-semibold tracking-wide uppercase">From</th>
+            <th hlmTh class="text-muted-foreground px-3 text-xs font-semibold tracking-wide uppercase">Action</th>
+            <th hlmTh class="text-muted-foreground px-3 text-xs font-semibold tracking-wide uppercase">Result</th>
+          </tr>
+        </thead>
+        <tbody hlmTBody>
+          @for (e of entries(); track $index) {
+            <tr hlmTr>
+              <td hlmTd class="text-muted-foreground px-3 whitespace-nowrap">{{ e.at | date: 'MMM d, HH:mm:ss' }}</td>
+              <td hlmTd class="px-3">{{ e.actorEmail }}</td>
+              <td hlmTd class="text-muted-foreground px-3 font-mono text-xs">{{ e.ip }}</td>
+              <td hlmTd class="px-3 font-mono text-xs">{{ e.action }}</td>
+              <td hlmTd class="px-3">
+                @if (e.allowed) {
+                  <span class="badge-ok">allowed</span>
+                } @else {
+                  <span class="badge-warn">refused</span>
+                }
+              </td>
+            </tr>
+          } @empty {
+            <tr hlmTr>
+              <td hlmTd class="text-muted-foreground px-3 py-8 text-center" colspan="5">
+                Nothing recorded yet.
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

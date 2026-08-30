@@ -1,0 +1,128 @@
+<div class="mx-auto flex max-w-5xl flex-col gap-6">
+  <a
+    class="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1.5 text-sm"
+    [routerLink]="listPath"
+  >
+    <app-icon name="chevron-left" />Skills
+  </a>
+
+  @if (loading()) {
+    <div class="text-muted-foreground flex items-center justify-center gap-2 py-16 text-sm">
+      <hlm-spinner class="text-xl" />
+      Loading {{ name() }}…
+    </div>
+  } @else if (loadError()) {
+    <div
+      class="border-destructive/40 bg-destructive/10 flex flex-col items-center rounded-xl border px-6 py-16 text-center"
+    >
+      <app-icon name="circle-x" class="text-destructive text-3xl" />
+      <div class="mt-3 text-sm font-medium">Could not load “{{ name() }}”.</div>
+      <p class="text-muted-foreground mt-1 max-w-md text-sm">{{ loadError() }}</p>
+      <button hlmBtn variant="outline" size="sm" class="mt-4" (click)="load(name())">
+        Try again
+      </button>
+    </div>
+  } @else if (skill(); as d) {
+    <div class="border-border bg-card rounded-xl border p-5">
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div class="min-w-0">
+          <h1 class="truncate font-mono text-lg font-semibold">{{ d.name }}</h1>
+          @if (d.description) {
+            <p class="text-muted-foreground mt-1 text-sm">{{ d.description }}</p>
+          }
+          <div class="text-muted-foreground mt-2 flex flex-wrap items-center gap-2 text-xs">
+            @if (d.owner) {
+              <a class="badge-muted hover:underline" [routerLink]="pluginsPath">{{ d.owner }}</a>
+            } @else {
+              <span class="badge-muted">yours</span>
+            }
+            <span>{{ d.fileCount }} file{{ d.fileCount === 1 ? '' : 's' }}</span>
+            @if (d.updatedAt) {
+              <span>· updated {{ d.updatedAt | date: 'MMM d, y, h:mm a' }}</span>
+            }
+          </div>
+        </div>
+        <div class="flex shrink-0 flex-wrap items-center gap-2">
+          <span class="inline-flex">
+            <hlm-switch
+              [aria-label]="'Enable ' + d.name"
+              [checked]="d.enabled"
+              (checkedChange)="toggle($event)"
+            />
+          </span>
+          <button hlmBtn variant="outline" size="sm" [routerLink]="editPath" [queryParams]="{ name: d.name }">
+            <app-icon name="pencil" />Edit
+          </button>
+          <button hlmBtn variant="outline" size="sm" (click)="remove()">
+            <app-icon name="trash-2" />Delete
+          </button>
+        </div>
+      </div>
+
+      @if (d.owner) {
+        <p class="text-muted-foreground mt-3 text-xs">
+          Installed by the <span class="font-mono">{{ d.owner }}</span> plugin — an edit or a delete
+          here is undone the next time it syncs.
+        </p>
+      }
+      @if (!d.exists) {
+        <p class="text-destructive mt-3 text-xs">
+          This folder has no SKILL.md, so nothing here is loadable as a skill.
+        </p>
+      }
+
+      <!-- Every file in the folder is readable, not just SKILL.md. -->
+      <div class="border-border mt-4 flex flex-wrap gap-1 border-b pb-2">
+        @for (f of d.files; track f) {
+          <button
+            type="button"
+            class="cursor-pointer rounded px-2 py-1 font-mono text-xs"
+            [class]="
+              (openFile() ?? 'SKILL.md') === f
+                ? 'bg-foreground/10 font-medium'
+                : 'text-muted-foreground hover:bg-foreground/5'
+            "
+            (click)="openSkillFile(f)"
+          >
+            {{ f }}
+          </button>
+        }
+      </div>
+
+      @if (openFile() === null) {
+        <div class="mt-4">
+          <app-markdown [source]="body()" />
+        </div>
+      } @else if (fileLoading()) {
+        <div class="text-muted-foreground flex items-center justify-center gap-2 py-12 text-sm">
+          <hlm-spinner class="text-xl" />
+          Reading {{ openFile() }}…
+        </div>
+      } @else if (fileError()) {
+        <div
+          class="border-destructive/40 bg-destructive/10 text-destructive mt-4 rounded-md border px-3 py-2 text-sm"
+        >
+          {{ fileError() }}
+        </div>
+      } @else if (fileContent(); as f) {
+        <div class="text-muted-foreground mt-3 text-xs">
+          {{ f.size }} bytes
+          @if (f.truncated) {
+            · showing the first part only
+          }
+        </div>
+        @if (f.binary) {
+          <div
+            class="text-muted-foreground bg-foreground/5 mt-2 rounded-md px-3 py-8 text-center text-sm"
+          >
+            This file is not text, so there is nothing to show.
+          </div>
+        } @else {
+          <pre
+            class="bg-foreground/5 mt-2 max-h-[65vh] overflow-auto rounded-md p-3 font-mono text-[13px] whitespace-pre"
+          >{{ f.content }}</pre>
+        }
+      }
+    </div>
+  }
+</div>

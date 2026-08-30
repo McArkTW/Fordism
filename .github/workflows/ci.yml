@@ -1,0 +1,139 @@
+# CI: secret scan + both builds with their gates on every PR and push to main.
+# Publishing is release.yml's job alone — a v* tag runs there, gates included.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # gitleaks scans history, not just the tip
+      - name: gitleaks
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz | tar -xz gitleaks
+          ./gitleaks detect --source . -v
+
+  core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      # banVar + banStyle + all tests ride inside `build`
+      - run: chmod +x gradlew && ./gradlew build --no-daemon
+        working-directory: core
+
+  app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+        working-directory: app
+      - run: npm run lint
+        working-directory: app
+      - run: npm run test
+        working-directory: app
+      - run: npm run build
+        working-directory: app
+
+  vectors:
+    # The permission-matcher vectors and the permission vocabulary are both duplicated,
+    # because the Java and Angular builds cannot share a file. Compare the PARSED JSON —
+    # the app copies are Prettier-formatted, so a byte diff would fail on whitespace alone.
+    #
+    # The other half of each check is in core: PermissionMatcherTest drives the matcher from
+    # the vectors, and PermissionLeavesTest pins the leaves file to the Permission enum. So
+    # "core's copy is right" and "the two copies agree" are both enforced.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Vectors match
+        run: |
+          node -e "
+            const assert = require('assert');
+            const a = require('./core/src/test/resources/permission-matcher-vectors.json');
+            const b = require('./app/src/app/auth/permission-matcher-vectors.json');
+            assert.deepStrictEqual(a, b, 'permission-matcher-vectors.json has drifted between core/ and app/');
+            console.log('vectors identical (' + a.length + ' cases)');
+          "
+      - name: Permission leaves match
+        run: |
+          node -e "
+            const assert = require('assert');
+            const a = require('./core/src/test/resources/permission-leaves.json');
+            const b = require('./app/src/app/auth/permission-leaves.json');
+            assert.deepStrictEqual(a, b, 'permission-leaves.json has drifted between core/ and app/');
+            console.log('leaves identical (' + a.length + ' permissions)');
+          "
+
+  images:
+    # Compose-build all three images so a Dockerfile break fails the PR. Nothing is
+    # pushed here; release.yml owns publishing so a tag cannot be pushed twice.
+    needs: [secret-scan, core, app, vectors]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # GHCR namespaces are lowercase and docker refuses a tag that is not, so
+      # github.repository (McArkTW/Fordism) cannot be used verbatim.
+      - name: Registry name
+        run: echo "REGISTRY=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+      - name: Build images
+        run: docker compose --profile build-only build
+        env:
+          TAG: ci
+          FORDISM_VERSION: ${{ github.ref_name }}
+          FORDISM_GIT_SHA: ${{ github.sha }}
+
+  arm64:
+    # release.yml publishes a multi-arch manifest, so an arm64 break is only discovered at
+    # the tag — too late — unless something builds that arch first. This is that something.
+    #
+    # Only `core` and `agent` are built: those two download arch-named release tarballs (the
+    # static docker CLI, gh, PowerShell), and every other layer in all three images is either
+    # a multi-arch base or an arch-neutral apt/npm install. `app` has nothing to get wrong.
+    #
+    # Building succeeds while carrying a wrong binary — a curl for the wrong asset 404s, but a
+    # right-named tarball for the wrong arch installs quietly and dies as an Exec format error
+    # on first use. So each binary is RUN, not just installed.
+    #
+    # push-only, and the slowest job here: an amd64 runner emulates arm64 through QEMU, and
+    # core's build stage runs the whole Java suite under it. A solo repo pushes straight to
+    # main, so this still gates every change that reaches the branch a tag is cut from.
+    if: github.event_name == 'push'
+    needs: [core, app]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      # --load, not --push: one platform at a time can be loaded into the local engine, which
+      # is what makes the binaries below runnable here.
+      - name: Build core for arm64
+        run: docker buildx build --platform linux/arm64 --load -f core/Dockerfile -t fordism-core:arm64 .
+      - name: Build agent for arm64
+        run: docker buildx build --platform linux/arm64 --load -t fordism-agent:arm64 ./agent
+      - name: The arm64 binaries actually start
+        run: |
+          run() { # $1 = image  $2... = command
+            image="$1"; shift
+            docker run --rm --platform linux/arm64 --entrypoint "$1" "$image" "${@:2}"
+          }
+          run fordism-core:arm64  docker --version
+          run fordism-agent:arm64 gh --version
+          run fordism-agent:arm64 pwsh --version
+          run fordism-agent:arm64 uv --version
+          run fordism-agent:arm64 claude --version
+          run fordism-agent:arm64 qwen --version
