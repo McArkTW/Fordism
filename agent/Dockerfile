@@ -22,9 +22,14 @@ ARG TARGETARCH
 # patch for two Action repos and had to report every check as unrun, because python3, pwsh and
 # pytest were all absent. libicu72 is pwsh's dependency, not ours; without it pwsh installs and
 # then fails at startup, which looks like a PowerShell bug rather than a missing package.
+#
+# ripgrep because an agent that searches falls back to a worse grep without it, and that failure is
+# silent rather than loud: a CLI whose search shells out to `grep -rnH` without -E matches nothing
+# at all for an `a|b` pattern, so the agent concludes the code is not there rather than that its
+# search was wrong. bzip2 for the log bundles that arrive as .tar.bz2, which unzip cannot open.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends bash curl ca-certificates coreutils git openssh-client unzip \
-       python3 python3-pip python3-venv libicu72 \
+       python3 python3-pip python3-venv libicu72 bzip2 ripgrep \
     && rm -rf /var/lib/apt/lists/*
 
 # Debian marks its Python as externally managed, so a bare `pip install` fails with PEP 668 even
