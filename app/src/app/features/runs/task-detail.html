@@ -243,11 +243,54 @@
                 <div class="bg-foreground/5 rounded-md px-3 py-2">
                   <div class="flex flex-wrap items-center gap-2">
                     <span [class]="roleBadge(e.role)">{{ e.role }}</span>
+                    @if (e.meta) {
+                      <span class="text-muted-foreground font-mono text-[11px]">{{ e.meta }}</span>
+                    }
                     @for (tool of e.tools; track $index) {
                       <span class="text-muted-foreground font-mono text-[11px]">{{ tool }}</span>
                     }
                   </div>
-                  @if (e.text) {
+                  <!-- Typed parts when the parser produced them: prose reads as prose, the model's
+                       reasoning is dimmed, a tool's arguments and output are code. A transcript
+                       flattened to one blob is technically complete and practically unreadable. -->
+                  @if (e.parts?.length) {
+                    @for (part of e.parts; track $index) {
+                      @switch (part.kind) {
+                        @case ('thinking') {
+                          <div
+                            class="text-muted-foreground mt-1 border-l-2 pl-2 text-xs break-words whitespace-pre-wrap italic"
+                          >
+                            {{ clip(part.text) }}
+                          </div>
+                        }
+                        @case ('tool') {
+                          <div class="mt-1 text-xs">
+                            <span class="font-mono font-medium">{{ part.name }}</span>
+                            @if (part.text) {
+                              <pre
+                                class="text-muted-foreground mt-0.5 overflow-x-auto font-mono text-[11px] whitespace-pre-wrap"
+                                >{{ clip(part.text) }}</pre>
+                            }
+                          </div>
+                        }
+                        @case ('code') {
+                          <pre
+                            class="mt-1 overflow-x-auto font-mono text-[11px] whitespace-pre-wrap"
+                            >{{ clip(part.text) }}</pre>
+                        }
+                        @case ('note') {
+                          <div class="text-muted-foreground mt-1 text-xs italic">
+                            {{ part.text }}
+                          </div>
+                        }
+                        @default {
+                          <div class="mt-1 font-mono text-xs break-words whitespace-pre-wrap">
+                            {{ clip(part.text) }}
+                          </div>
+                        }
+                      }
+                    }
+                  } @else if (e.text) {
                     <div class="mt-1 font-mono text-xs break-words whitespace-pre-wrap">
                       {{ clip(e.text) }}
                     </div>

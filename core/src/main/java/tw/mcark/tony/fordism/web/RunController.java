@@ -226,13 +226,17 @@ public final class RunController {
         }
     }
 
-    /** The task's normalized session transcript (result/logs/transcript.jsonl). */
+    /**
+     * The task's transcript. Core's proxy transcript when the task was proxied — one shape for
+     * every tool — and the tool's own session store otherwise, which is the only thing an
+     * un-proxied task has. The app parses both.
+     */
     public void transcript(Context ctx) {
         Task task = pathTask(ctx).orElse(null);
         if (task == null) {
             return;
         }
-        String transcript = results.transcript(task).orElse(null);
+        String transcript = results.proxyTranscript(task).or(() -> results.transcript(task)).orElse(null);
         if (transcript == null) {
             ctx.status(404).contentType("application/json").result("{\"error\":\"no transcript\"}");
             return;
