@@ -105,6 +105,26 @@ PROMPT="${PROMPT}"$'\n\n---\nYour task (task/task.md):\n'"${TASK}"
 # The step's whole wall-clock budget, shared by the first run and every self-resume below.
 EPOCH_DEADLINE=$(( $(date +%s) + TIMEOUT ))
 
+# --- the Agent Profile, as every OpenAI-dialect tool needs it ------------------------------
+# AGENT_FORMAT is the profile's format, which core has already checked this tool speaks: anthropic
+# gets each tool's Anthropic provider, openai-chat its OpenAI-compatible one. P_ROOT drops a
+# trailing /v1, for clients that append /v1/messages themselves.
+P_URL="${OPENAI_BASE_URL:-}"; P_KEY="${OPENAI_API_KEY:-}"; P_MODEL="${OPENAI_MODEL:-$MODEL}"
+P_ROOT="${P_URL%/}"; P_ROOT="${P_ROOT%/v1}"
+case "${AGENT_FORMAT:-openai-chat}" in anthropic) P_API=anthropic ;; *) P_API=openai ;; esac
+
+# Core's model proxy. When the launcher sets FORDISM_PROXY, every URL handed to a tool keeps its
+# path and swaps its origin for FORDISM_PROXY, so the call reaches core, which forwards it to the
+# profile's real origin and records its token usage. The key the tool holds is already a per-task
+# token core swaps for the real one. Unset — the default — nothing here changes.
+px() { printf '%s%s' "$FORDISM_PROXY" "$(printf '%s' "$1" | sed -E 's#^[A-Za-z][A-Za-z0-9+.-]*://[^/]*##')"; }
+if [ -n "${FORDISM_PROXY:-}" ]; then
+  [ -n "$P_URL" ] && P_URL="$(px "$P_URL")"
+  [ -n "$P_ROOT" ] && P_ROOT="$(px "$P_ROOT")"
+  [ -n "${OPENAI_BASE_URL:-}" ] && OPENAI_BASE_URL="$(px "$OPENAI_BASE_URL")"
+  [ -n "${ANTHROPIC_BASE_URL:-}" ] && ANTHROPIC_BASE_URL="$(px "$ANTHROPIC_BASE_URL")"
+fi
+
 # Mirror the staged skills into the dir a tool discovers them in ($HOME = /workspace), for the
 # CLIs that invoke skills by description. Rebuilt, not merged, so a dropped skill does not linger.
 mirror_skills() {  # $1 = the tool's skills dir under $WS
@@ -147,6 +167,124 @@ case "$ATYPE" in
       printf 'wire_api = "%s"\n' "${CX_WIRE}"
     } > "$WS/.codex/config.toml"
     ;;
+  aider)
+    # aider sees only files that are in git, so the workspace is made a repo and its inputs staged.
+    # /workspace is owned by the host, not this user: without safe.directory git — and aider's
+    # GitPython under it — refuses it as "dubious ownership". Exported so aider inherits it.
+    export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0="$WS"
+    git init -q "$WS" && git -C "$WS" add -A -- $(cd "$WS" && ls -d task skills memory 2>/dev/null) \
+      || echo "[agent] aider: staging the workspace in git failed; aider will see no files" >&2
+    AIDER_SETTINGS=""; ANTHROPIC_KEYS=""
+    if [ "$P_API" = anthropic ]; then
+      # aider's docs list only ANTHROPIC_API_KEY, but it runs on litellm, which honours
+      # ANTHROPIC_API_BASE. Without it aider ignores the profile's endpoint and reaches
+      # api.anthropic.com, failing there as "invalid x-api-key".
+      printf -- '- name: anthropic/%s\n  use_temperature: false\n  cache_control: true\n' "$P_MODEL" \
+        > "$WS/aider-models.yml"
+      AIDER_SETTINGS=1; ANTHROPIC_KEYS=1
+    fi
+    ;;
+  crush)
+    # crushrc is Bash that crush evaluates, so "$PROFILE_API_KEY" is read from the environment
+    # rather than written here. Its anthropic type appends /v1/messages itself, so it gets the root.
+    #
+    # request-timeout: crush aborts a stream after 60 s with nothing arriving (an idle timer reset
+    # on every part). A model sends nothing while it thinks, so a long think was cut off — and crush
+    # then spun at 100% CPU until the task timed out. 600 s lets a slow reply finish and still ends
+    # a truly stuck stream.
+    mkdir -p "$WS/.config/crush"
+    if [ "$P_API" = anthropic ]; then CTYPE=anthropic; CBASE="$P_ROOT"; else CTYPE=openai-compat; CBASE="$P_URL"; fi
+    printf 'provider add profile --type %s --base-url "%s" --api-key "$PROFILE_API_KEY"\nmodel add "profile/%s" --context-window 200000 --default-max-tokens 32000\nmodel large "profile/%s"\noption request-timeout 600\n' \
+      "$CTYPE" "$CBASE" "$P_MODEL" "$P_MODEL" > "$WS/.config/crush/crushrc"
+    ;;
+  continue)
+    # apiBase goes in for BOTH providers. Omitting it for anthropic pinned that provider to
+    # api.anthropic.com, which answered "invalid x-api-key" for any other endpoint's key. Continue
+    # appends /messages, not /v1/messages, so the /v1 belongs on the base.
+    #
+    # apiKey is a secrets reference, not the key: Continue resolves ${{ secrets.NAME }} from the
+    # environment, so the key never reaches this file — which is in the workspace. The field must be
+    # present (apiKey: null is refused), and omitting it is worse: the loader fills the value with
+    # the string "undefined" and sends that as the key.
+    if [ "$P_API" = anthropic ]; then CBASE="    apiBase: $P_ROOT/v1"$'\n'; else CBASE="    apiBase: $P_URL"$'\n'; fi
+    printf 'name: fordism\nversion: 0.0.1\nschema: v1\nmodels:\n  - name: fordism\n    provider: %s\n    model: %s\n    apiKey: %s\n%s' \
+      "$P_API" "$P_MODEL" '${{ secrets.PROFILE_API_KEY }}' "$CBASE" > "$WS/.continue.yaml"
+    ;;
+  dsh)
+    export DSH_HOME="$WS/.dsh"; mkdir -p "$DSH_HOME"
+    if [ "$P_API" = anthropic ]; then DAPI=anthropic-messages; DBASE="$P_ROOT"; else DAPI=openai-completions; DBASE="$P_URL"; fi
+    # apiKeyEnv names an environment variable, so the key stays out of the workspace.
+    printf 'llm-pi-ai:\n  providers:\n    profile:\n      api: %s\n      baseURL: %s\n      apiKeyEnv: PROFILE_API_KEY\n      models:\n        - id: %s\n' \
+      "$DAPI" "$DBASE" "$P_MODEL" > "$DSH_HOME/settings.yaml"
+    printf -- '- id: agent-default-model\n  config:\n    provider: profile\n    model: %s\n' "$P_MODEL" \
+      > "$DSH_HOME/cordis.patch.yml"
+    ;;
+  openclaw)
+    # "${PROFILE_API_KEY}" is substituted from the environment when the config loads.
+    # reasoning:true on the Anthropic route: false turned openclaw's thinking off entirely, so it
+    # sent thinking disabled; true gives its documented Claude default — the same baseline
+    # claude-code sends. maxTokens 64000 matches that baseline's budget for thinking plus answer.
+    if [ "$P_API" = anthropic ]; then
+      OAPI=anthropic-messages; OBASE="$P_ROOT"; OREASON=true; OMAX=64000
+    else
+      OAPI=openai-completions; OBASE="$P_URL"; OREASON=false; OMAX=32000
+    fi
+    printf '{models:{providers:{profile:{baseUrl:"%s",apiKey:"${PROFILE_API_KEY}",api:"%s",models:[{id:"%s",name:"%s",reasoning:%s,input:["text"],cost:{input:0,output:0,cacheRead:0,cacheWrite:0},contextWindow:200000,maxTokens:%s}]}}}}\n' \
+      "$OBASE" "$OAPI" "$P_MODEL" "$P_MODEL" "$OREASON" "$OMAX" > "$WS/.openclaw.json"
+    ;;
+  hermes)
+    if [ "$P_API" = anthropic ]; then
+      # A named provider in its own config, not --provider anthropic with ANTHROPIC_BASE_URL: that
+      # reached api.anthropic.com. The name matters — `bedrock` is reserved and routes to AWS
+      # session credentials — so a neutral one is used and the endpoint is treated as the
+      # Anthropic-compatible gateway it is. api_key is a ${VAR} reference, so the key never reaches
+      # this file. skills.external_dirs: hermes looks under $HERMES_HOME/skills only, so without it
+      # the workspace's skills are "not found".
+      export HOME="$WS/.hermes-home"; mkdir -p "$HOME/.hermes"
+      printf 'skills:\n  external_dirs: [%s/skills]\nproviders:\n  profile:\n    base_url: %s/v1\n    api_key: ${PROFILE_API_KEY}\n    models:\n      %s: {}\n' \
+        "$WS" "$P_ROOT" "$P_MODEL" > "$HOME/.hermes/config.yaml"
+    fi
+    ;;
+  deepagents)
+    mkdir -p "$WS/.deepagents"
+    if [ "$P_API" = anthropic ]; then DBASE="$P_ROOT"; else DBASE="$P_URL"; fi
+    # max_tokens: langchain-anthropic takes it from a model profile matched by exact name, and an
+    # unrecognised id matches none, so it fell back to 4096. A reply that spent those on thinking
+    # ended with no tool call, which the agent loop reads as done — "Task completed", no result.
+    printf '[models.providers.%s]\nbase_url = "%s"\napi_key_env = "PROFILE_API_KEY"\nmodels = ["%s"]\n\n[models.providers.%s.params]\nmax_tokens = 64000\n' \
+      "$P_API" "$DBASE" "$P_MODEL" "$P_API" > "$WS/.deepagents/config.toml"
+    ;;
+  kimi)
+    # default_thinking = true: false (kimi's own default) sends thinking disabled. True with no
+    # thinking capability declared sends no thinking field at all, so the model thinks at its own
+    # default. The key sits inline here, which is why .kimi.toml is scrubbed after the task.
+    if [ "$P_API" = anthropic ]; then KTYPE=anthropic; KBASE="$P_ROOT"; else KTYPE=openai_legacy; KBASE="$P_URL"; fi
+    printf 'default_thinking = true\n\n[providers.profile]\ntype = "%s"\nbase_url = "%s"\napi_key = "%s"\n\n[models.profile]\nprovider = "profile"\nmodel = "%s"\nmax_context_size = 200000\n' \
+      "$KTYPE" "$KBASE" "$P_KEY" "$P_MODEL" > "$WS/.kimi.toml"
+    ;;
+  codewhale)
+    if [ "$P_API" = anthropic ]; then
+      # Its docs list ANTHROPIC_BASE_URL but it does not honour it — pointed at a local server, no
+      # request ever arrived. The config file is honoured. api_key_env names an environment
+      # variable, so the key never lands in the file. Proxied, core's route is plain http on the
+      # launcher network, which codewhale refuses for any host but loopback unless allowed.
+      mkdir -p "$WS/.codewhale"
+      printf 'provider = "anthropic"\n\n[providers.anthropic]\napi_key_env = "PROFILE_API_KEY"\nbase_url = "%s"\nmodel = "%s"\n%s' \
+        "$P_ROOT" "$P_MODEL" "${FORDISM_PROXY:+allow_insecure_http = true
+}" > "$WS/.codewhale/config.toml"
+    fi
+    ;;
+  reasonix)
+    # The one tool that cannot take its key from the environment: api_key_env names a slot in
+    # <REASONIX_HOME>/.env, not an OS variable. The key therefore lands in the workspace, which is
+    # host-mounted and kept — which is exactly what FORDISM_CREDENTIAL_FILES and CredentialScrub
+    # exist for. Keep .reasonix/.env in that list.
+    export REASONIX_HOME="$WS/.reasonix"; mkdir -p "$REASONIX_HOME"
+    if [ "$P_API" = anthropic ]; then RAPI=anthropic; RBASE="$P_ROOT"; else RAPI=openai; RBASE="$P_URL"; fi
+    printf 'PROFILE_API_KEY=%s\n' "$P_KEY" > "$REASONIX_HOME/.env"
+    printf '{"providers":{"profile":{"type":"%s","base_url":"%s","api_key_env":"PROFILE_API_KEY","models":[{"id":"%s"}]}}}\n' \
+      "$RAPI" "$RBASE" "$P_MODEL" > "$REASONIX_HOME/config.json"
+    ;;
   opencode)
     # opencode — a provider in opencode.json, its key read from OPENAI_API_KEY. Which provider
     # depends on what the profile's endpoint actually serves (AGENT_FORMAT), because opencode
@@ -183,6 +321,19 @@ esac
 # generate their own id and cannot be told one — but a task container holds exactly one session, so
 # "the latest / most recent / continue" resolves to that one. Each keeps its store under $HOME
 # (=/workspace), so the session survives this container for a later one to resume.
+# Whether this tool keeps a session a LATER container can pick up. The five that do are the five
+# Fordism shipped with; the tools added since are one-shot — they have no session store under
+# $HOME to resume, so `resume` for them re-runs the task with the human's answer appended, which
+# works because the workspace still holds everything the first attempt did. Getting this list wrong
+# in the generous direction is the expensive mistake: a resume flag a tool does not honour starts a
+# silent NEW session, and the agent then answers a question it cannot see the context for.
+sessioned() {
+  case "$ATYPE" in
+    claude-code|qwen-code|gemini-cli|codex|opencode) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 agent_start() {   # $1 = prompt   $2 = seconds of budget
   case "$ATYPE" in
     qwen-code)  timeout "$2" qwen --yolo --chat-recording --session-id "$SID" --model "$MODEL" -p "$1" ;;
@@ -190,12 +341,92 @@ agent_start() {   # $1 = prompt   $2 = seconds of budget
     codex)      timeout "$2" codex exec --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check \
                         --model "$MODEL" "$1" ;;
     opencode)   timeout "$2" opencode run --model "${OPENCODE_PROVIDER:-fordism}/$MODEL" "$1" ;;
+
+    # --- one-shot tools. Each is handed the profile through its own configuration, written above.
+    aider)      timeout "$2" env ${P_API:+OPENAI_API_BASE="$P_URL"} \
+                        ${ANTHROPIC_KEYS:+ANTHROPIC_API_KEY="$P_KEY"} ANTHROPIC_API_BASE="$P_ROOT" \
+                        aider --model "$P_API/$P_MODEL" \
+                        ${AIDER_SETTINGS:+--model-settings-file "$WS/aider-models.yml"} \
+                        --no-auto-commits --no-dirty-commits --no-gitignore --map-tokens 4096 \
+                        --yes-always --no-check-update --no-show-release-notes --analytics-disable --no-pretty \
+                        --read "$WS/skills/fordism-agent/SKILL.md" --message "$1" </dev/null ;;
+    goose)      if [ "$P_API" = anthropic ]; then
+                  # GOOSE_THINKING_EFFORT: unset, goose treats the effort as off and sends thinking
+                  # disabled, unlike the model's own default. high matches claude-code's baseline.
+                  timeout "$2" env GOOSE_DISABLE_KEYRING=1 GOOSE_MODE=auto GOOSE_PROVIDER=anthropic \
+                          GOOSE_THINKING_EFFORT=high GOOSE_MODEL="$P_MODEL" \
+                          ANTHROPIC_API_KEY="$P_KEY" ANTHROPIC_HOST="$P_ROOT" \
+                          goose run --with-builtin developer -t "$1" </dev/null
+                else
+                  # goose wants host and path apart: http://h:11434/v1 -> host + v1/chat/completions.
+                  BASE="${OPENAI_BASE_URL%/}"
+                  GOOSE_HOST="$(printf '%s' "$BASE" | sed -E 's#^(https?://[^/]+).*#\1#')"
+                  GOOSE_PATH="${BASE#"$GOOSE_HOST"}"; GOOSE_PATH="${GOOSE_PATH#/}"
+                  timeout "$2" env GOOSE_DISABLE_KEYRING=1 GOOSE_MODE=auto GOOSE_PROVIDER=openai \
+                          GOOSE_MODEL="$OPENAI_MODEL" OPENAI_HOST="$GOOSE_HOST" \
+                          OPENAI_BASE_PATH="${GOOSE_PATH:+$GOOSE_PATH/}chat/completions" \
+                          goose run --with-builtin developer -t "$1" </dev/null
+                fi ;;
+    copilot)    # BYOK against the profile's endpoint; COPILOT_OFFLINE keeps it from needing a
+                # GitHub login. GH_TOKEN/GITHUB_TOKEN are cleared for this one process: the Copilot
+                # CLI reads them as its OWN login and exits rc 1 in about four seconds on a classic
+                # PAT ("Classic Personal Access Tokens (ghp_) are not supported by Copilot"). It is
+                # a startup validation of a token it never uses, and it killed every copilot task
+                # whose template granted GITHUB_TOKEN. `git` and `gh` in the agent's own shell still
+                # see the token; only copilot is started without it.
+                timeout "$2" env -u GH_TOKEN -u GITHUB_TOKEN \
+                        COPILOT_PROVIDER_BASE_URL="$OPENAI_BASE_URL" COPILOT_PROVIDER_API_KEY="$OPENAI_API_KEY" \
+                        COPILOT_MODEL="$OPENAI_MODEL" COPILOT_OFFLINE=true \
+                        copilot -p "$1" --allow-all --no-ask-user -s --model "$OPENAI_MODEL" </dev/null ;;
+    pi)         timeout "$2" env HOME="$WS/.pi" PROFILE_KEY="$P_KEY" \
+                        pi -p --provider profile --model "$P_MODEL" --mode json "$1" </dev/null ;;
+    crush)      timeout "$2" env PROFILE_API_KEY="$P_KEY" CRUSH_DISABLE_PROVIDER_AUTO_UPDATE=1 \
+                        CRUSH_DISABLE_METRICS=1 crush run -q -m "profile/$P_MODEL" "$1" </dev/null ;;
+    cline)      timeout "$2" env CLINE_API_KEY="$P_KEY" CLINE_BASE_URL="$P_URL" \
+                        cline --yolo --model "$P_MODEL" -p "$1" </dev/null ;;
+    continue)   timeout "$2" env PROFILE_API_KEY="$P_KEY" cn -p "$1" --config "$WS/.continue.yaml" --auto </dev/null ;;
+    openhands)  # LLM_* apply only with --override-with-envs; --exit-without-confirmation is what
+                # makes it exit rather than wait for a human once the task is done.
+                if [ "$P_API" = anthropic ]; then LBASE="$P_ROOT"; else LBASE="$P_URL"; fi
+                timeout "$2" env LLM_MODEL="$P_API/$P_MODEL" LLM_API_KEY="$P_KEY" ${LBASE:+LLM_BASE_URL="$LBASE"} \
+                        openhands --headless -t "$1" --override-with-envs --exit-without-confirmation </dev/null ;;
+    dsh)        timeout "$2" env PROFILE_API_KEY="$P_KEY" DSH_PERMISSION_MODE=danger-full-access \
+                        dsh --profile headless "$1" </dev/null ;;
+    openclaw)   # --timeout 9999: `agent exec` carries its own deadline, default 600 s, and killed
+                # itself mid tool call with no result. Fordism already bounds the run with $TIMEOUT.
+                timeout "$2" env PROFILE_API_KEY="$P_KEY" openclaw agent exec --config "$WS/.openclaw.json" \
+                        --cwd "$WS" --timeout 9999 --model "profile/$P_MODEL" "$1" </dev/null ;;
+    hermes)     if [ "$P_API" = anthropic ]; then
+                  timeout "$2" env PROFILE_API_KEY="$P_KEY" hermes -z "$1" --provider profile -m "$P_MODEL" --yolo </dev/null
+                else
+                  timeout "$2" hermes -z "$1" -m "$P_MODEL" --yolo </dev/null
+                fi ;;
+    deepagents) timeout "$2" env PROFILE_API_KEY="$P_KEY" dcode -n "$1" --model "$P_API:$P_MODEL" -S all \
+                        --allow-fs-tools ls,read_file,write_file,edit_file,glob,grep,execute </dev/null ;;
+    kimi)       timeout "$2" kimi --config-file "$WS/.kimi.toml" -m profile -w "$WS" --print --yolo --prompt "$1" </dev/null ;;
+    codewhale)  timeout "$2" env PROFILE_API_KEY="$P_KEY" ANTHROPIC_MODEL="$P_MODEL" \
+                        codewhale --provider "$P_API" exec --auto "$1" </dev/null ;;
+    reasonix)   timeout "$2" reasonix run --provider profile --model "$P_MODEL" --yes "$1" </dev/null ;;
+    jcode)      timeout "$2" env JCODE_API_KEY="$P_KEY" JCODE_BASE_URL="$P_URL" \
+                        jcode --yolo -m "$P_MODEL" -p "$1" </dev/null ;;
+    grok)       timeout "$2" env GROK_API_KEY="$P_KEY" GROK_BASE_URL="$P_URL" \
+                        grok --yolo -m "$P_MODEL" -p "$1" </dev/null ;;
+
     *)          timeout "$2" claude -p --session-id "$SID" --name "$SNAME" \
                         --model "$MODEL" --dangerously-skip-permissions "$1" ;;
   esac
 }
 
 agent_resume() {  # $1 = prompt   $2 = seconds of budget
+  # A tool with no session cannot be resumed, so it is started afresh with the WHOLE task plus the
+  # human's answer. That is not as good — the agent does not remember its own reasoning — but the
+  # workspace still holds everything it wrote, so it picks up from artefacts rather than from
+  # nothing. Silently passing a resume flag such a tool ignores would be worse: a brand-new session
+  # handed only the answer, with no idea what the question was.
+  if ! sessioned; then
+    agent_start "${PROMPT}"$'\n\n---\nThis task was paused on a question you asked; the workspace holds what you had already done. The human answered:\n'"$1" "$2"
+    return $?
+  fi
   case "$ATYPE" in
     qwen-code)  timeout "$2" qwen --yolo --chat-recording --resume "$SID" --model "$MODEL" -p "$1" ;;
     gemini-cli) timeout "$2" gemini --approval-mode yolo --model "$MODEL" -r latest -p "$1" ;;

@@ -41,13 +41,19 @@ flowchart LR
   instead of guessing. The run parks, the question surfaces in the UI, and your answer
   resumes the *same session* in a fresh container. A requested credential is injected
   as an environment variable — never into the transcript.
-- **Five agent runtimes, one image each.** Claude Code, Qwen Code, Gemini CLI, Codex and
-  opencode; each Agent Profile carries a `baseUrl`, a write-only API key, a model, the
-  `tool` that drives the task, and the wire `format` its endpoint serves. The environment
-  follows the tool's dialect — Anthropic, OpenAI-compatible, or Google — so adding another
-  CLI is one enum line, not a new code path. Every tool has its own image, a shared base
-  plus that one CLI, so a task pulls only what it will run and nothing else shares its
-  `$HOME`. No LLM gateway by default — agents call providers directly.
+- **Twenty-two agent runtimes, one image each.** Claude Code, Qwen Code, Gemini CLI, Codex,
+  opencode, aider, goose, Copilot CLI, pi, crush, cline, Continue, OpenHands, dsh, openclaw,
+  hermes, deepagents, kimi, codewhale, reasonix, jcode and grok. Each Agent Profile carries a
+  `baseUrl`, a write-only API key, a model, the `tool` that drives the task, and the wire
+  `format` its endpoint serves. The environment follows the tool's dialect — Anthropic,
+  OpenAI-compatible, or Google — so adding another CLI is one enum line, not a new code path.
+  Every tool has its own image, a shared base plus that one CLI, so a task pulls only what it
+  will run and nothing else shares its `$HOME`. No LLM gateway by default — agents call
+  providers directly.
+  **Five of them resume a session across containers** — Claude Code, Qwen Code, Gemini CLI,
+  Codex and opencode — which is what human-in-the-loop, a resumed rework and the self-heal
+  loop rely on. The rest are one-shot: answering their question re-runs the task with your
+  answer, over the workspace the first attempt already wrote.
   Same-session resume — human-in-the-loop, rework, and the self-heal loop — works across
   runtimes: the session store lives under the host-mounted workspace, so a later container
   resumes what an earlier one started.
@@ -111,7 +117,7 @@ and it keeps talking to its provider exactly as before.
 | `core/` | Java 25 / Javalin — the **workflow engine**: strategy orchestrators, Dispatcher/Collector/Reaper, the container launcher, and the Agent Profile / template / skill stores. |
 | `app/` | Angular 21 + Tailwind 4 + spartan/ui — the operator UI: **Workflows · Runs · Templates · Skills · Agent Profiles · Credentials · Users · Groups**. Built to a static SPA; the container is nginx (and the edge, proxying `/api` → core). |
 | `docs/` | The [operator guide](docs/usage.md): the workflow YAML reference, the six strategies, the result contract, and the permission model. |
-| `agent/` | The containerized agent runner — a shared `Dockerfile.base` and **one image per CLI** under `tools/` (Claude Code, Qwen Code, Gemini CLI, Codex, opencode); the Agent Profile's `tool` selects which drives the task, and which image runs it. The launcher runs one disposable container per task over a host-mounted `/workspace`. |
+| `agent/` | The containerized agent runner — a shared `Dockerfile.base` and **one image per CLI** under `tools/` (22 of them); the Agent Profile's `tool` selects which drives the task, and which image runs it. `tools/patches/` carries exact-text fixes applied to a CLI's own source at build time, which fail the build rather than the task if the target moved. The launcher runs one disposable container per task over a host-mounted `/workspace`. |
 | `deploy/` | Deploy assets: per-env `*.env.example` templates and `scripts/deploy.sh` (pull + `compose up` + health check). |
 
 ## Quickstart

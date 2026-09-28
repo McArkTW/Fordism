@@ -13,22 +13,28 @@ services:
     build:
       context: ./agent
       dockerfile: Dockerfile.base
+  fordism-agent-aider:
+    build:
+      context: ./agent
+      dockerfile: tools/aider.Dockerfile
+      args:
+        BASE: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-base:${TAG:-latest}
   fordism-agent-claude-code:
     build:
       context: ./agent
       dockerfile: tools/claude-code.Dockerfile
       args:
         BASE: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-base:${TAG:-latest}
-  fordism-agent-qwen-code:
+  fordism-agent-cline:
     build:
       context: ./agent
-      dockerfile: tools/qwen-code.Dockerfile
+      dockerfile: tools/cline.Dockerfile
       args:
         BASE: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-base:${TAG:-latest}
-  fordism-agent-gemini-cli:
+  fordism-agent-codewhale:
     build:
       context: ./agent
-      dockerfile: tools/gemini-cli.Dockerfile
+      dockerfile: tools/codewhale.Dockerfile
       args:
         BASE: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-base:${TAG:-latest}
   fordism-agent-codex:
@@ -37,9 +43,105 @@ services:
       dockerfile: tools/codex.Dockerfile
       args:
         BASE: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-base:${TAG:-latest}
+  fordism-agent-continue:
+    build:
+      context: ./agent
+      dockerfile: tools/continue.Dockerfile
+      args:
+        BASE: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-base:${TAG:-latest}
+  fordism-agent-copilot:
+    build:
+      context: ./agent
+      dockerfile: tools/copilot.Dockerfile
+      args:
+        BASE: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-base:${TAG:-latest}
+  fordism-agent-crush:
+    build:
+      context: ./agent
+      dockerfile: tools/crush.Dockerfile
+      args:
+        BASE: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-base:${TAG:-latest}
+  fordism-agent-deepagents:
+    build:
+      context: ./agent
+      dockerfile: tools/deepagents.Dockerfile
+      args:
+        BASE: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-base:${TAG:-latest}
+  fordism-agent-dsh:
+    build:
+      context: ./agent
+      dockerfile: tools/dsh.Dockerfile
+      args:
+        BASE: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-base:${TAG:-latest}
+  fordism-agent-gemini-cli:
+    build:
+      context: ./agent
+      dockerfile: tools/gemini-cli.Dockerfile
+      args:
+        BASE: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-base:${TAG:-latest}
+  fordism-agent-goose:
+    build:
+      context: ./agent
+      dockerfile: tools/goose.Dockerfile
+      args:
+        BASE: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-base:${TAG:-latest}
+  fordism-agent-grok:
+    build:
+      context: ./agent
+      dockerfile: tools/grok.Dockerfile
+      args:
+        BASE: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-base:${TAG:-latest}
+  fordism-agent-hermes:
+    build:
+      context: ./agent
+      dockerfile: tools/hermes.Dockerfile
+      args:
+        BASE: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-base:${TAG:-latest}
+  fordism-agent-jcode:
+    build:
+      context: ./agent
+      dockerfile: tools/jcode.Dockerfile
+      args:
+        BASE: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-base:${TAG:-latest}
+  fordism-agent-kimi:
+    build:
+      context: ./agent
+      dockerfile: tools/kimi.Dockerfile
+      args:
+        BASE: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-base:${TAG:-latest}
+  fordism-agent-openclaw:
+    build:
+      context: ./agent
+      dockerfile: tools/openclaw.Dockerfile
+      args:
+        BASE: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-base:${TAG:-latest}
   fordism-agent-opencode:
     build:
       context: ./agent
       dockerfile: tools/opencode.Dockerfile
+      args:
+        BASE: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-base:${TAG:-latest}
+  fordism-agent-openhands:
+    build:
+      context: ./agent
+      dockerfile: tools/openhands.Dockerfile
+      args:
+        BASE: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-base:${TAG:-latest}
+  fordism-agent-pi:
+    build:
+      context: ./agent
+      dockerfile: tools/pi.Dockerfile
+      args:
+        BASE: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-base:${TAG:-latest}
+  fordism-agent-qwen-code:
+    build:
+      context: ./agent
+      dockerfile: tools/qwen-code.Dockerfile
+      args:
+        BASE: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-base:${TAG:-latest}
+  fordism-agent-reasonix:
+    build:
+      context: ./agent
+      dockerfile: tools/reasonix.Dockerfile
       args:
         BASE: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-base:${TAG:-latest}

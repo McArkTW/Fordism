@@ -1,0 +1,6 @@
+{
+  "why": "identify a replayed reply by the requested model id, so thinking survives gateways that rename the model (Bedrock returns claude-sonnet-5 for global.anthropic.claude-sonnet-5)",
+  "file": "/usr/local/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/index.js",
+  "old": "\t\tmodel: state.response.api === \"anthropic-messages\" ? state.response.responseModel ?? state.response.model : state.response.model,",
+  "new": "\t\tmodel: state.response.model,"
+}

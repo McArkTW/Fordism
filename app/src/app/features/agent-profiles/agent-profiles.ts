@@ -13,11 +13,31 @@ import { Confirm } from '../../shared/confirm';
 /** The agent runtimes a profile can be driven by, with the dialect each one speaks. */
 const TOOL_LABELS: Record<string, string> = {
   'claude-code': 'Claude Code — Anthropic API',
-  'qwen-code': 'Qwen Code — OpenAI-compatible API',
+  'qwen-code': 'Qwen Code — OpenAI-compatible',
   'gemini-cli': 'Gemini CLI — Google API',
-  codex: 'Codex — OpenAI API',
-  opencode: 'opencode — OpenAI-compatible API',
+  codex: 'Codex — OpenAI Responses',
+  opencode: 'opencode',
+  aider: 'aider',
+  goose: 'goose',
+  copilot: 'GitHub Copilot CLI',
+  pi: 'pi',
+  crush: 'crush',
+  cline: 'cline',
+  continue: 'Continue',
+  openhands: 'OpenHands',
+  dsh: 'dsh',
+  openclaw: 'openclaw',
+  hermes: 'hermes',
+  deepagents: 'deepagents',
+  kimi: 'kimi',
+  codewhale: 'codewhale',
+  reasonix: 'reasonix',
+  jcode: 'jcode',
+  grok: 'grok',
 };
+
+/** The five tools that keep a session a later container can resume; the rest are one-shot. */
+const SESSION_TOOLS = new Set(['claude-code', 'qwen-code', 'gemini-cli', 'codex', 'opencode']);
 
 /**
  * The wire formats each tool can speak, primary first — mirrors AgentTool's declaration in core,
@@ -30,6 +50,23 @@ const TOOL_FORMATS: Record<string, string[]> = {
   'gemini-cli': ['gemini'],
   codex: ['openai-responses', 'openai-chat'],
   opencode: ['openai-chat', 'anthropic'],
+  aider: ['openai-chat', 'anthropic'],
+  goose: ['openai-chat', 'anthropic'],
+  copilot: ['openai-chat'],
+  pi: ['openai-chat', 'anthropic'],
+  crush: ['openai-chat', 'anthropic'],
+  cline: ['openai-chat', 'anthropic'],
+  continue: ['openai-chat', 'anthropic'],
+  openhands: ['openai-chat', 'anthropic'],
+  dsh: ['openai-chat', 'anthropic'],
+  openclaw: ['openai-chat', 'anthropic'],
+  hermes: ['openai-chat', 'anthropic'],
+  deepagents: ['openai-chat', 'anthropic'],
+  kimi: ['openai-chat', 'anthropic'],
+  codewhale: ['openai-chat', 'anthropic'],
+  reasonix: ['openai-chat', 'anthropic'],
+  jcode: ['openai-chat', 'anthropic'],
+  grok: ['openai-chat', 'anthropic'],
 };
 
 const FORMAT_LABELS: Record<string, string> = {
@@ -79,6 +116,10 @@ export class AgentProfiles {
    * a single option is a question with one answer.
    */
   readonly formatChoices = computed(() => TOOL_FORMATS[this.tool()] ?? []);
+  /** Tool ids in the order the select offers them. */
+  readonly toolChoices = Object.keys(TOOL_LABELS);
+  /** Whether the chosen tool can be resumed — what human-in-the-loop and rework depend on. */
+  readonly toolResumes = computed(() => SESSION_TOOLS.has(this.tool()));
   readonly formatIsAChoice = computed(() => this.formatChoices().length > 1);
 
   constructor() {

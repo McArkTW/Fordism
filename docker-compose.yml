@@ -96,18 +96,23 @@ services:
     image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-base:${TAG:-latest}
     profiles: ["build-only"]
 
+  fordism-agent-aider:
+    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-aider:${TAG:-latest}
+    depends_on: [fordism-agent-base]
+    profiles: ["build-only"]
+
   fordism-agent-claude-code:
     image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-claude-code:${TAG:-latest}
     depends_on: [fordism-agent-base]
     profiles: ["build-only"]
 
-  fordism-agent-qwen-code:
-    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-qwen-code:${TAG:-latest}
+  fordism-agent-cline:
+    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-cline:${TAG:-latest}
     depends_on: [fordism-agent-base]
     profiles: ["build-only"]
 
-  fordism-agent-gemini-cli:
-    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-gemini-cli:${TAG:-latest}
+  fordism-agent-codewhale:
+    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-codewhale:${TAG:-latest}
     depends_on: [fordism-agent-base]
     profiles: ["build-only"]
 
@@ -116,8 +121,88 @@ services:
     depends_on: [fordism-agent-base]
     profiles: ["build-only"]
 
+  fordism-agent-continue:
+    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-continue:${TAG:-latest}
+    depends_on: [fordism-agent-base]
+    profiles: ["build-only"]
+
+  fordism-agent-copilot:
+    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-copilot:${TAG:-latest}
+    depends_on: [fordism-agent-base]
+    profiles: ["build-only"]
+
+  fordism-agent-crush:
+    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-crush:${TAG:-latest}
+    depends_on: [fordism-agent-base]
+    profiles: ["build-only"]
+
+  fordism-agent-deepagents:
+    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-deepagents:${TAG:-latest}
+    depends_on: [fordism-agent-base]
+    profiles: ["build-only"]
+
+  fordism-agent-dsh:
+    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-dsh:${TAG:-latest}
+    depends_on: [fordism-agent-base]
+    profiles: ["build-only"]
+
+  fordism-agent-gemini-cli:
+    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-gemini-cli:${TAG:-latest}
+    depends_on: [fordism-agent-base]
+    profiles: ["build-only"]
+
+  fordism-agent-goose:
+    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-goose:${TAG:-latest}
+    depends_on: [fordism-agent-base]
+    profiles: ["build-only"]
+
+  fordism-agent-grok:
+    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-grok:${TAG:-latest}
+    depends_on: [fordism-agent-base]
+    profiles: ["build-only"]
+
+  fordism-agent-hermes:
+    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-hermes:${TAG:-latest}
+    depends_on: [fordism-agent-base]
+    profiles: ["build-only"]
+
+  fordism-agent-jcode:
+    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-jcode:${TAG:-latest}
+    depends_on: [fordism-agent-base]
+    profiles: ["build-only"]
+
+  fordism-agent-kimi:
+    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-kimi:${TAG:-latest}
+    depends_on: [fordism-agent-base]
+    profiles: ["build-only"]
+
+  fordism-agent-openclaw:
+    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-openclaw:${TAG:-latest}
+    depends_on: [fordism-agent-base]
+    profiles: ["build-only"]
+
   fordism-agent-opencode:
     image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-opencode:${TAG:-latest}
+    depends_on: [fordism-agent-base]
+    profiles: ["build-only"]
+
+  fordism-agent-openhands:
+    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-openhands:${TAG:-latest}
+    depends_on: [fordism-agent-base]
+    profiles: ["build-only"]
+
+  fordism-agent-pi:
+    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-pi:${TAG:-latest}
+    depends_on: [fordism-agent-base]
+    profiles: ["build-only"]
+
+  fordism-agent-qwen-code:
+    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-qwen-code:${TAG:-latest}
+    depends_on: [fordism-agent-base]
+    profiles: ["build-only"]
+
+  fordism-agent-reasonix:
+    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-reasonix:${TAG:-latest}
     depends_on: [fordism-agent-base]
     profiles: ["build-only"]
 

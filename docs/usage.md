@@ -218,9 +218,12 @@ asks for the value in prose. You get one masked field per name, and the values a
 environment variables into its container — deliberately not into the resume message, because that
 message is written to the session transcript on disk.
 
-> **Same-session resume is claude-code only today.** A qwen-code agent runs each task one-shot; it has
-> no session to resume, so it also sits outside the self-heal loop that nudges an agent that ended its
-> turn early.
+> **Same-session resume works for five of the twenty-two tools**: claude-code, qwen-code, gemini-cli,
+> codex and opencode. Each keeps its session store under the host-mounted workspace, so a later
+> container picks up the conversation. The other tools are one-shot — answering their question re-runs
+> the task with your answer appended, over the workspace the first attempt left behind, so the agent
+> picks up from what it wrote rather than from what it remembers. They also sit outside the self-heal
+> loop that nudges an agent which ended its turn early.
 
 ## Templates and profiles
 
