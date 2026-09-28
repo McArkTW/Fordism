@@ -5,6 +5,7 @@ import tw.mcark.tony.fordism.model.task.Task;
 import tw.mcark.tony.fordism.model.task.TaskResult;
 import tw.mcark.tony.fordism.model.task.TaskState;
 import tw.mcark.tony.fordism.store.TaskRepository;
+import tw.mcark.tony.fordism.workspace.CredentialScrub;
 import tw.mcark.tony.fordism.workspace.TaskResults;
 import java.util.Optional;
 import org.tinylog.Logger;
@@ -14,11 +15,14 @@ public final class Collector {
     private final TaskRepository tasks;
     private final TaskResults results;
     private final ContainerLauncher launcher;
+    private final CredentialScrub scrub;
 
-    public Collector(TaskRepository tasks, TaskResults results, ContainerLauncher launcher) {
+    public Collector(TaskRepository tasks, TaskResults results, ContainerLauncher launcher,
+            CredentialScrub scrub) {
         this.tasks = tasks;
         this.results = results;
         this.launcher = launcher;
+        this.scrub = scrub;
     }
 
     public void sweep() {
@@ -60,6 +64,9 @@ public final class Collector {
             }
             tasks.save(task);
             launcher.remove(task.containerId);
+            // Including on ASKED: the container that wrote the file is gone either way, and the
+            // fresh one that resumes the session writes it again from its own environment.
+            scrub.scrub(task);
         }
     }
 }

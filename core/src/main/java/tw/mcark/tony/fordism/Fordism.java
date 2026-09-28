@@ -35,6 +35,7 @@ import tw.mcark.tony.fordism.store.JsonStateStore;
 import tw.mcark.tony.fordism.store.TaskRepository;
 import tw.mcark.tony.fordism.store.WorkflowRunRepository;
 import tw.mcark.tony.fordism.web.App;
+import tw.mcark.tony.fordism.workspace.CredentialScrub;
 import tw.mcark.tony.fordism.workspace.TemplateStore;
 import tw.mcark.tony.fordism.workspace.TaskResults;
 import tw.mcark.tony.fordism.workspace.WorkspaceArchive;
@@ -71,9 +72,10 @@ public final class Fordism {
         ContainerLauncher launcher = new DockerContainerLauncher(configuration, models, secrets, credentials);
         FieldView field = new FieldView(tasks, configuration);
         Dispatcher dispatcher = new Dispatcher(tasks, workspaces, templates, launcher, field);
-        Collector collector = new Collector(tasks, results, launcher);
-        Reaper reaper = new Reaper(tasks, results, launcher, new CullPolicy(), configuration);
-        OrphanCuller culler = new OrphanCuller(tasks, runs, launcher);
+        CredentialScrub scrub = new CredentialScrub(configuration.credentialFiles);
+        Collector collector = new Collector(tasks, results, launcher, scrub);
+        Reaper reaper = new Reaper(tasks, results, launcher, new CullPolicy(), configuration, scrub);
+        OrphanCuller culler = new OrphanCuller(tasks, runs, launcher, scrub);
         JsonStateStore stateStore = new JsonStateStore(configuration);
         Engine engine = new Engine(configuration, tasks, runs, sessions, dispatcher, collector, reaper,
                 culler, stateStore, secrets);

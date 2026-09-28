@@ -13,6 +13,7 @@ import tw.mcark.tony.fordism.store.InMemoryTaskRepository;
 import tw.mcark.tony.fordism.store.InMemoryWorkflowRunRepository;
 import tw.mcark.tony.fordism.store.TaskRepository;
 import tw.mcark.tony.fordism.store.WorkflowRunRepository;
+import tw.mcark.tony.fordism.workspace.CredentialScrub;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -54,7 +55,7 @@ class OrphanCullerTest {
         tasks = new InMemoryTaskRepository();
         runs = new InMemoryWorkflowRunRepository();
         launcher = new RecordingLauncher();
-        culler = new OrphanCuller(tasks, runs, launcher);
+        culler = new OrphanCuller(tasks, runs, launcher, new CredentialScrub(List.of()));
     }
 
     private WorkflowRun run(String id, WorkflowRunState state) {
