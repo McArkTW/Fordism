@@ -130,6 +130,12 @@ case "$ATYPE" in
     # provider in ~/.codex/config.toml, keyed to the OPENAI_API_KEY the launcher set. Written each
     # start so an edited profile takes effect. Skills: none of its own — the doctrine prompt's
     # "read skills/" is what puts the staged library in reach.
+    #
+    # wire_api follows the profile's AGENT_FORMAT, and defaults to "responses": current codex has
+    # dropped chat-completions, so an endpoint serving only /chat/completions 404s every call. It
+    # was hardcoded to "chat" here, which is the wrong default for exactly that reason — but a
+    # profile that really does point at a chat-only gateway can still say openai-chat and get it.
+    case "${AGENT_FORMAT:-openai-responses}" in openai-chat) CX_WIRE=chat ;; *) CX_WIRE=responses ;; esac
     mkdir -p "$WS/.codex"
     {
       printf 'model = "%s"\n' "${MODEL}"
@@ -138,14 +144,26 @@ case "$ATYPE" in
       printf 'name = "fordism"\n'
       printf 'base_url = "%s"\n' "${OPENAI_BASE_URL}"
       printf 'env_key = "OPENAI_API_KEY"\n'
-      printf 'wire_api = "chat"\n'
+      printf 'wire_api = "%s"\n' "${CX_WIRE}"
     } > "$WS/.codex/config.toml"
     ;;
   opencode)
-    # opencode — OpenAI-compatible; a custom endpoint is a provider in opencode.json, its key read
-    # from OPENAI_API_KEY. model is addressed as fordism/<model>.
-    printf '{"provider":{"fordism":{"npm":"@ai-sdk/openai-compatible","options":{"baseURL":"%s"},"models":{"%s":{}}}}}\n' \
-      "${OPENAI_BASE_URL}" "${MODEL}" > "$WS/opencode.json"
+    # opencode — a provider in opencode.json, its key read from OPENAI_API_KEY. Which provider
+    # depends on what the profile's endpoint actually serves (AGENT_FORMAT), because opencode
+    # genuinely speaks both: the built-in anthropic provider for an Anthropic Messages endpoint,
+    # the openai-compatible one otherwise. The AI SDK's anthropic provider wants the /v1 on the
+    # base URL, so it is added here rather than expected in the profile.
+    if [ "${AGENT_FORMAT:-openai-chat}" = "anthropic" ]; then
+      A_ROOT="${OPENAI_BASE_URL%/}"; A_ROOT="${A_ROOT%/v1}"
+      mkdir -p "$WS/.config/opencode"
+      printf '{"provider":{"anthropic":{"options":{"baseURL":"%s/v1","apiKey":"{env:OPENAI_API_KEY}"},"models":{"%s":{}}}}}\n' \
+        "${A_ROOT}" "${MODEL}" > "$WS/opencode.json"
+      OPENCODE_PROVIDER=anthropic
+    else
+      printf '{"provider":{"fordism":{"npm":"@ai-sdk/openai-compatible","options":{"baseURL":"%s"},"models":{"%s":{}}}}}\n' \
+        "${OPENAI_BASE_URL}" "${MODEL}" > "$WS/opencode.json"
+      OPENCODE_PROVIDER=fordism
+    fi
     mirror_skills ".config/opencode/skills"
     ;;
 esac
@@ -171,7 +189,7 @@ agent_start() {   # $1 = prompt   $2 = seconds of budget
     gemini-cli) timeout "$2" gemini --approval-mode yolo --model "$MODEL" -p "$1" ;;
     codex)      timeout "$2" codex exec --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check \
                         --model "$MODEL" "$1" ;;
-    opencode)   timeout "$2" opencode run --model "fordism/$MODEL" "$1" ;;
+    opencode)   timeout "$2" opencode run --model "${OPENCODE_PROVIDER:-fordism}/$MODEL" "$1" ;;
     *)          timeout "$2" claude -p --session-id "$SID" --name "$SNAME" \
                         --model "$MODEL" --dangerously-skip-permissions "$1" ;;
   esac
@@ -183,7 +201,7 @@ agent_resume() {  # $1 = prompt   $2 = seconds of budget
     gemini-cli) timeout "$2" gemini --approval-mode yolo --model "$MODEL" -r latest -p "$1" ;;
     codex)      timeout "$2" codex exec resume --last --dangerously-bypass-approvals-and-sandbox \
                         --skip-git-repo-check --model "$MODEL" "$1" ;;
-    opencode)   timeout "$2" opencode run --continue --model "fordism/$MODEL" "$1" ;;
+    opencode)   timeout "$2" opencode run --continue --model "${OPENCODE_PROVIDER:-fordism}/$MODEL" "$1" ;;
     *)          timeout "$2" claude -p --resume "$SID" \
                         --model "$MODEL" --dangerously-skip-permissions "$1" ;;
   esac

@@ -32,7 +32,7 @@ class ProfileKeyOnDiskTest {
                 "no POSIX permissions on this filesystem");
         AgentProfileStore profiles = new AgentProfileStore(directory);
         String id = profiles.create(new AgentProfile(null, "anthropic", "https://api.anthropic.com",
-                "sk-secret", "claude-sonnet-5", AgentTool.CLAUDE_CODE));
+                "sk-secret", "claude-sonnet-5", AgentTool.CLAUDE_CODE, ApiFormat.ANTHROPIC));
 
         Path file = directory.resolve(id + ".json");
         assertTrue(Files.readString(file).contains("sk-secret"), "the key is on disk, as designed");
@@ -47,11 +47,11 @@ class ProfileKeyOnDiskTest {
                 "no POSIX permissions on this filesystem");
         AgentProfileStore profiles = new AgentProfileStore(directory);
         String id = profiles.create(new AgentProfile(null, "anthropic", "https://api.anthropic.com",
-                "sk-secret", "claude-sonnet-5", AgentTool.CLAUDE_CODE));
+                "sk-secret", "claude-sonnet-5", AgentTool.CLAUDE_CODE, ApiFormat.ANTHROPIC));
 
         // A blank key means "keep the stored one" — the rewrite must be as private as the original.
         profiles.update(id, new AgentProfile(id, "anthropic-renamed", "https://api.anthropic.com",
-                "", "claude-sonnet-5", AgentTool.CLAUDE_CODE));
+                "", "claude-sonnet-5", AgentTool.CLAUDE_CODE, ApiFormat.ANTHROPIC));
 
         Path file = directory.resolve(id + ".json");
         assertTrue(Files.readString(file).contains("sk-secret"), "the kept key survived the rename");

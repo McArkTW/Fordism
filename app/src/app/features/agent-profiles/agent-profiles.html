@@ -122,6 +122,31 @@
           </hlm-select>
         </div>
 
+        @if (formatIsAChoice()) {
+          <div class="mt-4 flex flex-col gap-1.5">
+            <label hlmLabel for="profile-format">Endpoint format</label>
+            <hlm-select
+              [value]="format()"
+              [itemToString]="formatLabel"
+              (valueChange)="setFormat($event)"
+            >
+              <hlm-select-trigger class="w-full" buttonId="profile-format">
+                <hlm-select-value />
+              </hlm-select-trigger>
+              <hlm-select-content *hlmSelectPortal>
+                @for (choice of formatChoices(); track choice) {
+                  <hlm-select-item [value]="choice">{{ formatLabel(choice) }}</hlm-select-item>
+                }
+              </hlm-select-content>
+            </hlm-select>
+            <p class="text-muted-foreground text-xs">
+              What this endpoint serves, not what the model is. The same model is served as
+              Anthropic Messages at api.anthropic.com and as OpenAI Chat through a /v1 compatibility
+              layer.
+            </p>
+          </div>
+        }
+
         <div class="mt-4 flex flex-col gap-1.5">
           <label hlmLabel for="profile-base-url">Base URL</label>
           <input

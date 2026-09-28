@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmInput } from '@spartan-ng/helm/input';
 import { HlmLabel } from '@spartan-ng/helm/label';
@@ -17,6 +17,26 @@ const TOOL_LABELS: Record<string, string> = {
   'gemini-cli': 'Gemini CLI — Google API',
   codex: 'Codex — OpenAI API',
   opencode: 'opencode — OpenAI-compatible API',
+};
+
+/**
+ * The wire formats each tool can speak, primary first — mirrors AgentTool's declaration in core,
+ * which is what actually enforces it. Kept here only so the form can offer the choice; a profile
+ * naming a format its tool cannot speak is refused by the API either way.
+ */
+const TOOL_FORMATS: Record<string, string[]> = {
+  'claude-code': ['anthropic'],
+  'qwen-code': ['openai-chat'],
+  'gemini-cli': ['gemini'],
+  codex: ['openai-responses', 'openai-chat'],
+  opencode: ['openai-chat', 'anthropic'],
+};
+
+const FORMAT_LABELS: Record<string, string> = {
+  anthropic: 'Anthropic Messages',
+  'openai-chat': 'OpenAI Chat Completions',
+  'openai-responses': 'OpenAI Responses',
+  gemini: 'Gemini',
 };
 
 /**
@@ -41,6 +61,7 @@ export class AgentProfiles {
   readonly apiKey = signal('');
   readonly model = signal('');
   readonly tool = signal('claude-code');
+  readonly format = signal('anthropic');
   readonly hasKey = signal(false);
   readonly busy = signal(false);
   /** The first list request is still out — an empty list means nothing yet. */
@@ -50,6 +71,15 @@ export class AgentProfiles {
 
   /** The select stores the raw tool id; the trigger shows the human label via itemToString. */
   readonly toolLabel = (tool: string): string => TOOL_LABELS[tool] ?? tool;
+  readonly formatLabel = (format: string): string => FORMAT_LABELS[format] ?? format;
+
+  /**
+   * The formats the chosen tool can speak. The form only offers the choice when there is one to
+   * make — for four of the five tools the endpoint shape follows from the tool, and a select with
+   * a single option is a question with one answer.
+   */
+  readonly formatChoices = computed(() => TOOL_FORMATS[this.tool()] ?? []);
+  readonly formatIsAChoice = computed(() => this.formatChoices().length > 1);
 
   constructor() {
     this.reload();
@@ -86,6 +116,7 @@ export class AgentProfiles {
         this.hasKey.set(!!p.hasKey);
         this.model.set(p.model ?? '');
         this.tool.set(p.tool || 'claude-code');
+        this.format.set(p.format || TOOL_FORMATS[p.tool || 'claude-code']?.[0] || 'anthropic');
       },
       error: (e) => this.toasts.error(apiError(e, 'Could not load the profile')),
     });
@@ -99,11 +130,22 @@ export class AgentProfiles {
     this.hasKey.set(false);
     this.model.set('');
     this.tool.set('claude-code');
+    this.format.set('anthropic');
   }
 
   setTool(value: unknown): void {
     // brn-select can emit null on deselect; the tool is never optional, so fall back.
-    this.tool.set(typeof value === 'string' && value ? value : 'claude-code');
+    const tool = typeof value === 'string' && value ? value : 'claude-code';
+    this.tool.set(tool);
+    // The format belonged to the old tool and the new one may not speak it, which the API would
+    // refuse. Reset to the new tool's primary rather than sending a pairing that cannot save.
+    this.format.set(TOOL_FORMATS[tool]?.[0] ?? 'anthropic');
+  }
+
+  setFormat(value: unknown): void {
+    this.format.set(
+      typeof value === 'string' && value ? value : (TOOL_FORMATS[this.tool()]?.[0] ?? 'anthropic'),
+    );
   }
 
   save(): void {
@@ -118,6 +160,7 @@ export class AgentProfiles {
       apiKey: this.apiKey(),
       model: this.model(),
       tool: this.tool(),
+      format: this.format(),
     };
     const id = this.selected();
     const request = id ? this.service.update(id, payload) : this.service.create(payload);

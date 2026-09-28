@@ -28,7 +28,7 @@ class SoleProfileTest {
     void exactly_one_profile_is_the_default_for_everything() throws IOException {
         AgentProfileStore profiles = new AgentProfileStore(directory);
         profiles.create(new AgentProfile(null, "anthropic", "https://api.anthropic.com", "sk-test",
-                "claude-sonnet-5", AgentTool.CLAUDE_CODE));
+                "claude-sonnet-5", AgentTool.CLAUDE_CODE, ApiFormat.ANTHROPIC));
         Optional<AgentProfile> sole = profiles.sole();
         assertEquals("anthropic", sole.orElseThrow().name());
     }
@@ -37,9 +37,9 @@ class SoleProfileTest {
     void two_profiles_are_ambiguous_and_resolve_to_nothing() throws IOException {
         AgentProfileStore profiles = new AgentProfileStore(directory);
         profiles.create(new AgentProfile(null, "anthropic", "https://api.anthropic.com", "sk-test",
-                "claude-sonnet-5", AgentTool.CLAUDE_CODE));
+                "claude-sonnet-5", AgentTool.CLAUDE_CODE, ApiFormat.ANTHROPIC));
         profiles.create(new AgentProfile(null, "ollama", "http://gpu-host:11434", "",
-                "qwen3", AgentTool.QWEN_CODE));
+                "qwen3", AgentTool.QWEN_CODE, ApiFormat.OPENAI_CHAT));
         assertTrue(profiles.sole().isEmpty());
     }
 }
