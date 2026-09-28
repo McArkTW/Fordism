@@ -16,8 +16,16 @@ an ad-hoc task or a real backlog item.
 
 ## How it works
 
-```
-Workflow YAML → Orchestrator (per strategy) → Dispatcher → [Task = agent container] → Collector / Reaper
+```mermaid
+flowchart LR
+    Y[Workflow YAML] --> O[Orchestrator<br/>level-triggered reconcile]
+    O -->|next task| D[Dispatcher]
+    D --> C[(agent container<br/>/workspace)]
+    C -->|result/result.json| K[Collector]
+    K --> R[Reaper<br/>container removed]
+    K -->|finished · failed| O
+    K -->|asked| H[Human answers in the UI]
+    H -->|same session, fresh container| D
 ```
 
 - **Six strategies**: `linear` · `graph` · `conditional` · `map-reduce` · `rework` ·
@@ -41,6 +49,36 @@ Workflow YAML → Orchestrator (per strategy) → Dispatcher → [Task = agent c
   Same-session resume — human-in-the-loop, rework, and the self-heal loop — works across
   runtimes: the session store lives under the host-mounted workspace, so a later container
   resumes what an earlier one started.
+
+## Why it is built this way
+
+Four decisions, each one a bet you can argue with:
+
+1. **No result means FAILED.** An agent that talks for ten minutes and writes no
+   `result.json` has not finished; it has produced a transcript. Fordism marks the task
+   *rotten* and fails or retries it. Success is a file the agent had to write on purpose,
+   never something the engine inferred from chat output.
+2. **Ask instead of guess.** When an agent hits a decision it should not make alone, the
+   cheapest correct move is to stop. `asked` parks the run, the question shows up in the UI,
+   and the answer resumes the same session in a fresh container. This is also how secrets
+   move: a requested credential arrives as an environment variable in the next container,
+   never as text in the conversation.
+3. **Level-triggered, not event-driven.** The orchestrator keeps no memory of what it told
+   the Dispatcher. On every tick it reads the run's current state and computes what should
+   exist. A crash mid-run, a duplicate tick, or an operator pressing *run* twice all converge
+   on the same answer instead of launching the same task twice. This is the Kubernetes
+   controller pattern applied to agent work, and it is why each of the six strategies is
+   under 200 lines.
+4. **One container per task, thrown away after.** A task sees its own `/workspace` and the
+   credentials its template declared, nothing else. When it ends, the container is gone,
+   so a wandering agent cannot leave state behind for the next one to trip over. The cost
+   is a cold start per task; the gain is that "what could this step touch" is answered by
+   the YAML, not by trust.
+
+What it does **not** do, on purpose: no database (state is in memory behind a store port
+and snapshots to disk), no LLM gateway (agents call their provider directly), no message
+queue (the filesystem is the protocol). Each of those is a dependency someone would have
+to operate, and none of them is needed to run a backlog honestly.
 
 ## Repository layout
 
