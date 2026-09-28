@@ -30,7 +30,11 @@ public final class FordismConfiguration {
 
     // Launcher
     public final String launcherNetwork = env("FORDISM_LAUNCHER_NETWORK", "bridge");
-    public final String agentImage = env("FORDISM_AGENT_IMAGE", "fordism/fordism-agent:local");
+    // One image per tool: the launcher appends the tool's wire name, so claude-code runs
+    // fordism/fordism-agent-claude-code:<tag>. It was one image carrying every CLI, of which a run
+    // used exactly one — and the tools shared $HOME, which is the mounted workspace.
+    public final String agentImagePrefix = env("FORDISM_AGENT_IMAGE_PREFIX", "fordism/fordism-agent");
+    public final String agentImageTag = env("FORDISM_AGENT_IMAGE_TAG", "local");
     public final String dockerCmd = env("FORDISM_DOCKER_CMD", "docker");
 
     // Agent container edge. The agent has full control INSIDE its container — it installs
@@ -61,6 +65,11 @@ public final class FordismConfiguration {
     // the workspace, which is bind-mounted from the host, kept and downloadable. Comma-separated;
     // empty scrubs nothing.
     public final List<String> credentialFiles = envList("FORDISM_CREDENTIAL_FILES", ".reasonix/.env");
+
+    /** The image that runs this tool. */
+    public String agentImage(String toolWireName) {
+        return agentImagePrefix + "-" + toolWireName + ":" + agentImageTag;
+    }
 
     private static String env(String key, String fallback) {
         String value = System.getenv(key);
