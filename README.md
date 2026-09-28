@@ -54,9 +54,6 @@ flowchart LR
   Codex and opencode — which is what human-in-the-loop, a resumed rework and the self-heal
   loop rely on. The rest are one-shot: answering their question re-runs the task with your
   answer, over the workspace the first attempt already wrote.
-  Same-session resume — human-in-the-loop, rework, and the self-heal loop — works across
-  runtimes: the session store lives under the host-mounted workspace, so a later container
-  resumes what an earlier one started.
 
 ## Why it is built this way
 
