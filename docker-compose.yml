@@ -35,7 +35,11 @@ services:
       # Launcher. FORDISM_LAUNCHER_NETWORK must name a network the agent can reach core on —
       # the env files point it at this project's `internal` (e.g. uat_internal).
       FORDISM_LAUNCHER_NETWORK: ${FORDISM_LAUNCHER_NETWORK:-}
-      FORDISM_AGENT_IMAGE: ${FORDISM_AGENT_IMAGE:-}
+      # One image per tool; the launcher appends the tool's wire name to the prefix.
+      FORDISM_AGENT_IMAGE_PREFIX: ${FORDISM_AGENT_IMAGE_PREFIX:-}
+      FORDISM_AGENT_IMAGE_TAG: ${FORDISM_AGENT_IMAGE_TAG:-}
+      # Workspace-relative files holding a live API key, deleted when the task ends.
+      FORDISM_CREDENTIAL_FILES: ${FORDISM_CREDENTIAL_FILES:-.reasonix/.env}
       FORDISM_LAUNCHER_MAX: ${FORDISM_LAUNCHER_MAX:-4}
       # The gid the agent image runs as; a staged workspace is handed to this group.
       FORDISM_AGENT_GID: ${FORDISM_AGENT_GID:-1001}
@@ -73,11 +77,40 @@ services:
     networks: [edge]
     restart: unless-stopped
 
-  # Not a service — the recipe for the agent image, so `compose build` produces it under the
-  # same REGISTRY/TAG as the others. The launcher runs one of these per task; nothing
-  # long-lived. Behind a profile so `up` never starts it.
-  fordism-agent:
-    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent:${TAG:-latest}
+  # Not services — the recipes for the agent images, so `compose build` produces them under the
+  # same REGISTRY/TAG as the others. The launcher runs one per task; nothing long-lived. Behind a
+  # profile so `up` never starts them.
+  #
+  # One image per tool, each the shared base plus its own CLI. It was a single image carrying every
+  # CLI, of which any run used exactly one — and the tools shared $HOME, which is the mounted
+  # workspace. Build the base first; each tool image takes it as ARG BASE.
+  fordism-agent-base:
+    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-base:${TAG:-latest}
+    profiles: ["build-only"]
+
+  fordism-agent-claude-code:
+    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-claude-code:${TAG:-latest}
+    depends_on: [fordism-agent-base]
+    profiles: ["build-only"]
+
+  fordism-agent-qwen-code:
+    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-qwen-code:${TAG:-latest}
+    depends_on: [fordism-agent-base]
+    profiles: ["build-only"]
+
+  fordism-agent-gemini-cli:
+    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-gemini-cli:${TAG:-latest}
+    depends_on: [fordism-agent-base]
+    profiles: ["build-only"]
+
+  fordism-agent-codex:
+    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-codex:${TAG:-latest}
+    depends_on: [fordism-agent-base]
+    profiles: ["build-only"]
+
+  fordism-agent-opencode:
+    image: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-opencode:${TAG:-latest}
+    depends_on: [fordism-agent-base]
     profiles: ["build-only"]
 
 networks:

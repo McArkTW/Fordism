@@ -7,6 +7,39 @@ services:
       dockerfile: core/Dockerfile
   fordism-app:
     build: ./app
-  # Built, never run: the launcher spawns one container per task from this image.
-  fordism-agent:
-    build: ./agent
+  # Built, never run: the launcher spawns one container per task from these. The base carries the
+  # shared runtime; each tool image is that base plus its own CLI.
+  fordism-agent-base:
+    build:
+      context: ./agent
+      dockerfile: Dockerfile.base
+  fordism-agent-claude-code:
+    build:
+      context: ./agent
+      dockerfile: tools/claude-code.Dockerfile
+      args:
+        BASE: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-base:${TAG:-latest}
+  fordism-agent-qwen-code:
+    build:
+      context: ./agent
+      dockerfile: tools/qwen-code.Dockerfile
+      args:
+        BASE: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-base:${TAG:-latest}
+  fordism-agent-gemini-cli:
+    build:
+      context: ./agent
+      dockerfile: tools/gemini-cli.Dockerfile
+      args:
+        BASE: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-base:${TAG:-latest}
+  fordism-agent-codex:
+    build:
+      context: ./agent
+      dockerfile: tools/codex.Dockerfile
+      args:
+        BASE: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-base:${TAG:-latest}
+  fordism-agent-opencode:
+    build:
+      context: ./agent
+      dockerfile: tools/opencode.Dockerfile
+      args:
+        BASE: ${REGISTRY:-ghcr.io/mcarktw/fordism}/fordism-agent-base:${TAG:-latest}

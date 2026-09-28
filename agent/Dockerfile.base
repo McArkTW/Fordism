@@ -1,9 +1,13 @@
-# The Fordism agent — a one-shot CLI agent (claude-code, qwen-code, gemini-cli, codex or
-# opencode, chosen at run time by AGENT_TYPE) over a host-mounted workspace. The launcher runs
-# one container per task; it reads task/task.md, does the work, writes result/, and exits.
-# The model backend is chosen at run time by env, per the tool's dialect: ANTHROPIC_* for
-# claude-code, OPENAI_* for qwen-code/codex/opencode, GEMINI_API_KEY for gemini-cli — each
-# pointing straight at the resolved endpoint, no gateway.
+# The Fordism agent BASE — the runtime every tool image shares.
+#
+# One image per tool builds FROM this and installs only its own CLI (agent/tools/<tool>.Dockerfile).
+# It was a single image with every CLI baked in and AGENT_TYPE picking a branch: a run used exactly
+# one of them, and the tools collided over $HOME, which is the mounted workspace. Splitting them
+# means a task pulls the CLI it will actually run, and nothing else writes to that workspace.
+#
+# The launcher runs one container per task; it reads task/task.md, does the work, writes result/,
+# and exits. The model backend is chosen at run time by env, per the tool's dialect — each pointing
+# straight at the resolved endpoint.
 FROM node:22-slim
 
 # BuildKit sets this to the arch being built for (amd64 / arm64). Every apt package and npm
@@ -77,32 +81,3 @@ RUN build_arch="${TARGETARCH:-$(uname -m)}" \
     && curl -fsSL "https://github.com/cli/cli/releases/download/v2.62.0/gh_2.62.0_linux_${gh_arch}.tar.gz" \
        | tar xz -C /usr/local --strip-components=1 "gh_2.62.0_linux_${gh_arch}/bin/gh" \
     && gh --version
-
-# All agent CLIs are baked in; AGENT_TYPE picks which one runs at container start. Each npm
-# package resolves its own per-arch binary through optionalDependencies, so this one line is
-# multi-arch on both amd64 and arm64 with nothing to branch on. Pinned, and each is smoke-run
-# below so a wrong-arch or broken install fails the build, not the first task.
-RUN npm install -g \
-      @anthropic-ai/claude-code@2.1.251 \
-      @qwen-code/qwen-code@0.22.3 \
-      @google/gemini-cli@0.57.0 \
-      @openai/codex@0.151.0 \
-      opencode-ai@1.18.25 \
-    && claude --version && qwen --version && gemini --version && codex --version && opencode --version
-
-COPY entrypoint.sh /usr/local/bin/fordism-agent
-COPY CLAUDE.md      /doctrine/CLAUDE.md
-COPY skills/        /doctrine/skills/
-RUN chmod +x /usr/local/bin/fordism-agent
-
-# Claude Code refuses --dangerously-skip-permissions as root, so run as a non-root user.
-# Pin that user to uid/gid 1001 so workspace files on the host are owned by a stable non-root uid,
-# not uid 1000. HOME points at the mounted workspace so sessions/transcripts persist and resume.
-RUN groupmod -g 1001 node && usermod -u 1001 -g 1001 node
-USER node
-ENV HOME=/workspace
-# pip drops console scripts in $HOME/.local/bin, which is not on the default PATH — so
-# `pip install pytest && pytest` fails with "command not found" one step after appearing to work.
-ENV PATH=/workspace/.local/bin:$PATH
-WORKDIR /workspace
-ENTRYPOINT ["/usr/local/bin/fordism-agent"]

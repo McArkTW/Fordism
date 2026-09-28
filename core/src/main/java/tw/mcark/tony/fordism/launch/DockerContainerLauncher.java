@@ -92,7 +92,8 @@ public final class DockerContainerLauncher implements ContainerLauncher {
         }
         cmd.add("-v");
         cmd.add(task.hostWorkspacePath + ":/workspace");
-        cmd.add(configuration.agentImage);
+        // The image is chosen by the tool, not fixed: each tool has its own, holding only its CLI.
+        cmd.add(configuration.agentImage(models.backend(task.agentProfile, task.config.model()).tool().wireName()));
         return cmd;
     }
 

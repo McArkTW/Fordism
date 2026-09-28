@@ -13,7 +13,7 @@ native:
 |---|---|---|
 | `core/` | JDK 25 | `./gradlew build` — compiles, runs every test, and the `banVar` + `banStyle` gates |
 | `app/` | Node ≥ 24 | `npm ci`, then `npm start` (dev server, `/api` proxied to `localhost:8080`), `npm run lint`, `npm run test`, `npm run build` |
-| `agent/` | — | shell + Dockerfile only; `docker compose --profile build-only build fordism-agent` |
+| `agent/` | — | shell + Dockerfiles only; `docker compose --profile build-only build fordism-agent-base fordism-agent-<tool>` |
 
 CI runs exactly these plus a gitleaks secret scan — a PR that passes locally passes CI.
 

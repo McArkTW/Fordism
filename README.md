@@ -41,11 +41,13 @@ flowchart LR
   instead of guessing. The run parks, the question surfaces in the UI, and your answer
   resumes the *same session* in a fresh container. A requested credential is injected
   as an environment variable — never into the transcript.
-- **Five agent runtimes, one image.** The agent image bakes Claude Code, Qwen Code,
-  Gemini CLI, Codex, and opencode; each Agent Profile carries a `baseUrl`, a write-only
-  API key, a model, and the `tool` that drives the task. The environment follows the
-  tool's dialect — Anthropic, OpenAI-compatible, or Google — so adding another CLI is one
-  enum line, not a new code path. No LLM gateway — agents call providers directly.
+- **Five agent runtimes, one image each.** Claude Code, Qwen Code, Gemini CLI, Codex and
+  opencode; each Agent Profile carries a `baseUrl`, a write-only API key, a model, the
+  `tool` that drives the task, and the wire `format` its endpoint serves. The environment
+  follows the tool's dialect — Anthropic, OpenAI-compatible, or Google — so adding another
+  CLI is one enum line, not a new code path. Every tool has its own image, a shared base
+  plus that one CLI, so a task pulls only what it will run and nothing else shares its
+  `$HOME`. No LLM gateway — agents call providers directly.
   Same-session resume — human-in-the-loop, rework, and the self-heal loop — works across
   runtimes: the session store lives under the host-mounted workspace, so a later container
   resumes what an earlier one started.
@@ -87,7 +89,7 @@ to operate, and none of them is needed to run a backlog honestly.
 | `core/` | Java 25 / Javalin — the **workflow engine**: strategy orchestrators, Dispatcher/Collector/Reaper, the container launcher, and the Agent Profile / template / skill stores. |
 | `app/` | Angular 21 + Tailwind 4 + spartan/ui — the operator UI: **Workflows · Runs · Templates · Skills · Agent Profiles · Credentials · Users · Groups**. Built to a static SPA; the container is nginx (and the edge, proxying `/api` → core). |
 | `docs/` | The [operator guide](docs/usage.md): the workflow YAML reference, the six strategies, the result contract, and the permission model. |
-| `agent/` | The containerized agent runner — one image baking **five agent CLIs** (Claude Code, Qwen Code, Gemini CLI, Codex, opencode); the Agent Profile's `tool` selects which drives the task. The launcher runs one disposable container per task over a host-mounted `/workspace`. |
+| `agent/` | The containerized agent runner — a shared `Dockerfile.base` and **one image per CLI** under `tools/` (Claude Code, Qwen Code, Gemini CLI, Codex, opencode); the Agent Profile's `tool` selects which drives the task, and which image runs it. The launcher runs one disposable container per task over a host-mounted `/workspace`. |
 | `deploy/` | Deploy assets: per-env `*.env.example` templates and `scripts/deploy.sh` (pull + `compose up` + health check). |
 
 ## Quickstart
@@ -95,29 +97,31 @@ to operate, and none of them is needed to run a backlog honestly.
 Everything is containerized — the only requirement is **Docker**. Published images are
 multi-arch: **amd64 and arm64**.
 
-`fordism-core` and `fordism-app` are published to GHCR; **the agent image is not**. It bakes
-in the agent CLIs (Claude Code and Codex are proprietary), so you build that one image yourself. You
-clone the repo either way (the agent build needs it), then pull core and app rather than
+`fordism-core` and `fordism-app` are published to GHCR; **the agent images are not**. They bake
+in the agent CLIs (Claude Code and Codex are proprietary), so you build those yourself. There is one
+image per tool — a shared base plus that tool's CLI — so you only build the ones you will actually
+run. You clone the repo either way (the agent build needs it), then pull core and app rather than
 building them:
 
 ```bash
 git clone https://github.com/McArkTW/Fordism && cd Fordism
-cp .env.example .env                                       # set FORDISM_ADMIN_SECRET
-docker compose --profile build-only build fordism-agent   # the one image you build (once)
-docker compose pull                                        # core + app from GHCR
+cp .env.example .env                       # set FORDISM_ADMIN_SECRET
+docker compose --profile build-only build \
+  fordism-agent-base fordism-agent-claude-code   # the base + the tool you will run
+docker compose pull                        # core + app from GHCR
 docker compose up -d
 ```
 
-Pin a release by setting `TAG=v1.0.0` in `.env` — `latest` follows the newest tag. The agent
-image is what the launcher runs per task; build it once and `up` never rebuilds it. Building it
-locally is also how you accept the agent CLIs' own licenses.
+Pin a release by setting `TAG=v1.0.0` in `.env` — `latest` follows the newest tag. A tool's agent
+image is what the launcher runs for a task that names it; build it once and `up` never rebuilds it.
+Building locally is also how you accept the agent CLIs' own licenses.
 
 **Or build from source**, which is also the dev loop:
 
 ```bash
 git clone https://github.com/McArkTW/Fordism && cd Fordism
 cp .env.example .env                       # set FORDISM_ADMIN_SECRET; the rest works locally
-docker compose --profile build-only build  # builds core, app, AND the agent image
+docker compose --profile build-only build  # builds core, app, AND every agent image
 docker compose up -d
 ```
 
