@@ -55,5 +55,9 @@
     "typescript": "~5.9.2",
     "typescript-eslint": "8.59.2",
     "vitest": "^4.0.8"
+  },
+  "overrides": {
+    "smol-toml": "^1.7.1",
+    "qs": "^6.16.0"
   }
 }
