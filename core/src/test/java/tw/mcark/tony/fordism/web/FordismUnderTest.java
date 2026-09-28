@@ -27,6 +27,7 @@ import tw.mcark.tony.fordism.launch.DockerContainerLauncher;
 import tw.mcark.tony.fordism.launch.ModelRegistry;
 import tw.mcark.tony.fordism.launch.SessionIdentifierFactory;
 import tw.mcark.tony.fordism.orchestrate.Engine;
+import tw.mcark.tony.fordism.proxy.UsageProxy;
 import tw.mcark.tony.fordism.secret.SecretVault;
 import tw.mcark.tony.fordism.skill.SkillPluginStore;
 import tw.mcark.tony.fordism.skill.SkillState;
@@ -70,6 +71,7 @@ final class FordismUnderTest implements AutoCloseable {
     private final Javalin javalin;
     private final int port;
     private final Accounts accounts;
+    private final TaskRepository tasks;
 
     FordismUnderTest(Path stateDir) {
         FordismConfiguration configuration = new FordismConfiguration();
@@ -100,7 +102,9 @@ final class FordismUnderTest implements AutoCloseable {
                 new ApiTokenStore(stateDir), new AuditLog(stateDir));
 
         this.javalin = new App(engine, configuration, templates, results, new WorkspaceArchive(),
-                skills, skillPlugins, profiles, secrets, credentials, accounts).startOn(0);
+                skills, skillPlugins, profiles, secrets, credentials, accounts,
+                new UsageProxy(tasks, new ModelRegistry(configuration, profiles))).startOn(0);
+        this.tasks = tasks;
         this.port = javalin.port();
     }
 
@@ -115,6 +119,11 @@ final class FordismUnderTest implements AutoCloseable {
         Group group = accounts.groups().findByName(groupName).orElseThrow();
         accounts.groups().update(group.withMember(user.id()));
         return SessionCookie.NAME + "=" + accounts.sessions().create(user.id()).token();
+    }
+
+    /** The task store this instance is running on — so a test can plant a task to call about. */
+    TaskRepository tasks() {
+        return tasks;
     }
 
     HttpRequest.Builder to(String path) {

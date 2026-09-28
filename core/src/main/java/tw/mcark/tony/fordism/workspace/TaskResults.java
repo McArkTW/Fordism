@@ -14,10 +14,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -191,18 +193,169 @@ public final class TaskResults {
         return false;
     }
 
-    /** Token usage, summed from the session transcript. Robust to an early container reap. */
+    /**
+     * Token usage, summed from the task's own record of it. Robust to an early container reap.
+     *
+     * <p>Three sources, in order of how much they can be trusted. Core's proxy ledger is the same
+     * record for every tool, read off the wire. Failing that the tool's own transcript is parsed as
+     * JSONL, one record per line — scraping it with a regex over the whole file counted every
+     * assistant message as many times as the tool wrote it, and Claude Code repeats each one, so a
+     * 19-message run reported 45 turns and 2.2x its real tokens. Records carrying a message id are
+     * therefore counted once per id. The whole-file regex survives only as the last fallback, for a
+     * tool writing some other shape.
+     */
     public TokenUsage usage(Task task) {
+        TokenUsage proxied = usageFromLedger(task);
+        if (proxied != null) {
+            return proxied;   // read off the wire by core's proxy: the same record for every tool
+        }
         String transcript = transcript(task).orElse(null);
         if (transcript == null) {
             return null;
+        }
+        TokenUsage parsed = usageFromJsonl(transcript);
+        if (parsed != null) {
+            return parsed;
         }
         long input = sumMatches(transcript, "\"(?:input|prompt)_tokens\"\\s*:\\s*(\\d+)");
         long output = sumMatches(transcript, "\"(?:output|completion)_tokens\"\\s*:\\s*(\\d+)");
         if (input == 0 && output == 0) {
             return null;   // an agent that reported none — the UI shows a dash
         }
-        return new TokenUsage(input, output, input + output, countMatches(transcript, "\"usage\""));
+        return TokenUsage.of(new TokenUsage.Counts(input, 0L, 0L, output), countMatches(transcript, "\"usage\""));
+    }
+
+    /**
+     * The sum of {@code result/logs/usage.jsonl}, which core's proxy writes one line per model
+     * call, or null when the task was not proxied. A line with no token fields is a call that
+     * billed nothing.
+     */
+    private static TokenUsage usageFromLedger(Task task) {
+        if (task.workspacePath == null) {
+            return null;
+        }
+        Path ledger = Paths.get(task.workspacePath, "result", "logs", "usage.jsonl");
+        if (!Files.isRegularFile(ledger)) {
+            return null;
+        }
+        long input = 0L;
+        long cacheWrite = 0L;
+        long cacheRead = 0L;
+        long output = 0L;
+        long calls = 0L;
+        try {
+            for (String line : Files.readAllLines(ledger, StandardCharsets.UTF_8)) {
+                JsonObject record = asObject(line);
+                if (record == null || !record.has("output_tokens")) {
+                    continue;
+                }
+                input += longAt(record, "input_tokens");
+                cacheWrite += longAt(record, "cache_creation_input_tokens");
+                cacheRead += longAt(record, "cache_read_input_tokens");
+                output += longAt(record, "output_tokens");
+                calls++;
+            }
+        } catch (IOException e) {
+            return null;
+        }
+        return calls == 0 ? null : TokenUsage.of(new TokenUsage.Counts(input, cacheWrite, cacheRead, output), calls);
+    }
+
+    /** Sums each distinct usage record, or null when the transcript is not JSONL we understand. */
+    private static TokenUsage usageFromJsonl(String transcript) {
+        long input = 0L;
+        long cacheWrite = 0L;
+        long cacheRead = 0L;
+        long output = 0L;
+        long turns = 0L;
+        Set<String> seen = new HashSet<>();
+        for (String line : transcript.split("\\R")) {
+            JsonObject record = asObject(line);
+            if (record == null) {
+                continue;
+            }
+            JsonObject message = record.has("message") && record.get("message").isJsonObject()
+                    ? record.getAsJsonObject("message") : record;
+            if (!message.has("usage") || !message.get("usage").isJsonObject()) {
+                continue;
+            }
+            // The same message is written more than once by some tools; its id is what makes it one.
+            String id = message.has("id") && message.get("id").isJsonPrimitive()
+                    ? message.get("id").getAsString() : null;
+            if (id != null && !seen.add(id)) {
+                continue;
+            }
+            JsonObject usage = message.getAsJsonObject("usage");
+            input += longAt(usage, "input_tokens", "prompt_tokens");
+            output += longAt(usage, "output_tokens", "completion_tokens");
+            cacheWrite += longAt(usage, "cache_creation_input_tokens", "cache_write_tokens");
+            cacheRead += longAt(usage, "cache_read_input_tokens", "cached_tokens");
+            turns++;
+        }
+        if (turns == 0 || (input == 0 && output == 0 && cacheWrite == 0 && cacheRead == 0)) {
+            return null;
+        }
+        return TokenUsage.of(new TokenUsage.Counts(input, cacheWrite, cacheRead, output), turns);
+    }
+
+    /** One JSONL line as an object; null for a blank or stray non-JSON line, which is not fatal. */
+    private static JsonObject asObject(String line) {
+        if (line == null || line.isBlank()) {
+            return null;
+        }
+        try {
+            JsonElement parsed = GSON.fromJson(line, JsonElement.class);
+            return parsed != null && parsed.isJsonObject() ? parsed.getAsJsonObject() : null;
+        } catch (JsonSyntaxException e) {
+            return null;
+        }
+    }
+
+    /** The first of these keys the object actually carries, as a long; 0 when it carries none. */
+    private static long longAt(JsonObject usage, String... keys) {
+        for (String key : keys) {
+            if (usage.has(key) && usage.get(key).isJsonPrimitive()) {
+                try {
+                    return usage.get(key).getAsLong();
+                } catch (NumberFormatException e) {
+                    return 0L;
+                }
+            }
+        }
+        return 0L;
+    }
+
+    /**
+     * Core's proxy transcript, {@code result/logs/llm.jsonl} — present only when
+     * {@code FORDISM_TRANSCRIPT} was on for the task. One format for every tool, which is what the
+     * tool's own transcript can never be.
+     */
+    public Optional<String> proxyTranscript(Task task) {
+        if (!hasProxyTranscript(task)) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(Files.readString(proxyTranscriptPath(task)));
+        } catch (IOException e) {
+            return Optional.empty();
+        }
+    }
+
+    /** Whether a proxy transcript exists, without reading it — asked for every task on a run page. */
+    public boolean hasProxyTranscript(Task task) {
+        if (task.workspacePath == null) {
+            return false;
+        }
+        try {
+            Path file = proxyTranscriptPath(task);
+            return Files.isRegularFile(file) && Files.size(file) > 0;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    private static Path proxyTranscriptPath(Task task) {
+        return Paths.get(task.workspacePath, "result", "logs", "llm.jsonl");
     }
 
     private static long sumMatches(String text, String regex) {

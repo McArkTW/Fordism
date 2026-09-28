@@ -8,6 +8,7 @@ import tw.mcark.tony.fordism.auth.ExternalAuthProviders;
 import tw.mcark.tony.fordism.config.FordismConfiguration;
 import tw.mcark.tony.fordism.credential.CredentialStore;
 import tw.mcark.tony.fordism.orchestrate.Engine;
+import tw.mcark.tony.fordism.proxy.UsageProxy;
 import tw.mcark.tony.fordism.secret.SecretVault;
 import tw.mcark.tony.fordism.skill.SkillPluginStore;
 import tw.mcark.tony.fordism.skill.SkillStore;
@@ -31,12 +32,14 @@ public final class App {
     private final SecretVault secrets;
     private final CredentialStore credentials;
     private final Accounts accounts;
+    private final UsageProxy proxy;
 
     public App(Engine engine, FordismConfiguration configuration, TemplateStore templates, TaskResults results,
             WorkspaceArchive archive,
             SkillStore skills, SkillPluginStore skillPlugins, AgentProfileStore profiles,
             SecretVault secrets, CredentialStore credentials,
-            Accounts accounts) {
+            Accounts accounts, UsageProxy proxy) {
+        this.proxy = proxy;
         this.engine = engine;
         this.configuration = configuration;
         this.templates = templates;
@@ -78,6 +81,15 @@ public final class App {
         // First, before any route: no session, no answer. Health, version and /api/auth/* are the
         // only exemptions, and AuthGate — not this list — is where that is decided.
         app.before("/api/*", new AuthGate(accounts)::guard);
+
+        // Agents' model calls. Deliberately NOT under /api, and so deliberately outside the gate
+        // above: the caller is an agent container, which has no session and never will — it
+        // authenticates with its own task's proxy token, which core minted for that one task and
+        // swaps for the real provider key on the way out. Registering it under /api instead would
+        // mean either a session an agent cannot have, or an exemption inside AuthGate, which is
+        // the one place session-less access is decided and should stay about humans.
+        // ProxyAuthorizationTest holds the token check in place.
+        proxy.register(app);
 
         app.get("/api/health", ctx -> ctx.contentType("application/json").result("{\"status\":\"ok\"}"));
         app.get("/api/version", this::version);
