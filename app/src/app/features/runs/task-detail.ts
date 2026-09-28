@@ -20,8 +20,7 @@ const REFRESH_MS = 5_000;
 /** Nothing more will be written for a task in one of these — the poll has nothing left to ask for. */
 const TERMINAL = ['COLLECTED', 'FAILED', 'REAPED'];
 
-/** One parsed transcript record — role + best-effort text + any tools it invoked. */
-type TxEntry = { role: string; text: string; tools: string[] };
+import { TxEntry, parseTranscript } from './transcript-parse';
 
 /** A result file plus how to render it. */
 type FileView = { name: string; size: number; binary: boolean; markdown: boolean; content: string };
@@ -161,7 +160,7 @@ export class TaskDetailPage implements OnDestroy {
     // 404 just means the task never wrote a transcript — absent, not an error.
     this.service.transcript(taskId).subscribe({
       next: (text) => {
-        this.transcript.set(this.parseTranscript(text));
+        this.transcript.set(parseTranscript(text));
         this.transcriptPending.set(false);
       },
       error: () => this.transcriptPending.set(false),
@@ -278,75 +277,5 @@ export class TaskDetailPage implements OnDestroy {
       markdown: !f.binary && f.name.toLowerCase().endsWith('.md'),
       content: f.content,
     };
-  }
-
-  /** Best-effort readable parse of an NDJSON transcript; unparseable lines are skipped. */
-  private parseTranscript(text: string): TxEntry[] {
-    const out: TxEntry[] = [];
-    for (const line of text.split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed) {
-        continue;
-      }
-      let obj: Record<string, unknown>;
-      try {
-        obj = JSON.parse(trimmed) as Record<string, unknown>;
-      } catch {
-        continue;
-      }
-      const msg = (obj['message'] ?? {}) as Record<string, unknown>;
-      const role = String(obj['role'] ?? msg['role'] ?? obj['type'] ?? 'event');
-      const tools: string[] = [];
-      let body = '';
-      // Two transcript dialects. claude-code writes message.content[] with a `type` discriminator;
-      // qwen-code writes message.parts[] with no type at all — a part is text, a functionCall or a
-      // functionResponse depending on which key it has. Reading only `content` leaves every qwen
-      // row rendered with its role and an empty body, which looks like a transcript that was not
-      // captured rather than one that was not parsed.
-      const content = msg['content'] ?? obj['content'] ?? msg['parts'] ?? obj['parts'];
-      if (typeof content === 'string') {
-        body = content;
-      } else if (Array.isArray(content)) {
-        for (const raw of content) {
-          const part = raw as Record<string, unknown>;
-          if (typeof raw === 'string') {
-            body += raw;
-          } else if (part['type'] === 'text') {
-            body += String(part['text'] ?? '');
-          } else if (part['type'] === 'thinking') {
-            body += String(part['thinking'] ?? '');
-          } else if (part['type'] === 'tool_use') {
-            tools.push(String(part['name'] ?? 'tool'));
-          } else if (part['type'] === 'tool_result') {
-            const result = part['content'];
-            if (typeof result === 'string') {
-              body += result;
-            } else if (Array.isArray(result)) {
-              body += result
-                .map((x) => String((x as Record<string, unknown>)?.['text'] ?? ''))
-                .join('');
-            }
-          } else if (part['functionCall']) {
-            const call = part['functionCall'] as Record<string, unknown>;
-            tools.push(String(call?.['name'] ?? 'tool'));
-          } else if (part['functionResponse']) {
-            const response = part['functionResponse'] as Record<string, unknown>;
-            const output = (response?.['response'] ?? {}) as Record<string, unknown>;
-            body += String(output['output'] ?? output['error'] ?? '');
-          } else if (typeof part['text'] === 'string') {
-            // qwen text part; `thought` marks reasoning rather than an answer.
-            body += part['thought'] ? '' : String(part['text']);
-          }
-        }
-      }
-      if (!body && typeof obj['text'] === 'string') {
-        body = obj['text'];
-      }
-      if (!body && typeof obj['summary'] === 'string') {
-        body = obj['summary'];
-      }
-      out.push({ role, text: body.trim(), tools });
-    }
-    return out;
   }
 }
