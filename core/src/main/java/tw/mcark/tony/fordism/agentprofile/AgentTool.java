@@ -10,14 +10,12 @@ import java.util.List;
  * {@link Dialect}, and the launcher sets the environment for that dialect — not for the tool — so a
  * new OpenAI-compatible CLI is one enum line, not a new branch in the launcher.
  *
- * <ul>
- *   <li>{@link #CLAUDE_CODE} — Anthropic ({@code ANTHROPIC_BASE_URL} / {@code ANTHROPIC_AUTH_TOKEN}),
- *       {@code claude -p}.
- *   <li>{@link #QWEN_CODE} — OpenAI-chat ({@code OPENAI_*}), {@code qwen -p}.
- *   <li>{@link #GEMINI_CLI} — Google ({@code GEMINI_API_KEY}), {@code gemini -p}.
- *   <li>{@link #CODEX} — OpenAI ({@code OPENAI_*}), {@code codex exec}.
- *   <li>{@link #OPENCODE} — OpenAI-compatible ({@code OPENAI_*}), {@code opencode run}.
- * </ul>
+ * <p>Five of them keep a session a later container can resume — claude-code, qwen-code, gemini-cli,
+ * codex and opencode — which is what makes human-in-the-loop, a resumed rework and the self-heal
+ * loop work for them. The rest are one-shot: answering their question re-runs the task with the
+ * answer appended, over the workspace the first attempt left behind. The entrypoint's
+ * {@code sessioned()} is the list, and it is deliberately the conservative one — a resume flag a
+ * tool does not honour starts a silent NEW session, which is worse than not resuming at all.
  *
  * <p>Each tool also declares the {@link ApiFormat}s its endpoint may serve, primary first. The
  * dialect and the format answer different questions: the dialect names the environment variables,
@@ -35,7 +33,24 @@ public enum AgentTool {
     @SerializedName("qwen-code") QWEN_CODE("qwen-code", Dialect.OPENAI, ApiFormat.OPENAI_CHAT),
     @SerializedName("gemini-cli") GEMINI_CLI("gemini-cli", Dialect.GOOGLE, ApiFormat.GEMINI),
     @SerializedName("codex") CODEX("codex", Dialect.OPENAI, ApiFormat.OPENAI_RESPONSES, ApiFormat.OPENAI_CHAT),
-    @SerializedName("opencode") OPENCODE("opencode", Dialect.OPENAI, ApiFormat.OPENAI_CHAT, ApiFormat.ANTHROPIC);
+    @SerializedName("opencode") OPENCODE("opencode", Dialect.OPENAI, ApiFormat.OPENAI_CHAT, ApiFormat.ANTHROPIC),
+    @SerializedName("aider") AIDER("aider", Dialect.OPENAI, ApiFormat.OPENAI_CHAT, ApiFormat.ANTHROPIC),
+    @SerializedName("goose") GOOSE("goose", Dialect.OPENAI, ApiFormat.OPENAI_CHAT, ApiFormat.ANTHROPIC),
+    @SerializedName("copilot") COPILOT("copilot", Dialect.OPENAI, ApiFormat.OPENAI_CHAT),
+    @SerializedName("pi") PI("pi", Dialect.OPENAI, ApiFormat.OPENAI_CHAT, ApiFormat.ANTHROPIC),
+    @SerializedName("crush") CRUSH("crush", Dialect.OPENAI, ApiFormat.OPENAI_CHAT, ApiFormat.ANTHROPIC),
+    @SerializedName("cline") CLINE("cline", Dialect.OPENAI, ApiFormat.OPENAI_CHAT, ApiFormat.ANTHROPIC),
+    @SerializedName("continue") CONTINUE("continue", Dialect.OPENAI, ApiFormat.OPENAI_CHAT, ApiFormat.ANTHROPIC),
+    @SerializedName("openhands") OPENHANDS("openhands", Dialect.OPENAI, ApiFormat.OPENAI_CHAT, ApiFormat.ANTHROPIC),
+    @SerializedName("dsh") DSH("dsh", Dialect.OPENAI, ApiFormat.OPENAI_CHAT, ApiFormat.ANTHROPIC),
+    @SerializedName("openclaw") OPENCLAW("openclaw", Dialect.OPENAI, ApiFormat.OPENAI_CHAT, ApiFormat.ANTHROPIC),
+    @SerializedName("hermes") HERMES("hermes", Dialect.OPENAI, ApiFormat.OPENAI_CHAT, ApiFormat.ANTHROPIC),
+    @SerializedName("deepagents") DEEPAGENTS("deepagents", Dialect.OPENAI, ApiFormat.OPENAI_CHAT, ApiFormat.ANTHROPIC),
+    @SerializedName("kimi") KIMI("kimi", Dialect.OPENAI, ApiFormat.OPENAI_CHAT, ApiFormat.ANTHROPIC),
+    @SerializedName("codewhale") CODEWHALE("codewhale", Dialect.OPENAI, ApiFormat.OPENAI_CHAT, ApiFormat.ANTHROPIC),
+    @SerializedName("reasonix") REASONIX("reasonix", Dialect.OPENAI, ApiFormat.OPENAI_CHAT, ApiFormat.ANTHROPIC),
+    @SerializedName("jcode") JCODE("jcode", Dialect.OPENAI, ApiFormat.OPENAI_CHAT, ApiFormat.ANTHROPIC),
+    @SerializedName("grok") GROK("grok", Dialect.OPENAI, ApiFormat.OPENAI_CHAT, ApiFormat.ANTHROPIC);
 
     /** The wire format a tool's model backend speaks — what the launcher's environment depends on. */
     public enum Dialect { ANTHROPIC, OPENAI, GOOGLE }

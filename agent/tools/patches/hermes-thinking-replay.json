@@ -1,0 +1,6 @@
+{
+  "why": "keep signed thinking blocks on every assistant turn when FORDISM_KEEP_THINKING_SIGNATURES=1 (Bedrock validates them; hermes strips them for any non-anthropic.com URL)",
+  "file": "/opt/uv-tools/hermes-agent/lib/python3.12/site-packages/agent/anthropic_adapter.py",
+  "old": "        elif _is_third_party or idx != last_assistant_idx:",
+  "new": "        elif (_is_third_party or idx != last_assistant_idx) and os.environ.get(\"FORDISM_KEEP_THINKING_SIGNATURES\") != \"1\":"
+}

@@ -113,13 +113,17 @@
               <hlm-select-value />
             </hlm-select-trigger>
             <hlm-select-content *hlmSelectPortal>
-              <hlm-select-item value="claude-code">Claude Code — Anthropic API</hlm-select-item>
-              <hlm-select-item value="qwen-code">Qwen Code — OpenAI-compatible API</hlm-select-item>
-              <hlm-select-item value="gemini-cli">Gemini CLI — Google API</hlm-select-item>
-              <hlm-select-item value="codex">Codex — OpenAI API</hlm-select-item>
-              <hlm-select-item value="opencode">opencode — OpenAI-compatible API</hlm-select-item>
+              @for (choice of toolChoices; track choice) {
+                <hlm-select-item [value]="choice">{{ toolLabel(choice) }}</hlm-select-item>
+              }
             </hlm-select-content>
           </hlm-select>
+          @if (!toolResumes()) {
+            <p class="text-muted-foreground text-xs">
+              One-shot: this tool keeps no session a later container can resume. Answering its
+              question re-runs the task with your answer, over the workspace it already wrote.
+            </p>
+          }
         </div>
 
         @if (formatIsAChoice()) {

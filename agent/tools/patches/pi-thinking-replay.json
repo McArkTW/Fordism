@@ -1,0 +1,6 @@
+{
+  "why": "keep the requested model id on the reply and record Bedrock's name as responseModel, so signed thinking survives replay (backport of earendil-works/pi 1283afd0d, unreleased after 0.85.1)",
+  "file": "/usr/local/lib/node_modules/@earendil-works/pi-coding-agent/dist/bundle/chunks/anthropic-messages-VWZZOSJQ.js",
+  "old": "output.model=event.message.model;",
+  "new": "event.message.model!==model.id&&(output.responseModel=event.message.model);"
+}
