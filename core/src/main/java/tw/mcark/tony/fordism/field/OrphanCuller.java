@@ -5,6 +5,7 @@ import tw.mcark.tony.fordism.model.task.Task;
 import tw.mcark.tony.fordism.model.task.TaskState;
 import tw.mcark.tony.fordism.store.TaskRepository;
 import tw.mcark.tony.fordism.store.WorkflowRunRepository;
+import tw.mcark.tony.fordism.workspace.CredentialScrub;
 import java.util.List;
 import org.tinylog.Logger;
 
@@ -32,11 +33,14 @@ public final class OrphanCuller {
     private final TaskRepository tasks;
     private final WorkflowRunRepository runs;
     private final ContainerLauncher launcher;
+    private final CredentialScrub scrub;
 
-    public OrphanCuller(TaskRepository tasks, WorkflowRunRepository runs, ContainerLauncher launcher) {
+    public OrphanCuller(TaskRepository tasks, WorkflowRunRepository runs, ContainerLauncher launcher,
+            CredentialScrub scrub) {
         this.tasks = tasks;
         this.runs = runs;
         this.launcher = launcher;
+        this.scrub = scrub;
     }
 
     public void sweep() {
@@ -56,6 +60,7 @@ public final class OrphanCuller {
         tasks.save(task);           // first, so no other sweep can still see it
         launcher.kill(task.containerId);
         launcher.remove(task.containerId);
+        scrub.scrub(task);
         Logger.info("cull task {} — its run is {}", task.id, because);
     }
 }

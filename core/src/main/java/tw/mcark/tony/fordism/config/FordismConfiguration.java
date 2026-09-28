@@ -1,5 +1,8 @@
 package tw.mcark.tony.fordism.config;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /** All runtime configuration, read from the environment (compose provides it). */
 public final class FordismConfiguration {
     public final int port = (int) envLong("FORDISM_PORT", 8080);
@@ -52,9 +55,28 @@ public final class FordismConfiguration {
     public final String gitSha = env("FORDISM_GIT_SHA", "unknown");
     public final String builtAt = env("FORDISM_BUILT_AT", "unknown");
 
+    // Workspace-relative files an agent tool had to write a live API key into, deleted once the
+    // task ends (see CredentialScrub). Nearly every tool takes its key from the environment and
+    // leaves nothing behind; a tool that can only resolve one from a file on disk writes it into
+    // the workspace, which is bind-mounted from the host, kept and downloadable. Comma-separated;
+    // empty scrubs nothing.
+    public final List<String> credentialFiles = envList("FORDISM_CREDENTIAL_FILES", ".reasonix/.env");
+
     private static String env(String key, String fallback) {
         String value = System.getenv(key);
         return value == null || value.isBlank() ? fallback : value;
+    }
+
+    /** A comma-separated list; blank entries dropped, so a trailing comma is not a blank path. */
+    private static List<String> envList(String key, String fallback) {
+        List<String> out = new ArrayList<>();
+        for (String part : env(key, fallback).split(",")) {
+            String trimmed = part.trim();
+            if (!trimmed.isEmpty()) {
+                out.add(trimmed);
+            }
+        }
+        return List.copyOf(out);
     }
 
     private static long envLong(String key, long fallback) {

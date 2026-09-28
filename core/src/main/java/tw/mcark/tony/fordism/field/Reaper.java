@@ -6,6 +6,7 @@ import tw.mcark.tony.fordism.model.task.ReportedState;
 import tw.mcark.tony.fordism.model.task.Task;
 import tw.mcark.tony.fordism.model.task.TaskState;
 import tw.mcark.tony.fordism.store.TaskRepository;
+import tw.mcark.tony.fordism.workspace.CredentialScrub;
 import tw.mcark.tony.fordism.workspace.TaskResults;
 import org.tinylog.Logger;
 
@@ -16,14 +17,16 @@ public final class Reaper {
     private final ContainerLauncher launcher;
     private final CullPolicy policy;
     private final FordismConfiguration configuration;
+    private final CredentialScrub scrub;
 
     public Reaper(TaskRepository tasks, TaskResults results, ContainerLauncher launcher,
-                  CullPolicy policy, FordismConfiguration configuration) {
+                  CullPolicy policy, FordismConfiguration configuration, CredentialScrub scrub) {
         this.tasks = tasks;
         this.results = results;
         this.launcher = launcher;
         this.policy = policy;
         this.configuration = configuration;
+        this.scrub = scrub;
     }
 
     public void sweep() {
@@ -47,6 +50,9 @@ public final class Reaper {
                         task.id, timeout, stale, dead, decision);
                 launcher.kill(task.containerId);
                 launcher.remove(task.containerId);
+                // kill() is SIGKILL — the one exit an agent's own cleanup could never trap, which
+                // is exactly why the scrub is here and not in the entrypoint.
+                scrub.scrub(task);
                 if (decision == CullDecision.ESCALATE) {
                     task.state = TaskState.REAPED;
                     task.error = "reaped: " + rot + " (attempt " + task.attempt

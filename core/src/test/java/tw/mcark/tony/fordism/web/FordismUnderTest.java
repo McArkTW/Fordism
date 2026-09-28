@@ -36,6 +36,7 @@ import tw.mcark.tony.fordism.store.InMemoryWorkflowRunRepository;
 import tw.mcark.tony.fordism.store.JsonStateStore;
 import tw.mcark.tony.fordism.store.TaskRepository;
 import tw.mcark.tony.fordism.store.WorkflowRunRepository;
+import tw.mcark.tony.fordism.workspace.CredentialScrub;
 import tw.mcark.tony.fordism.workspace.TaskResults;
 import tw.mcark.tony.fordism.workspace.TemplateStore;
 import tw.mcark.tony.fordism.workspace.WorkspaceArchive;
@@ -83,12 +84,13 @@ final class FordismUnderTest implements AutoCloseable {
         CredentialStore credentials = new CredentialStore(stateDir.resolve("credentials"));
         ContainerLauncher launcher = new DockerContainerLauncher(configuration,
                 new ModelRegistry(configuration, profiles), secrets, credentials);
+        CredentialScrub scrub = new CredentialScrub(configuration.credentialFiles);
         Engine engine = new Engine(configuration, tasks, runs, new SessionIdentifierFactory(),
                 new Dispatcher(tasks, new WorkspaceStager(configuration), templates, launcher,
                         new FieldView(tasks, configuration)),
-                new Collector(tasks, results, launcher),
-                new Reaper(tasks, results, launcher, new CullPolicy(), configuration),
-                new OrphanCuller(tasks, runs, launcher), new JsonStateStore(configuration), secrets);
+                new Collector(tasks, results, launcher, scrub),
+                new Reaper(tasks, results, launcher, new CullPolicy(), configuration, scrub),
+                new OrphanCuller(tasks, runs, launcher, scrub), new JsonStateStore(configuration), secrets);
 
         GroupStore groups = new GroupStore(stateDir);
         SeededGroups.into(groups);
