@@ -3,6 +3,7 @@ package tw.mcark.tony.fordism.launch;
 import tw.mcark.tony.fordism.agentprofile.AgentProfile;
 import tw.mcark.tony.fordism.agentprofile.AgentProfileStore;
 import tw.mcark.tony.fordism.agentprofile.AgentTool;
+import tw.mcark.tony.fordism.agentprofile.ApiFormat;
 import tw.mcark.tony.fordism.config.FordismConfiguration;
 
 /**
@@ -34,7 +35,9 @@ public final class ModelRegistry {
                         profile.baseUrl(),
                         profile.hasKey() ? profile.apiKey() : DEFAULT_TOKEN,
                         profile.tool(),
+                        profile.format(),
                         profile.model() == null || profile.model().isBlank() ? model : profile.model()))
-                .orElseGet(() -> new AgentBackend(configuration.llmBaseUrl, DEFAULT_TOKEN, AgentTool.CLAUDE_CODE, model));
+                .orElseGet(() -> new AgentBackend(configuration.llmBaseUrl, DEFAULT_TOKEN, AgentTool.CLAUDE_CODE,
+                        AgentTool.CLAUDE_CODE.primaryFormat(), model));
     }
 }

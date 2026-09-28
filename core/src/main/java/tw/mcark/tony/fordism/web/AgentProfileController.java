@@ -3,6 +3,7 @@ package tw.mcark.tony.fordism.web;
 import tw.mcark.tony.fordism.agentprofile.AgentProfile;
 import tw.mcark.tony.fordism.agentprofile.AgentProfileStore;
 import tw.mcark.tony.fordism.agentprofile.AgentTool;
+import tw.mcark.tony.fordism.agentprofile.ApiFormat;
 import tw.mcark.tony.fordism.workspace.TemplateStore;
 import io.javalin.http.Context;
 import java.util.Map;
@@ -59,12 +60,17 @@ public final class AgentProfileController {
         }
     }
 
-    /** The profile the request body describes. A blank apiKey means "keep the stored one". */
+    /**
+     * The profile the request body describes. A blank apiKey means "keep the stored one", and a
+     * blank format means the tool's primary — an absent format is the common case, since most
+     * tools only ever speak one.
+     */
     private static AgentProfile submitted(String id, Context ctx) {
         Map<String, Object> body = Api.body(ctx);
+        AgentTool tool = AgentTool.from(Api.string(body.get("tool")));
+        ApiFormat format = ApiFormat.from(Api.string(body.get("format"))).orElse(tool.primaryFormat());
         return new AgentProfile(id, Api.string(body.get("name")), Api.string(body.get("baseUrl")),
-                Api.string(body.get("apiKey")), Api.string(body.get("model")),
-                AgentTool.from(Api.string(body.get("tool"))));
+                Api.string(body.get("apiKey")), Api.string(body.get("model")), tool, format);
     }
 
     public void delete(Context ctx) {

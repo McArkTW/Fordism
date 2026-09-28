@@ -116,6 +116,11 @@ public final class DockerContainerLauncher implements ContainerLauncher {
         // One image, both agent CLIs baked in; AGENT_TYPE picks the entrypoint branch. The model
         // dialect follows the tool: claude-code speaks Anthropic, qwen-code speaks OpenAI-chat.
         env.put("AGENT_TYPE", backend.tool().wireName());
+        // The profile's format, which the store has already checked this tool speaks. The
+        // entrypoint configures a tool's provider from it rather than assuming one endpoint shape
+        // per tool: codex needs /responses where qwen-code needs /chat/completions, and both read
+        // OPENAI_BASE_URL, so the dialect alone cannot tell them apart.
+        env.put("AGENT_FORMAT", backend.format().wireName());
         env.put("AGENT_MODE", task.mode.wireName());
         env.put("FORDISM_SESSION_ID", task.sessionId);
         if (task.resumeMessage != null && !task.resumeMessage.isBlank()) {

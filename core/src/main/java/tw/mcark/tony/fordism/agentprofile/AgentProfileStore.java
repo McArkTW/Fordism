@@ -53,7 +53,7 @@ public final class AgentProfileStore {
     /** Public single view by id — key stripped. */
     public AgentProfileView read(String id) {
         return get(id).map(AgentProfileView::of).map(AgentProfileView::found)
-                .orElseGet(() -> new AgentProfileView(id, null, null, null, null, false, false));
+                .orElseGet(() -> new AgentProfileView(id, null, null, null, null, null, false, false));
     }
 
     /** Full record incl. key by id. Server-side only. */
@@ -68,7 +68,7 @@ public final class AgentProfileStore {
                 return Optional.empty();
             }
             return Optional.of(new AgentProfile(id, loaded.name(), loaded.baseUrl(), loaded.apiKey(),
-                    loaded.model(), loaded.tool()));
+                    loaded.model(), loaded.tool(), loaded.format()));
         } catch (IOException | RuntimeException e) {
             Logger.warn("unreadable agent-profile {}: {}", path, e.getMessage());
             return Optional.empty();
@@ -136,7 +136,7 @@ public final class AgentProfileStore {
     /** The record as it goes to disk: this store's id, trimmed fields, the key that survived. */
     private static AgentProfile normalised(String id, AgentProfile profile, String apiKey) {
         return new AgentProfile(id, clean(profile.name()), clean(profile.baseUrl()),
-                apiKey == null ? "" : apiKey, clean(profile.model()), profile.tool());
+                apiKey == null ? "" : apiKey, clean(profile.model()), profile.tool(), profile.format());
     }
 
     public void delete(String id) throws IOException {

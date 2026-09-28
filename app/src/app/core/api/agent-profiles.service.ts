@@ -9,6 +9,7 @@ export type AgentProfileView = {
   baseUrl: string;
   model: string;
   tool: string; // claude-code | qwen-code — the agent runtime that drives this profile
+  format: string; // the wire format the endpoint speaks; the tool must be able to speak it
   hasKey: boolean;
   exists?: boolean;
 };
@@ -19,6 +20,7 @@ export type AgentProfileSave = {
   apiKey: string; // blank on edit = keep the stored key
   model: string;
   tool: string;
+  format: string;
 };
 
 /** Agent-profiles CRUD, id-keyed (rename in place; keys write-only). */

@@ -8,6 +8,7 @@ import com.google.gson.JsonObject;
 import tw.mcark.tony.fordism.agentprofile.AgentProfile;
 import tw.mcark.tony.fordism.agentprofile.AgentProfileView;
 import tw.mcark.tony.fordism.agentprofile.AgentTool;
+import tw.mcark.tony.fordism.agentprofile.ApiFormat;
 import tw.mcark.tony.fordism.credential.Credential;
 import tw.mcark.tony.fordism.credential.CredentialView;
 import tw.mcark.tony.fordism.skill.SkillView;
@@ -161,10 +162,10 @@ class ApiShapeTest {
     void an_agent_profile_never_carries_the_key_itself() {
         AgentProfileView view = AgentProfileView.of(
                 new AgentProfile("p1", "claude-prod", "https://api.anthropic.com", "sk-secret",
-                        "claude-opus", AgentTool.CLAUDE_CODE));
-        assertEquals(expect("id", "name", "baseUrl", "model", "tool", "hasKey"), fieldsOf(view));
+                        "claude-opus", AgentTool.CLAUDE_CODE, ApiFormat.ANTHROPIC));
+        assertEquals(expect("id", "name", "baseUrl", "model", "tool", "format", "hasKey"), fieldsOf(view));
         assertFalse(GSON.toJson(view).contains("sk-secret"));
-        assertEquals(expect("id", "name", "baseUrl", "model", "tool", "hasKey", "exists"),
+        assertEquals(expect("id", "name", "baseUrl", "model", "tool", "format", "hasKey", "exists"),
                 fieldsOf(view.found()));
     }
 
