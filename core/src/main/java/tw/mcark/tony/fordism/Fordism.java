@@ -25,6 +25,8 @@ import tw.mcark.tony.fordism.model.task.Task;
 import tw.mcark.tony.fordism.model.workflow.Workflow;
 import tw.mcark.tony.fordism.orchestrate.Engine;
 import tw.mcark.tony.fordism.orchestrate.ReconcileLoop;
+import tw.mcark.tony.fordism.proxy.TranscriptRecorder;
+import tw.mcark.tony.fordism.proxy.UsageProxy;
 import tw.mcark.tony.fordism.parse.WorkflowLoader;
 import tw.mcark.tony.fordism.skill.SkillPluginStore;
 import tw.mcark.tony.fordism.skill.SkillState;
@@ -96,8 +98,18 @@ public final class Fordism {
         loop.setDaemon(true);
         loop.start();
 
+        if (configuration.transcript && configuration.proxyUrl.isBlank()) {
+            Logger.warn("FORDISM_TRANSCRIPT is on but FORDISM_PROXY_URL is not set: no transcript will be written");
+        }
+        java.util.Optional<TranscriptRecorder> transcripts = configuration.transcript
+                ? java.util.Optional.of(new TranscriptRecorder(configuration.transcriptFiles))
+                : java.util.Optional.empty();
+        // The proxy is handed the credential VALUES a task was granted so the transcript can redact
+        // them: an agent that pastes a token into a prompt would otherwise have it written to disk.
+        UsageProxy proxy = new UsageProxy(tasks, models, transcripts,
+                task -> credentials.values(task.credentials).values());
         new App(engine, configuration, templates, results, archive, skills, skillPlugins, profiles, secrets, credentials,
-                accounts).start();
+                accounts, proxy).start();
         Logger.info("fordism-core up version={} gitSha={}", configuration.version, configuration.gitSha);
     }
 

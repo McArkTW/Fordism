@@ -33,6 +33,7 @@ public final class Task {
     public String workspacePath;              // container-side path core reads (…/result)
     public String hostWorkspacePath;          // host-side path bind-mounted into the agent
     public String containerId;
+    public String proxyToken;                 // the key a proxied tool holds instead of the profile's; valid only for this task
     public String summary;
     public String verdict;                    // the agent's one-word answer, when it wrote one
     public String error;

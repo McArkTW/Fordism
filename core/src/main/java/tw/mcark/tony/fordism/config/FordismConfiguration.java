@@ -37,6 +37,18 @@ public final class FordismConfiguration {
     public final String agentImageTag = env("FORDISM_AGENT_IMAGE_TAG", "local");
     public final String dockerCmd = env("FORDISM_DOCKER_CMD", "docker");
 
+    // Core's model proxy, as an agent container reaches it — e.g. http://fordism-core:8080. Set,
+    // every agent on the launcher network sends its model calls through core, which records their
+    // token usage in the task's result/logs/usage.jsonl and swaps the real key in. Empty (the
+    // default), agents call the provider directly and nothing about the old path changes.
+    public final String proxyUrl = env("FORDISM_PROXY_URL", "");
+
+    // With the proxy on, also write every model call's conversation to result/logs/llm.jsonl, one
+    // format for every tool, redacted. Off by default: it stores what the agent read and wrote.
+    // _FILES additionally saves inline images and PDFs to result/logs/llm-files/.
+    public final boolean transcript = env("FORDISM_TRANSCRIPT", "").equalsIgnoreCase("on");
+    public final boolean transcriptFiles = env("FORDISM_TRANSCRIPT_FILES", "").equalsIgnoreCase("on");
+
     // Agent container edge. The agent has full control INSIDE its container — it installs
     // packages and runs project test suites, which is the point — so nothing here restricts what
     // it does with /workspace. These bound only what a compromised agent could do to the HOST:

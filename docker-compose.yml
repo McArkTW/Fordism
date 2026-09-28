@@ -40,6 +40,14 @@ services:
       FORDISM_AGENT_IMAGE_TAG: ${FORDISM_AGENT_IMAGE_TAG:-}
       # Workspace-relative files holding a live API key, deleted when the task ends.
       FORDISM_CREDENTIAL_FILES: ${FORDISM_CREDENTIAL_FILES:-.reasonix/.env}
+      # Core's model proxy, as agents reach it (e.g. http://fordism-core:8080). Set, every agent's
+      # model calls go through core, which records token usage per task and holds the real provider
+      # key. Empty (the default), agents call providers directly, exactly as before.
+      FORDISM_PROXY_URL: ${FORDISM_PROXY_URL:-}
+      # With the proxy on: write each task's model conversation to result/logs/llm.jsonl (redacted),
+      # and with _FILES also its inline images/PDFs. Both off unless set to "on".
+      FORDISM_TRANSCRIPT: ${FORDISM_TRANSCRIPT:-}
+      FORDISM_TRANSCRIPT_FILES: ${FORDISM_TRANSCRIPT_FILES:-}
       FORDISM_LAUNCHER_MAX: ${FORDISM_LAUNCHER_MAX:-4}
       # The gid the agent image runs as; a staged workspace is handed to this group.
       FORDISM_AGENT_GID: ${FORDISM_AGENT_GID:-1001}

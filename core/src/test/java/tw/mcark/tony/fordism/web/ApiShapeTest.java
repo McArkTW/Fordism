@@ -66,7 +66,7 @@ class ApiShapeTest {
     void a_task_carries_everything_the_run_page_renders() {
         Views.TaskDetail task = new Views.TaskDetail("t1", 0, "COLLECTED", "probe-rw", "s1", "/ws",
                 "did it", "pass", 1L, 1, "boom", "which one?", List.of("GITHUB_TOKEN"),
-                List.of("HP_PASSWORD"), 42L, new TokenUsage(1, 2, 3, 4));
+                List.of("HP_PASSWORD"), 42L, TokenUsage.of(new TokenUsage.Counts(1, 2, 3, 4), 5));
         assertEquals(expect("taskId", "step", "state", "template", "session", "workspace", "summary",
                 "verdict", "createdAt", "attempt", "error", "question", "secretsRequested",
                 "secretsHeld", "durationMs", "usage"), fieldsOf(task));
@@ -86,10 +86,15 @@ class ApiShapeTest {
 
     @Test
     void token_usage_keeps_the_provider_spelling() {
-        JsonObject usage = GSON.toJsonTree(new TokenUsage(10, 20, 30, 2)).getAsJsonObject();
-        assertEquals(expect("input_tokens", "output_tokens", "total", "turns"),
+        JsonObject usage = GSON.toJsonTree(TokenUsage.of(new TokenUsage.Counts(10, 20, 30, 40), 2)).getAsJsonObject();
+        assertEquals(expect("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens",
+                        "output_tokens", "total", "turns"),
                 new TreeSet<>(usage.keySet()));
         assertEquals(10, usage.get("input_tokens").getAsLong());
+        assertEquals(20, usage.get("cache_creation_input_tokens").getAsLong());
+        assertEquals(30, usage.get("cache_read_input_tokens").getAsLong());
+        // Total is the sum of all four, not of the uncached two: the classes are disjoint.
+        assertEquals(100, usage.get("total").getAsLong());
     }
 
     @Test

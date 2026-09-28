@@ -38,7 +38,8 @@ workspace — there is no callback and no queue. Core polls for that file.
 
 3. **Add an Agent Profile.** A profile is where a model provider lives: a `baseUrl`, a write-only API
    key, a model, and the `tool` that drives the task (`claude-code` or `qwen-code`). There is no
-   gateway; agents call the provider directly. Define exactly one profile and it becomes the default
+   gateway by default; agents call the provider directly (see the usage proxy in the README to put
+   core in front of those calls). Define exactly one profile and it becomes the default
    for everything.
 
 4. **Run an example.** Workflows → `linear-example` → Run. Watch it on the Live page, then open the

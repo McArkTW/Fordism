@@ -2,13 +2,16 @@ package tw.mcark.tony.fordism.launch;
 
 import tw.mcark.tony.fordism.config.FordismConfiguration;
 import tw.mcark.tony.fordism.credential.CredentialStore;
+import tw.mcark.tony.fordism.model.task.NetworkPolicy;
 import tw.mcark.tony.fordism.model.task.Task;
+import tw.mcark.tony.fordism.proxy.UsageProxy;
 import tw.mcark.tony.fordism.secret.SecretVault;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.LinkedHashMap;
+import java.util.UUID;
 import java.util.Map;
 import org.tinylog.Logger;
 import java.util.ArrayList;
@@ -44,9 +47,27 @@ public final class DockerContainerLauncher implements ContainerLauncher {
 
         Path envFile = writeEnvFile(name, env);
         try {
-            ProcessResult result = Proc.run(runCommand(task, name, envFile), 60);
-            if (result.exit() != 0) {
-                throw new IOException("docker run failed: " + result.err());
+            // create, (join), start — not `run -d`. A proxied task on the "full" network sits on
+            // docker's bridge for internet access, where core is unreachable, so it must also join
+            // the launcher network before its first model call. Joining after `run` would race the
+            // tool's startup, and a tool that fails its first call does not retry it.
+            ProcessResult created = Proc.run(runCommand(task, name, envFile), 60);
+            if (created.exit() != 0) {
+                throw new IOException("docker create failed: " + created.err());
+            }
+            if (proxied(task) && task.config.network() == NetworkPolicy.FULL) {
+                ProcessResult joined = Proc.run(List.of(configuration.dockerCmd, "network", "connect",
+                        configuration.launcherNetwork, name), 60);
+                if (joined.exit() != 0) {
+                    remove(name);   // it holds only a task token that nothing else would honour
+                    throw new IOException("could not join " + name + " to " + configuration.launcherNetwork
+                            + " to reach the proxy: " + joined.err());
+                }
+            }
+            ProcessResult started = Proc.run(List.of(configuration.dockerCmd, "start", name), 60);
+            if (started.exit() != 0) {
+                remove(name);
+                throw new IOException("docker start failed: " + started.err());
             }
             return name;
         } finally {
@@ -73,7 +94,7 @@ public final class DockerContainerLauncher implements ContainerLauncher {
      */
     List<String> runCommand(Task task, String name, Path envFile) {
         List<String> cmd = new ArrayList<>(List.of(
-                configuration.dockerCmd, "run", "-d", "--name", name,
+                configuration.dockerCmd, "create", "--name", name,
                 "--network", task.config.network().dockerNetwork(configuration.launcherNetwork),
                 "--cap-drop", "ALL",
                 "--security-opt", "no-new-privileges",
@@ -127,20 +148,35 @@ public final class DockerContainerLauncher implements ContainerLauncher {
         if (task.resumeMessage != null && !task.resumeMessage.isBlank()) {
             env.put("RESUME_PROMPT", task.resumeMessage);
         }
+        // Proxied, the tool holds a per-task token instead of the profile's key and is pointed at
+        // core (FORDISM_PROXY), which swaps the real key back in on the way out. The endpoint
+        // variables still carry the profile's real URL: the entrypoint decides each tool's route
+        // from the real host, then swaps the origin for FORDISM_PROXY. A task with network "none"
+        // reaches nothing at all, so it keeps its real settings and the proxy stays out of it —
+        // which also means the profile's key is only ever handed to a container that could not
+        // have used the proxy anyway.
+        String key = backend.authToken();
+        if (proxied(task)) {
+            if (task.proxyToken == null) {
+                task.proxyToken = UUID.randomUUID().toString();
+            }
+            key = task.proxyToken;
+            env.put("FORDISM_PROXY", configuration.proxyUrl.replaceAll("/+$", "") + UsageProxy.PREFIX + task.id);
+        }
         // The environment follows the model DIALECT, not the tool: every OpenAI-compatible CLI
         // reads the same OPENAI_* names, so adding one is an enum line, not a branch here.
         switch (backend.dialect()) {
             case ANTHROPIC -> {
                 env.put("ANTHROPIC_BASE_URL", backend.baseUrl());
-                env.put("ANTHROPIC_AUTH_TOKEN", backend.authToken());
+                env.put("ANTHROPIC_AUTH_TOKEN", key);
             }
             case OPENAI -> {
                 env.put("OPENAI_BASE_URL", backend.baseUrl());
-                env.put("OPENAI_API_KEY", backend.authToken());
+                env.put("OPENAI_API_KEY", key);
                 env.put("OPENAI_MODEL", backend.model());
             }
             case GOOGLE -> {
-                env.put("GEMINI_API_KEY", backend.authToken());
+                env.put("GEMINI_API_KEY", key);
                 // gemini-cli hits Google's endpoint by default; a profile baseUrl overrides it.
                 if (backend.baseUrl() != null && !backend.baseUrl().isBlank()) {
                     env.put("GOOGLE_GEMINI_BASE_URL", backend.baseUrl());
@@ -171,6 +207,15 @@ public final class DockerContainerLauncher implements ContainerLauncher {
             env.put("GH_TOKEN", env.get("GITHUB_TOKEN"));
         }
         return env;
+    }
+
+    /**
+     * Whether this task's model calls go through core's proxy: it is configured, and the task has a
+     * network at all. A "full" task is joined to the launcher network in {@link #launch} to reach
+     * it; a "none" task could not reach core even if it wanted to.
+     */
+    private boolean proxied(Task task) {
+        return !configuration.proxyUrl.isBlank() && task.config.network() != NetworkPolicy.NONE;
     }
 
     /** The rescue-secret keys this task may receive: what its template declared, plus what it was answered. */

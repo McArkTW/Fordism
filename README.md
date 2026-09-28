@@ -47,7 +47,7 @@ flowchart LR
   follows the tool's dialect — Anthropic, OpenAI-compatible, or Google — so adding another
   CLI is one enum line, not a new code path. Every tool has its own image, a shared base
   plus that one CLI, so a task pulls only what it will run and nothing else shares its
-  `$HOME`. No LLM gateway — agents call providers directly.
+  `$HOME`. No LLM gateway by default — agents call providers directly.
   Same-session resume — human-in-the-loop, rework, and the self-heal loop — works across
   runtimes: the session store lives under the host-mounted workspace, so a later container
   resumes what an earlier one started.
@@ -78,9 +78,31 @@ Four decisions, each one a bet you can argue with:
    the YAML, not by trust.
 
 What it does **not** do, on purpose: no database (state is in memory behind a store port
-and snapshots to disk), no LLM gateway (agents call their provider directly), no message
-queue (the filesystem is the protocol). Each of those is a dependency someone would have
-to operate, and none of them is needed to run a backlog honestly.
+and snapshots to disk), no LLM gateway *service* (agents call their provider directly, and the
+optional usage proxy below is core itself, not another container to run), no message queue (the
+filesystem is the protocol). Each of those is a dependency someone would have to operate, and none
+of them is needed to run a backlog honestly.
+
+### The usage proxy (optional, off by default)
+
+Set `FORDISM_PROXY_URL` and an agent's model calls go through core instead of straight to the
+provider. Core forwards each call to the profile's real endpoint, streams the response back
+byte-for-byte, and records what it cost. It buys three things that cannot be had otherwise:
+
+- **Token usage in one format for every tool.** Read off the wire, not out of each CLI's own log,
+  so a tool nobody has written a parser for still reports what it spent. It lands in the task's
+  `result/logs/usage.jsonl`, one append-only line per call — a container killed mid-run still
+  leaves every completed call counted, and a retried attempt keeps its own lines, because that
+  attempt was billed too.
+- **The agent never holds the real key.** A proxied task is handed a token core minted for that
+  one task; core swaps it for the provider key on the way out and refuses the token anywhere else.
+- **One transcript shape across tools**, with `FORDISM_TRANSCRIPT=on` — `result/logs/llm.jsonl`,
+  credential values redacted. Off by default, because it stores what the agent read and wrote.
+
+The usage tap cannot affect the bytes a tool receives: the tool is written to first and handed a
+copy, and nothing thrown while reading it escapes — a response core cannot parse loses its metric,
+never its content. A step with `network: none` is never proxied; it could not reach core anyway,
+and it keeps talking to its provider exactly as before.
 
 ## Repository layout
 

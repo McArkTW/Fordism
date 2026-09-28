@@ -40,11 +40,18 @@ class TaskResultsUsageTest {
 
         TokenUsage usage = results.usage(task);
 
-        // 900 cache_read_input_tokens are deliberately absent: they are a breakdown of the input the
-        // provider already reported, so adding them would double-bill every cached turn.
+        // The 900 cache_read_input_tokens ARE counted, and are their own class. This test used to
+        // assert the opposite — that they were a breakdown of input_tokens already reported, so
+        // counting them would double-bill — and that is the wrong way round: the Anthropic API
+        // documents input_tokens as the input which was neither read from nor written to the cache.
+        // The three classes are disjoint, so leaving the cache out did not avoid double-billing, it
+        // silently dropped most of a long run's cost. On an agent run the cache classes are nearly
+        // all of it.
         assertEquals(4400L, usage.inputTokens());
+        assertEquals(900L, usage.cacheReadTokens());
+        assertEquals(0L, usage.cacheWriteTokens());
         assertEquals(240L, usage.outputTokens());
-        assertEquals(4640L, usage.total());
+        assertEquals(5540L, usage.total());
         assertEquals(3L, usage.turns(), "one turn per usage block, not per line");
     }
 

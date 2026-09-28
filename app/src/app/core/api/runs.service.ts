@@ -35,9 +35,16 @@ export type RunFilter = {
  */
 export type RunPage = { runs: RunSummary[]; nextCursor: string | null };
 
-/** Token accounting a task reports, or null when the agent produced none. */
+/**
+ * Token accounting a task reports, or null when the agent produced none. The three input classes
+ * are disjoint and bill at different rates: input_tokens is only what was neither read from nor
+ * written to the cache, so total is the sum of all four numbers, not of the uncached two. On a long
+ * agent run the cache classes are nearly all of it.
+ */
 export type TaskUsage = {
   input_tokens: number;
+  cache_creation_input_tokens: number;
+  cache_read_input_tokens: number;
   output_tokens: number;
   total: number;
   turns: number;
