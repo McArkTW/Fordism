@@ -5,18 +5,21 @@ parameters: [change]
 steps:
   - id: classify
     template: generic
+    config: {network: full}   # the agent reaches its model provider; the default is none
     task: |
       Does this change touch security-sensitive code? Answer exactly "yes"
       or "no":
       ${change}
   - id: security-review
     template: generic
+    config: {network: full}   # the agent reaches its model provider; the default is none
     when: classify.result == 'yes'
     task: |
       Perform a security review of this change and list any findings:
       ${change}
   - id: summary
     template: generic
+    config: {network: full}   # the agent reaches its model provider; the default is none
     task: |
       Briefly summarize this change and note whether a security review was
       needed:

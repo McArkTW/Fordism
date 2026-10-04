@@ -4,6 +4,10 @@
 FROM eclipse-temurin:25-jdk AS build
 WORKDIR /src
 COPY core ./core
+# EveryToolIsBuildableTest checks each AgentTool against its image recipe, entrypoint branch and
+# compose service, which live outside core/.
+COPY agent ./agent
+COPY docker-compose.yml docker-compose.override.yml ./
 WORKDIR /src/core
 # The wrapper's distribution download is fetched here, and under QEMU it is slow enough to hit
 # the JDK's default socket timeouts — the v1.0.0 release build died in exactly this line, in

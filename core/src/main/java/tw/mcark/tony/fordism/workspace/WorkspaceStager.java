@@ -1,6 +1,7 @@
 package tw.mcark.tony.fordism.workspace;
 
 import tw.mcark.tony.fordism.config.FordismConfiguration;
+import tw.mcark.tony.fordism.launch.ModelRegistry;
 import tw.mcark.tony.fordism.launch.Proc;
 import tw.mcark.tony.fordism.launch.ProcessResult;
 import tw.mcark.tony.fordism.model.task.Task;
@@ -12,6 +13,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -26,9 +28,16 @@ import org.tinylog.Logger;
  */
 public final class WorkspaceStager {
     private final FordismConfiguration configuration;
+    private final ModelRegistry models;
 
+    /** No profiles: config.json carries the step's own model. */
     public WorkspaceStager(FordismConfiguration configuration) {
+        this(configuration, new ModelRegistry(configuration, name -> Optional.empty(), Optional::empty));
+    }
+
+    public WorkspaceStager(FordismConfiguration configuration, ModelRegistry models) {
         this.configuration = configuration;
+        this.models = models;
     }
 
     public Path stage(Task task, TemplateStore templates) throws IOException {
@@ -37,9 +46,13 @@ public final class WorkspaceStager {
         clearResult(workspace.resolve("result"));
         Files.createDirectories(workspace.resolve("result"));
         TaskConfiguration config = task.config;
+        // The model the entrypoint hands the CLI is the one the launcher resolved — the profile's
+        // own model wins — not the step's, which defaults to qwen3 and would reach a claude-code
+        // profile on api.anthropic.com as a model it has never heard of.
+        String model = models.backend(task.agentProfile, config.model()).model();
         Files.writeString(workspace.resolve("config.json"),
                 String.format("{\"model\":\"%s\",\"timeout\":%d,\"network\":\"%s\"}",
-                        config.model(), config.timeoutSeconds(), config.network().name().toLowerCase()));
+                        model, config.timeoutSeconds(), config.network().name().toLowerCase()));
         templates.stageInto(task.template, workspace);
         if (task.taskZipPath != null) {
             unzipInto(Paths.get(task.taskZipPath), workspace.resolve("task"));   // uploaded inputs

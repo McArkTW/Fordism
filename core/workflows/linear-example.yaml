@@ -5,11 +5,13 @@ parameters: [requirement]
 steps:
   - id: draft
     template: generic
+    config: {network: full}   # the agent reaches its model provider; the default is none
     task: |
       Draft a user story for this requirement:
       ${requirement}
   - id: review
     template: generic
+    config: {network: full}   # the agent reaches its model provider; the default is none
     task: |
       Review the user story in task/previous-result/answer_work.txt against
       INVEST and acceptance criteria. Answer pass or fail with reasons.

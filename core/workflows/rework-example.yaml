@@ -5,12 +5,14 @@ parameters: [requirement]
 steps:
   - id: work
     template: generic
+    config: {network: full}   # the agent reaches its model provider; the default is none
     task: |
       Write a Python function that satisfies this requirement, and save it
       to answer_work.txt:
       ${requirement}
   - id: gate
     template: generic
+    config: {network: full}   # the agent reaches its model provider; the default is none
     task: |
       Review the function in task/previous-result/answer_work.txt.
       If it fully meets the requirement, answer "pass". Otherwise answer
