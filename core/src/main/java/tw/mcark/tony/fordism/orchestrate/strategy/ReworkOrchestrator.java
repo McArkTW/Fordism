@@ -121,8 +121,11 @@ public final class ReworkOrchestrator implements Orchestrator {
             if (onFail.mode() == ReworkMode.RESUME && resumable) {
                 engine.resumeTask(retryTask, nextAttempt, correction);
             } else {
+                // Staged whatever the step declared: a work step rarely sets includePreviousResult,
+                // and without this the retry got its last workspace's path but not its contents,
+                // so every attempt started from nothing.
                 engine.seedTask(run, TaskSeed.of(retryIndex, retryStep, run.parameterValues,
-                        retryTask == null ? null : retryTask.workspacePath, nextAttempt));
+                        retryTask == null ? null : retryTask.workspacePath, nextAttempt).includingPreviousResult());
             }
             run.currentStepIndex = retryIndex;
             engine.saveRun(run);
