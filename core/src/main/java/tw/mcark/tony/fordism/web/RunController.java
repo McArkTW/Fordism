@@ -241,7 +241,9 @@ public final class RunController {
             ctx.status(404).contentType("application/json").result("{\"error\":\"no transcript\"}");
             return;
         }
-        ctx.contentType("application/x-ndjson").result(transcript);
+        // The charset is not optional: Jetty encodes a String body for a type it does not know as text
+        // in ISO-8859-1, so every em dash and middle dot reached the browser as a lone, undecodable byte.
+        ctx.contentType("application/x-ndjson; charset=utf-8").result(transcript);
     }
 
     /**
