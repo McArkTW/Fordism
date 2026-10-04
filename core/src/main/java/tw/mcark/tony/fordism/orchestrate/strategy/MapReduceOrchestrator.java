@@ -11,6 +11,7 @@ import tw.mcark.tony.fordism.orchestrate.Engine;
 import tw.mcark.tony.fordism.orchestrate.Orchestrator;
 import java.util.Optional;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -49,10 +50,17 @@ public final class MapReduceOrchestrator implements Orchestrator {
         int reduceIndex = items.size();
         Optional<Task> reduceTask = engine.currentTask(run, reduceIndex);
         if (reduceTask.isEmpty()) {
-            // The reduce step reads the FIRST map task's workspace, not the one before it in index
-            // order — which is the map fan-out's last item, and not what "previous" means here.
+            // The reduce reads EVERY map task's result, one folder per item, numbered so two items
+            // that sanitise to the same name stay apart. previousWorkspace stays the first map task,
+            // for anything that still reads the single-predecessor field.
+            Map<String, String> mapped = new LinkedHashMap<>();
+            for (int k = 0; k < items.size(); k++) {
+                String label = (k + 1) + "-" + items.get(k).trim();
+                engine.currentTask(run, k).ifPresent(map -> mapped.put(label, map.workspacePath));
+            }
             String firstMapWorkspace = engine.currentTask(run, 0).map(first -> first.workspacePath).orElse(null);
-            engine.seedTask(run, TaskSeed.of(reduceIndex, reduceStep, run.parameterValues, firstMapWorkspace, 1));
+            engine.seedTask(run, TaskSeed.of(reduceIndex, reduceStep, run.parameterValues, firstMapWorkspace, 1)
+                    .withFanIn(mapped));
             return;
         }
         switch (reduceTask.get().state) {

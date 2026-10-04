@@ -13,6 +13,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
@@ -60,18 +61,43 @@ public final class WorkspaceStager {
         // Written after the unzip: the workflow defines the task, and an uploaded file must not be
         // able to replace it by being named task.md.
         Files.writeString(workspace.resolve("task/task.md"), task.taskText == null ? "" : task.taskText);
-        if (task.includePreviousResult && task.previousWorkspace != null) {
-            Path previous = Paths.get(task.previousWorkspace, "result");
-            if (Files.isDirectory(previous)) {
-                Path into = workspace.resolve("task/previous-result");
-                Files.createDirectories(into);
-                TemplateStore.copyDir(previous, into);
-            }
+        if (task.includePreviousResult) {
+            stagePrevious(task, workspace.resolve("task/previous-result"));
         }
         task.workspacePath = workspace.toString();
         task.hostWorkspacePath = Paths.get(configuration.workspacesHost, task.id).toString();
         groupWritable(workspace);
         return workspace;
+    }
+
+    /**
+     * The predecessors' {@code result/} under {@code into}. One predecessor is copied flat, as it
+     * always was. Several (a reduce over its map tasks, a join over its dependencies) each get a
+     * folder named by their label: copying them all flat would let the last overwrite the rest, and
+     * staging only the first is how a reduce came to summarise one item out of three.
+     */
+    static void stagePrevious(Task task, Path into) throws IOException {
+        if (task.fanInWorkspaces != null && !task.fanInWorkspaces.isEmpty()) {
+            for (Map.Entry<String, String> source : task.fanInWorkspaces.entrySet()) {
+                copyResult(source.getValue(), into.resolve(folderName(source.getKey())));
+            }
+        } else if (task.previousWorkspace != null) {
+            copyResult(task.previousWorkspace, into);
+        }
+    }
+
+    private static void copyResult(String workspace, Path into) throws IOException {
+        Path result = Paths.get(workspace, "result");
+        if (Files.isDirectory(result)) {
+            Files.createDirectories(into);
+            TemplateStore.copyDir(result, into);
+        }
+    }
+
+    /** A label as one safe path segment: a map item is free text and must not climb out of task/. */
+    static String folderName(String label) {
+        String safe = label.replaceAll("[^A-Za-z0-9._-]+", "-").replaceAll("^[.-]+|-+$", "");
+        return safe.isEmpty() ? "_" : safe;
     }
 
     /**

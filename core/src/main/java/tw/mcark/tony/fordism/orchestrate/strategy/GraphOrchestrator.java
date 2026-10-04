@@ -9,6 +9,8 @@ import tw.mcark.tony.fordism.model.workflow.Step;
 import tw.mcark.tony.fordism.model.workflow.Workflow;
 import tw.mcark.tony.fordism.orchestrate.Engine;
 import tw.mcark.tony.fordism.orchestrate.Orchestrator;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 
 /** Seed every step whose dependsOn are all COLLECTED; fan-out + join; done when all collected. */
@@ -25,6 +27,7 @@ public final class GraphOrchestrator implements Orchestrator {
             }
             boolean depsReady = true;
             String firstDepWorkspace = null;
+            Map<String, String> dependencies = new LinkedHashMap<>();
             for (String dependency : step.dependsOn()) {
                 // The loader guarantees the id resolves, so an absent task here means "not seeded
                 // yet", never "misspelled".
@@ -32,14 +35,19 @@ public final class GraphOrchestrator implements Orchestrator {
                         .filter(candidate -> candidate.state == TaskState.COLLECTED);
                 if (dependencyTask.isEmpty()) {
                     depsReady = false;
-                } else if (firstDepWorkspace == null) {
-                    firstDepWorkspace = dependencyTask.get().workspacePath;
+                } else {
+                    if (firstDepWorkspace == null) {
+                        firstDepWorkspace = dependencyTask.get().workspacePath;
+                    }
+                    dependencies.put(dependency, dependencyTask.get().workspacePath);
                 }
             }
             if (planted.isEmpty() && depsReady) {
-                // A graph step's "previous" is its first collected dependency, not the step before
-                // it in the list — so this one seeds directly rather than through seedStep.
-                engine.seedTask(run, TaskSeed.of(i, step, run.parameterValues, firstDepWorkspace, 1));
+                // A graph step's "previous" is its dependencies, not the step before it in the list,
+                // so this one seeds directly rather than through seedStep. A join over several gets
+                // each in its own folder, named by step id; one dependency is staged flat as before.
+                TaskSeed seed = TaskSeed.of(i, step, run.parameterValues, firstDepWorkspace, 1);
+                engine.seedTask(run, dependencies.size() > 1 ? seed.withFanIn(dependencies) : seed);
             }
             if (planted.filter(candidate -> candidate.state == TaskState.COLLECTED).isEmpty()) {
                 allCollected = false;

@@ -93,7 +93,7 @@ steps:
 | `id` | Names the step so other steps can reference it. |
 | `template` | The Agent Template that supplies skills, credentials, and standing instructions. |
 | `task` | The instruction written to `task/task.md`. Use a block scalar for anything multi-line. |
-| `includePreviousResult` | Mounts the previous step's `result/` at `task/previous-result/`. |
+| `includePreviousResult` | Mounts the previous step's `result/` at `task/previous-result/`. A step fed by several (a `map-reduce` reduce, a `graph` step with more than one `dependsOn`) gets one folder each: `task/previous-result/<n>-<item>/` or `task/previous-result/<step-id>/`. |
 | `dependsOn` | `graph` only — the step ids that must collect first. |
 | `when` | `conditional` only — a predicate, e.g. `classify.result == 'yes'`. |
 | `forEach` | `map-reduce` only — fans out over a list parameter; each task sees `${item}`. |
@@ -189,7 +189,7 @@ agents already know it — it is here so you know it too.
 | Path | Contents |
 |---|---|
 | `task/task.md` | The task itself. Other files under `task/` are its inputs. |
-| `task/previous-result/` | The previous step's output, when `includePreviousResult` is set. |
+| `task/previous-result/` | The previous step's output, when `includePreviousResult` is set; one sub-folder per predecessor when there are several. |
 | `skills/` | Reusable capabilities the template selected. |
 | `memory/` | Presets the agent treats as ground truth. |
 | `result/` | Everything the agent produces, including its result file. |

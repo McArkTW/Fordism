@@ -162,6 +162,7 @@ public final class Engine {
         task.taskText = seed.taskText();
         task.includePreviousResult = seed.includePreviousResult();
         task.previousWorkspace = seed.previousWorkspace();
+        task.fanInWorkspaces = seed.fanIn().isEmpty() ? null : seed.fanIn();
         task.config = seed.config();
         task.attempt = seed.attempt();
         if (seed.stepIndex() == 0 && run.taskZipPath != null) {

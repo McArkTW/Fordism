@@ -13,5 +13,6 @@ steps:
     template: generic
     config: {network: full}   # the agent reaches its model provider; the default is none
     task: |
-      Combine the per-topic summaries into a single short overview.
+      Combine the per-topic summaries in task/previous-result/ (one folder per
+      topic) into a single short overview.
     includePreviousResult: true

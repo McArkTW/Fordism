@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import tw.mcark.tony.fordism.model.run.WorkflowRun;
 import tw.mcark.tony.fordism.model.run.WorkflowRunState;
 import tw.mcark.tony.fordism.model.task.TaskState;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
@@ -76,6 +77,21 @@ class MapReduceOrchestratorTest {
         harness.reconcile(run);
 
         assertEquals(harness.at(run, 0).workspacePath, harness.at(run, 3).previousWorkspace);
+    }
+
+    @Test
+    void the_reduce_is_fed_every_map_result_labelled_by_item() {
+        WorkflowRun run = threeItems();
+        harness.reconcile(run);
+        harness.collect(run, 0);
+        harness.collect(run, 1);
+        harness.collect(run, 2);
+        harness.reconcile(run);
+
+        Map<String, String> fanIn = harness.at(run, 3).fanInWorkspaces;
+        assertEquals(List.of("1-alpha", "2-beta", "3-gamma"), List.copyOf(fanIn.keySet()));
+        assertEquals(List.of(harness.at(run, 0).workspacePath, harness.at(run, 1).workspacePath,
+                harness.at(run, 2).workspacePath), List.copyOf(fanIn.values()));
     }
 
     @Test

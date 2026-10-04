@@ -1,6 +1,7 @@
 package tw.mcark.tony.fordism.model.task;
 
 import java.util.List;
+import java.util.Map;
 
 /** A live task instance (mutable — state advances over its lifecycle). */
 public final class Task {
@@ -25,6 +26,7 @@ public final class Task {
     public String taskText;
     public boolean includePreviousResult;
     public String previousWorkspace;          // container-side path of the previous step's workspace
+    public Map<String, String> fanInWorkspaces; // label -> workspace, when several predecessors feed this one
     public String taskZipPath;                // optional task.zip to unzip into this task's task/
     public TaskMode mode = TaskMode.WORK;     // resume skips staging and continues the session
     public TaskConfiguration config = TaskConfiguration.defaults();

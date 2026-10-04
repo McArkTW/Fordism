@@ -14,5 +14,8 @@ steps:
   - id: synthesize
     template: generic
     config: {network: full}   # the agent reaches its model provider; the default is none
-    task: Weigh the pros and cons of ${topic} and give a recommendation.
+    task: |
+      Weigh the pros and cons of ${topic} in task/previous-result/research-pros/ and
+      task/previous-result/research-cons/, and give a recommendation.
     dependsOn: [research-pros, research-cons]
+    includePreviousResult: true
