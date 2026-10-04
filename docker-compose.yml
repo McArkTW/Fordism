@@ -34,19 +34,19 @@ services:
       FORDISM_COOKIE_SECURE: ${FORDISM_COOKIE_SECURE:-false}
       # Launcher. FORDISM_LAUNCHER_NETWORK must name a network the agent can reach core on —
       # the env files point it at this project's `internal` (e.g. uat_internal).
-      FORDISM_LAUNCHER_NETWORK: ${FORDISM_LAUNCHER_NETWORK:-}
+      FORDISM_LAUNCHER_NETWORK: ${FORDISM_LAUNCHER_NETWORK:-fordism_internal}
       # One image per tool; the launcher appends the tool's wire name to the prefix.
       FORDISM_AGENT_IMAGE_PREFIX: ${FORDISM_AGENT_IMAGE_PREFIX:-}
       FORDISM_AGENT_IMAGE_TAG: ${FORDISM_AGENT_IMAGE_TAG:-}
       # Workspace-relative files holding a live API key, deleted when the task ends.
       FORDISM_CREDENTIAL_FILES: ${FORDISM_CREDENTIAL_FILES:-.reasonix/.env}
-      # Core's model proxy, as agents reach it (e.g. http://fordism-core:8080). Set, every agent's
-      # model calls go through core, which records token usage per task and holds the real provider
-      # key. Empty (the default), agents call providers directly, exactly as before.
-      FORDISM_PROXY_URL: ${FORDISM_PROXY_URL:-}
-      # With the proxy on: write each task's model conversation to result/logs/llm.jsonl (redacted),
-      # and with _FILES also its inline images/PDFs. Both off unless set to "on".
-      FORDISM_TRANSCRIPT: ${FORDISM_TRANSCRIPT:-}
+      # Core's model proxy, as agents reach it. On by default: every agent's model calls go through
+      # core, which records token usage per task and holds the real provider key. "off" turns it off,
+      # and agents call providers directly.
+      FORDISM_PROXY_URL: ${FORDISM_PROXY_URL:-http://fordism-core:8080}
+      # With the proxy on: write each task's model conversation to result/logs/llm.jsonl (redacted) —
+      # on unless "off" — and with _FILES, off unless "on", also its inline images/PDFs.
+      FORDISM_TRANSCRIPT: ${FORDISM_TRANSCRIPT:-on}
       FORDISM_TRANSCRIPT_FILES: ${FORDISM_TRANSCRIPT_FILES:-}
       FORDISM_LAUNCHER_MAX: ${FORDISM_LAUNCHER_MAX:-4}
       # The gid the agent image runs as; a staged workspace is handed to this group.
