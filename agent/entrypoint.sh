@@ -197,6 +197,20 @@ case "$ATYPE" in
     printf 'provider add profile --type %s --base-url "%s" --api-key "$PROFILE_API_KEY"\nmodel add "profile/%s" --context-window 200000 --default-max-tokens 32000\nmodel large "profile/%s"\noption request-timeout 600\n' \
       "$CTYPE" "$CBASE" "$P_MODEL" "$P_MODEL" > "$WS/.config/crush/crushrc"
     ;;
+  cline)
+    # Cline's default provider is its own hosted one, which wants a Cline account: unconfigured, it
+    # exits rc 1 with "Unauthorized ... re-authenticate your Cline account". The CLI reads no
+    # CLINE_BASE_URL, and `cline auth` refuses a base URL for anthropic and writes the key into the
+    # file — so providers.json is written here instead. lastUsedProvider is what a run without -P
+    # picks; passing -P/-m instead would re-save the provider and drop its baseUrl. The anthropic
+    # default base carries /v1, so the root gets it back. No apiKey: each provider falls back to
+    # its own env var (ANTHROPIC_API_KEY / OPENAI_API_KEY), set only on the cline process below.
+    if [ "$P_API" = anthropic ]; then CPROV=anthropic; CBASE="$P_ROOT/v1"; else CPROV=openai-compatible; CBASE="$P_URL"; fi
+    mkdir -p "$WS/.cline/data/settings"
+    printf '{"version":1,"lastUsedProvider":"%s","modes":{},"providers":{"%s":{"settings":{"provider":"%s","model":"%s","baseUrl":"%s"},"updatedAt":"%s","tokenSource":"manual"}}}\n' \
+      "$CPROV" "$CPROV" "$CPROV" "$P_MODEL" "$CBASE" "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" \
+      > "$WS/.cline/data/settings/providers.json"
+    ;;
   continue)
     # apiBase goes in for BOTH providers. Omitting it for anthropic pinned that provider to
     # api.anthropic.com, which answered "invalid x-api-key" for any other endpoint's key. Continue
@@ -218,6 +232,25 @@ case "$ATYPE" in
       "$DAPI" "$DBASE" "$P_MODEL" > "$DSH_HOME/settings.yaml"
     printf -- '- id: agent-default-model\n  config:\n    provider: profile\n    model: %s\n' "$P_MODEL" \
       > "$DSH_HOME/cordis.patch.yml"
+    ;;
+  pi)
+    # `--provider profile` names a custom provider, and pi learns those only from
+    # ~/.pi/agent/models.json. Nothing was written there, so every run died at startup with
+    # 'Unknown provider "profile"'. pi runs with HOME=$WS/.pi, hence the doubled .pi.
+    # apiKey "$PROFILE_KEY" is interpolated from the environment, so the key stays out of the
+    # workspace. The Anthropic SDK appends /v1/messages itself, so it gets the root.
+    # reasoning + forceAdaptiveThinking on the Anthropic route: that is how pi's own catalog
+    # declares current Claude models (claude-sonnet-5 et al.); a custom model defaults to
+    # reasoning:false, which would send no thinking at all.
+    if [ "$P_API" = anthropic ]; then
+      PAPI=anthropic-messages; PBASE="$P_ROOT"; PREASON=true; PMAX=64000
+      PCOMPAT=',"compat":{"forceAdaptiveThinking":true}'
+    else
+      PAPI=openai-completions; PBASE="$P_URL"; PREASON=false; PMAX=32000; PCOMPAT=""
+    fi
+    mkdir -p "$WS/.pi/.pi/agent"
+    printf '{"providers":{"profile":{"baseUrl":"%s","api":"%s","apiKey":"$PROFILE_KEY","models":[{"id":"%s","reasoning":%s,"input":["text"],"contextWindow":200000,"maxTokens":%s%s}]}}}\n' \
+      "$PBASE" "$PAPI" "$P_MODEL" "$PREASON" "$PMAX" "$PCOMPAT" > "$WS/.pi/.pi/agent/models.json"
     ;;
   openclaw)
     # "${PROFILE_API_KEY}" is substituted from the environment when the config loads.
@@ -255,12 +288,15 @@ case "$ATYPE" in
       "$P_API" "$DBASE" "$P_MODEL" "$P_API" > "$WS/.deepagents/config.toml"
     ;;
   kimi)
-    # default_thinking = true: false (kimi's own default) sends thinking disabled. True with no
-    # thinking capability declared sends no thinking field at all, so the model thinks at its own
-    # default. The key sits inline here, which is why .kimi.toml is scrubbed after the task.
-    if [ "$P_API" = anthropic ]; then KTYPE=anthropic; KBASE="$P_ROOT"; else KTYPE=openai_legacy; KBASE="$P_URL"; fi
-    printf 'default_thinking = true\n\n[providers.profile]\ntype = "%s"\nbase_url = "%s"\napi_key = "%s"\n\n[models.profile]\nprovider = "profile"\nmodel = "%s"\nmax_context_size = 200000\n' \
-      "$KTYPE" "$KBASE" "$P_KEY" "$P_MODEL" > "$WS/.kimi.toml"
+    # Kimi Code CLI, the successor to kimi-cli. It has no --config-file: it reads only
+    # $KIMI_CODE_HOME/config.toml, so that home is pointed into the workspace. api_key_env names an
+    # environment variable, so the key never lands in the file — kimi-cli could only take it inline.
+    # No thinking setting: on the anthropic type it sends a Claude model adaptive thinking by
+    # itself, the same baseline claude-code sends. Its openai type is chat completions.
+    export KIMI_CODE_HOME="$WS/.kimi-code" KIMI_CODE_NO_AUTO_UPDATE=1; mkdir -p "$KIMI_CODE_HOME"
+    if [ "$P_API" = anthropic ]; then KTYPE=anthropic; KBASE="$P_ROOT"; else KTYPE=openai; KBASE="$P_URL"; fi
+    printf 'default_model = "profile"\ntelemetry = false\n\n[providers.profile]\ntype = "%s"\nbase_url = "%s"\napi_key_env = "PROFILE_API_KEY"\n\n[models.profile]\nprovider = "profile"\nmodel = "%s"\nmax_context_size = 200000\n' \
+      "$KTYPE" "$KBASE" "$P_MODEL" > "$KIMI_CODE_HOME/config.toml"
     ;;
   codewhale)
     if [ "$P_API" = anthropic ]; then
@@ -282,8 +318,31 @@ case "$ATYPE" in
     export REASONIX_HOME="$WS/.reasonix"; mkdir -p "$REASONIX_HOME"
     if [ "$P_API" = anthropic ]; then RAPI=anthropic; RBASE="$P_ROOT"; else RAPI=openai; RBASE="$P_URL"; fi
     printf 'PROFILE_API_KEY=%s\n' "$P_KEY" > "$REASONIX_HOME/.env"
-    printf '{"providers":{"profile":{"type":"%s","base_url":"%s","api_key_env":"PROFILE_API_KEY","models":[{"id":"%s"}]}}}\n' \
-      "$RAPI" "$RBASE" "$P_MODEL" > "$REASONIX_HOME/config.json"
+    # config.toml, not config.json: the 1.x rewrite reads only <REASONIX_HOME>/config.toml and
+    # ignores the old JSON without a word, so the profile provider never existed. Providers are a
+    # [[providers]] array keyed by name, and the protocol field is `kind`, not `type`.
+    printf 'default_model = "profile/%s"\n\n[[providers]]\nname = "profile"\nkind = "%s"\nbase_url = "%s"\napi_key_env = "PROFILE_API_KEY"\nmodels = ["%s"]\ndefault = "%s"\n' \
+      "$P_MODEL" "$RAPI" "$RBASE" "$P_MODEL" "$P_MODEL" > "$REASONIX_HOME/config.toml"
+    ;;
+  grok)
+    # grok reads no GROK_API_KEY or GROK_BASE_URL: without a login or XAI_API_KEY it exits "Not
+    # signed in" before any request. A model of its own in ~/.grok/config.toml with an env_key is
+    # what it calls BYOK, and that alone gets past the sign-in check. env_key names a variable, so
+    # the key stays out of this file. The messages backend is Anthropic's protocol, but env_key goes
+    # out as a Bearer header only; Anthropic wants x-api-key, which env_http_headers sends from the
+    # same variable. [models] points new sessions and the session-title call at this model too —
+    # left alone, the title call asks the profile's endpoint for grok-4.6.
+    mkdir -p "$WS/.grok"
+    if [ "$P_API" = anthropic ]; then
+      GBASE="$P_ROOT/v1"; GBACK=messages
+      GHDR='env_http_headers = { "x-api-key" = "PROFILE_API_KEY" }
+extra_headers = { "anthropic-version" = "2023-06-01" }
+'
+    else
+      GBASE="$P_URL"; GBACK=chat_completions; GHDR=""
+    fi
+    printf '[models]\ndefault = "profile"\nsession_summary = "profile"\n\n[model.profile]\nmodel = "%s"\nbase_url = "%s"\napi_backend = "%s"\nenv_key = "PROFILE_API_KEY"\ncontext_window = 200000\nmax_completion_tokens = 64000\n%s' \
+      "$P_MODEL" "$GBASE" "$GBACK" "$GHDR" > "$WS/.grok/config.toml"
     ;;
   opencode)
     # opencode — a provider in opencode.json, its key read from OPENAI_API_KEY. Which provider
@@ -353,8 +412,14 @@ agent_start() {   # $1 = prompt   $2 = seconds of budget
     goose)      if [ "$P_API" = anthropic ]; then
                   # GOOSE_THINKING_EFFORT: unset, goose treats the effort as off and sends thinking
                   # disabled, unlike the model's own default. high matches claude-code's baseline.
+                  # goose only sends adaptive thinking to models its built-in registry marks adaptive;
+                  # its entry for Sonnet 5.5 (still in 1.53) lacks that mark, so any effort goes out as
+                  # thinking.type enabled, which the model rejects with a 400 on every turn. off makes
+                  # goose leave thinking out of the request, and the model's own default for that is
+                  # adaptive thinking — so thinking stays on, at the API's default effort, not ours.
+                  case "$P_MODEL" in *sonnet-5[.-]5*) GOOSE_EFFORT=off ;; *) GOOSE_EFFORT=high ;; esac
                   timeout "$2" env GOOSE_DISABLE_KEYRING=1 GOOSE_MODE=auto GOOSE_PROVIDER=anthropic \
-                          GOOSE_THINKING_EFFORT=high GOOSE_MODEL="$P_MODEL" \
+                          GOOSE_THINKING_EFFORT="$GOOSE_EFFORT" GOOSE_MODEL="$P_MODEL" \
                           ANTHROPIC_API_KEY="$P_KEY" ANTHROPIC_HOST="$P_ROOT" \
                           goose run --with-builtin developer -t "$1" </dev/null
                 else
@@ -382,8 +447,9 @@ agent_start() {   # $1 = prompt   $2 = seconds of budget
                         pi -p --provider profile --model "$P_MODEL" --mode json "$1" </dev/null ;;
     crush)      timeout "$2" env PROFILE_API_KEY="$P_KEY" CRUSH_DISABLE_PROVIDER_AUTO_UPDATE=1 \
                         CRUSH_DISABLE_METRICS=1 crush run -q -m "profile/$P_MODEL" "$1" </dev/null ;;
-    cline)      timeout "$2" env CLINE_API_KEY="$P_KEY" CLINE_BASE_URL="$P_URL" \
-                        cline --yolo --model "$P_MODEL" -p "$1" </dev/null ;;
+    cline)      # The prompt is positional: -p is --plan in cline 3, which only plans and edits nothing.
+                timeout "$2" env ANTHROPIC_API_KEY="$P_KEY" OPENAI_API_KEY="$P_KEY" \
+                        cline --yolo "$1" </dev/null ;;
     continue)   timeout "$2" env PROFILE_API_KEY="$P_KEY" cn -p "$1" --config "$WS/.continue.yaml" --auto </dev/null ;;
     openhands)  # LLM_* apply only with --override-with-envs; --exit-without-confirmation is what
                 # makes it exit rather than wait for a human once the task is done.
@@ -403,14 +469,29 @@ agent_start() {   # $1 = prompt   $2 = seconds of budget
                 fi ;;
     deepagents) timeout "$2" env PROFILE_API_KEY="$P_KEY" dcode -n "$1" --model "$P_API:$P_MODEL" -S all \
                         --allow-fs-tools ls,read_file,write_file,edit_file,glob,grep,execute </dev/null ;;
-    kimi)       timeout "$2" kimi --config-file "$WS/.kimi.toml" -m profile -w "$WS" --print --yolo --prompt "$1" </dev/null ;;
+    kimi)       # -p alone: it refuses --yolo or --auto beside it, as prompt mode already runs every
+                # tool call under the auto policy with no one to ask. It works in the cwd, $WS.
+                timeout "$2" env PROFILE_API_KEY="$P_KEY" kimi -m profile -p "$1" </dev/null ;;
     codewhale)  timeout "$2" env PROFILE_API_KEY="$P_KEY" ANTHROPIC_MODEL="$P_MODEL" \
                         codewhale --provider "$P_API" exec --auto "$1" </dev/null ;;
-    reasonix)   timeout "$2" reasonix run --provider profile --model "$P_MODEL" --yes "$1" </dev/null ;;
-    jcode)      timeout "$2" env JCODE_API_KEY="$P_KEY" JCODE_BASE_URL="$P_URL" \
-                        jcode --yolo -m "$P_MODEL" -p "$1" </dev/null ;;
-    grok)       timeout "$2" env GROK_API_KEY="$P_KEY" GROK_BASE_URL="$P_URL" \
-                        grok --yolo -m "$P_MODEL" -p "$1" </dev/null ;;
+    reasonix)   # 1.x dropped --provider and --yes: the model is named "provider/model", and an unattended
+                # run denies whatever its permission preset does not cover, so it gets full access.
+                timeout "$2" reasonix run --model "profile/$P_MODEL" --permission-mode danger-full-access \
+                        --dir "$WS" "$1" </dev/null ;;
+    jcode)      # One-shot is the `run` subcommand; -p is --provider, not the prompt, and there is no
+                # --yolo. Its anthropic-api provider ignores -m and takes the model from
+                # JCODE_ANTHROPIC_MODEL, and it posts to <base>/messages, so the base keeps its /v1.
+                # The OpenAI side is its openai-compatible provider, keyed by OPENAI_COMPAT_API_KEY.
+                if [ "$P_API" = anthropic ]; then
+                  timeout "$2" env JCODE_NO_TELEMETRY=1 ANTHROPIC_API_KEY="$P_KEY" ANTHROPIC_BASE_URL="$P_ROOT/v1" \
+                          JCODE_ANTHROPIC_MODEL="$P_MODEL" \
+                          jcode run --no-update --provider anthropic-api -m "$P_MODEL" "$1" </dev/null
+                else
+                  timeout "$2" env JCODE_NO_TELEMETRY=1 OPENAI_COMPAT_API_KEY="$P_KEY" \
+                          JCODE_OPENAI_COMPAT_API_BASE="$P_URL" JCODE_OPENAI_COMPAT_DEFAULT_MODEL="$P_MODEL" \
+                          jcode run --no-update --provider openai-compatible -m "$P_MODEL" "$1" </dev/null
+                fi ;;
+    grok)       timeout "$2" env PROFILE_API_KEY="$P_KEY" grok --yolo -m profile -p "$1" </dev/null ;;
 
     *)          timeout "$2" claude -p --session-id "$SID" --name "$SNAME" \
                         --model "$MODEL" --dangerously-skip-permissions "$1" ;;
