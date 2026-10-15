@@ -8,7 +8,7 @@
 # The launcher runs one container per task; it reads task/task.md, does the work, writes result/,
 # and exits. The model backend is chosen at run time by env, per the tool's dialect — each pointing
 # straight at the resolved endpoint.
-FROM node:25-slim
+FROM node:26-slim
 
 # BuildKit sets this to the arch being built for (amd64 / arm64). Every apt package and npm
 # install below is architecture-neutral; the two GitHub release tarballs are not, and the two
