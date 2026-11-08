@@ -93,7 +93,7 @@ steps:
 | `id` | Names the step so other steps can reference it. |
 | `template` | The Agent Template that supplies skills, credentials, and standing instructions. |
 | `task` | The instruction written to `task/task.md`. Use a block scalar for anything multi-line. |
-| `includePreviousResult` | Copies the previous step's `result/` into `task/previous-result/`. The product itself is in `artifact/`, which every step sees without asking. A step fed by several (a `map-reduce` reduce, a `graph` step with more than one `dependsOn`) gets one folder each: `task/previous-result/<n>-<item>/` or `task/previous-result/<step-id>/`. |
+| `includePreviousResult` | Hands the previous step's `result/` to this one, copied into `task/previous-result/`. One of two ways work reaches a step — the other is `artifact/`, the shared product every step sees without asking; a step may use either or both, see [Two ways to pass work on](#two-ways-to-pass-work-on). A step fed by several (a `map-reduce` reduce, a `graph` step with more than one `dependsOn`) gets one folder each: `task/previous-result/<n>-<item>/` or `task/previous-result/<step-id>/`. |
 | `dependsOn` | `graph` only — the step ids that must collect first. |
 | `when` | `conditional` only — a predicate, e.g. `classify.result == 'yes'`. |
 | `forEach` | `map-reduce` only — fans out over a list parameter; each task sees `${item}`. |
@@ -204,6 +204,21 @@ last one left: no step repeats the setup, and uncommitted work is not lost betwe
 the workspace (`task/`, `result/`, scratch, the CLI's session store) stays per task and is thrown
 away with it. `result/` stays the step's sign-off — a verdict, a summary, a report — not a copy of
 the product.
+
+#### Two ways to pass work on
+
+A step has two channels to the steps after it, and they are alternatives, not old and new.
+
+| | `artifact/` | `result/` via `includePreviousResult` |
+|---|---|---|
+| What it carries | The product: the tree itself, as the step left it. | A bounded hand-over: a verdict, a report, a patch, the files the task asked for. |
+| Who sees it | Every step of the run, without declaring anything. | Only the step that sets `includePreviousResult`, and only its predecessor's. |
+| Shape | Implicit and growing. | Explicit and fixed: the next step sees exactly what was signed off, nothing the tree happens to hold. |
+| Use it when | The next step needs the checkout, the build, the uncommitted edits. | The next step judges, summarizes or merges; the step was read-only; or the step must not depend on the state of the tree. |
+
+Pick per step. A build-then-test chain works on the artifact and never sets the flag. A write-then-review
+chain sets the flag so the reviewer gets the author's sign-off beside the tree. A reduce or join
+*must* set it — its predecessors were read-only, so `result/` is the only way their work arrives.
 
 **Fan-out is read-only.** A step may write the artifact only when no other step can run beside it.
 Core works this out from the strategy and `dependsOn` when the workflow loads, and the editor outline
