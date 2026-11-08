@@ -34,13 +34,15 @@ public final class App {
     private final CredentialStore credentials;
     private final Accounts accounts;
     private final UsageProxy proxy;
+    private final ArtifactStore artifacts;
 
     public App(Engine engine, FordismConfiguration configuration, TemplateStore templates, TaskResults results,
             WorkspaceArchive archive,
             SkillStore skills, SkillPluginStore skillPlugins, AgentProfileStore profiles,
             SecretVault secrets, CredentialStore credentials,
-            Accounts accounts, UsageProxy proxy) {
+            Accounts accounts, UsageProxy proxy, ArtifactStore artifacts) {
         this.proxy = proxy;
+        this.artifacts = artifacts;
         this.engine = engine;
         this.configuration = configuration;
         this.templates = templates;
@@ -63,8 +65,8 @@ public final class App {
      * suite that fails on whichever machine already has 8080.
      */
     public Javalin startOn(int port) {
-        WorkflowController workflows = new WorkflowController(engine, configuration, templates, profiles, credentials);
-        RunController runs = new RunController(engine, results, archive, secrets, new ArtifactStore(configuration));
+        WorkflowController workflows = new WorkflowController(engine, configuration, templates, profiles, credentials, artifacts);
+        RunController runs = new RunController(engine, results, archive, secrets, artifacts);
         TemplateController templateApi = new TemplateController(templates);
         SkillController skillApi = new SkillController(skills, skillPlugins);
         SkillPluginController pluginApi = new SkillPluginController(skillPlugins);

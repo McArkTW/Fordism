@@ -1,6 +1,8 @@
 package tw.mcark.tony.fordism.parse;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import tw.mcark.tony.fordism.model.workflow.ArtifactAccess;
 import tw.mcark.tony.fordism.model.workflow.Step;
@@ -189,5 +191,22 @@ class ArtifactAccessTest {
                   task: converge
                 """);
         assertEquals(WRITE, workflow.generator().artifact());
+    }
+
+    @Test
+    void a_parameter_named_artifactFrom_is_refused_because_the_run_request_owns_that_name() {
+        // The run endpoint takes artifactFrom out of the values as the run to continue from, so a
+        // parameter by that name would be declared and never receive anything.
+        IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class, () -> loader.parse("""
+                name: p
+                parameters:
+                  - name: artifactFrom
+                steps:
+                  - id: build
+                    template: generic
+                    task: build it
+                """));
+        assertTrue(thrown.getMessage().contains("artifactFrom"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("reserved"), thrown.getMessage());
     }
 }

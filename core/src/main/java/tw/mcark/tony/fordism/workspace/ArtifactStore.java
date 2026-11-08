@@ -69,8 +69,12 @@ public final class ArtifactStore {
      *
      * <p>The copy goes to a sibling first and is renamed into place, so a crash half way leaves no
      * folder that a later task would take for a finished copy.
+     *
+     * <p>Two tasks of one run can be staged moments apart — every map item of a fan-out is. The
+     * method is synchronized for the stagers of this process, and the rename is still allowed to
+     * lose: whichever copy lands first is the artifact, and the other is thrown away.
      */
-    public Path prepare(String runId, String fromRunId) throws IOException {
+    public synchronized Path prepare(String runId, String fromRunId) throws IOException {
         Path artifact = path(runId);
         if (Files.isDirectory(artifact)) {
             return artifact;
@@ -86,20 +90,44 @@ public final class ArtifactStore {
             }
             Path staging = root.resolve("." + segment(runId) + "-" + UUID.randomUUID());
             copyTree(source, staging);
-            Files.move(staging, artifact, StandardCopyOption.ATOMIC_MOVE);
-            Logger.info("artifact of run {} copied from run {}", runId, fromRunId);
+            if (install(staging, artifact)) {
+                Logger.info("artifact of run {} copied from run {}", runId, fromRunId);
+            }
         }
         groupWritable(artifact);
         return artifact;
     }
 
+    /**
+     * Rename a finished copy into place. False when another copy got there first — the one already
+     * in place is kept, since a task may be working in it, and this one is deleted.
+     */
+    static boolean install(Path staging, Path artifact) throws IOException {
+        try {
+            Files.move(staging, artifact, StandardCopyOption.ATOMIC_MOVE);
+            return true;
+        } catch (IOException failed) {
+            // How a rename onto an existing folder fails depends on the filesystem: Linux says
+            // DirectoryNotEmpty, Windows AccessDenied. What decides it is whether the artifact is
+            // now there — if it is, this copy lost; if not, the failure is real.
+            if (!Files.isDirectory(artifact)) {
+                throw failed;
+            }
+            deleteTree(staging);
+            return false;
+        }
+    }
+
     /** Remove a run's artifact. Absent is not an error: culling twice is culling once. */
     public void delete(String runId) throws IOException {
-        Path artifact = path(runId);
-        if (!Files.exists(artifact, LinkOption.NOFOLLOW_LINKS)) {
+        deleteTree(path(runId));
+    }
+
+    private static void deleteTree(Path tree) throws IOException {
+        if (!Files.exists(tree, LinkOption.NOFOLLOW_LINKS)) {
             return;
         }
-        try (Stream<Path> walk = Files.walk(artifact)) {
+        try (Stream<Path> walk = Files.walk(tree)) {
             for (Path path : (Iterable<Path>) walk.sorted(Comparator.reverseOrder())::iterator) {
                 Files.deleteIfExists(path);
             }

@@ -13,11 +13,11 @@ import tw.mcark.tony.fordism.workspace.TaskResults;
 import tw.mcark.tony.fordism.workspace.WorkspaceArchive;
 import io.javalin.http.Context;
 import java.io.IOException;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
-import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.stream.Stream;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -154,42 +154,73 @@ public final class RunController {
             return;
         }
         Path root = artifacts.path(run.id);
-        List<Views.ArtifactEntry> files = new ArrayList<>();
-        boolean truncated = false;
-        if (Files.isDirectory(root)) {
-            try (Stream<Path> walk = Files.walk(root)) {
-                for (Path path : (Iterable<Path>) walk.skip(1).filter(entry -> !insideBulk(root, entry))::iterator) {
-                    if (files.size() >= ARTIFACT_LISTING_LIMIT) {
-                        truncated = true;
-                        break;
-                    }
-                    BasicFileAttributes attributes =
-                            Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
-                    boolean directory = attributes.isDirectory();
-                    long size = directory ? 0L : attributes.size();
-                    files.add(new Views.ArtifactEntry(root.relativize(path).toString().replace('\\', '/'),
-                            size, directory));
-                }
-            } catch (IOException e) {
-                Api.fail(ctx, 500, "could not read the artifact: " + e.getMessage());
-                return;
-            }
+        ArtifactListing listing;
+        try {
+            listing = ArtifactListing.of(root, ARTIFACT_LISTING_LIMIT);
+        } catch (IOException e) {
+            Api.fail(ctx, 500, "could not read the artifact: " + e.getMessage());
+            return;
         }
         Api.json(ctx, new Views.ArtifactFiles(run.id, artifacts.hostPath(run.id), Files.isDirectory(root),
-                files, truncated));
+                listing.files(), listing.truncated()));
     }
 
-    /** Below a .git or node_modules folder — the folder itself is listed, its contents are not. */
-    private static boolean insideBulk(Path root, Path path) {
-        Path relative = root.relativize(path);
-        for (int index = 0; index < relative.getNameCount() - 1; index++) {
-            String name = relative.getName(index).toString();
-            if (name.equals(".git") || name.equals("node_modules")) {
-                return true;
+    /**
+     * An artifact's entries, at most {@code limit} of them.
+     *
+     * <p>A file-tree visit, not a stream and a filter: {@code Files.walk} would still descend every
+     * entry under {@code node_modules} only to have them dropped, and walk on past the cap. Here a
+     * bulk folder is listed and its subtree skipped, and the visit stops as soon as the cap is hit.
+     */
+    record ArtifactListing(List<Views.ArtifactEntry> files, boolean truncated) {
+
+        private static final Set<String> BULK = Set.of(".git", "node_modules");
+
+        static ArtifactListing of(Path root, int limit) throws IOException {
+            List<Views.ArtifactEntry> files = new ArrayList<>();
+            boolean[] truncated = {false};
+            if (!Files.isDirectory(root)) {
+                return new ArtifactListing(files, false);
             }
+            Files.walkFileTree(root, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) {
+                    if (directory.equals(root)) {
+                        return FileVisitResult.CONTINUE;
+                    }
+                    if (!add(directory, attributes)) {
+                        return FileVisitResult.TERMINATE;
+                    }
+                    return BULK.contains(directory.getFileName().toString())
+                            ? FileVisitResult.SKIP_SUBTREE : FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
+                    return add(file, attributes) ? FileVisitResult.CONTINUE : FileVisitResult.TERMINATE;
+                }
+
+                @Override
+                public FileVisitResult visitFileFailed(Path file, IOException failure) {
+                    return FileVisitResult.CONTINUE;   // unreadable is not worth failing the listing for
+                }
+
+                /** False once the cap is reached: the entry is not listed and the visit stops. */
+                private boolean add(Path path, BasicFileAttributes attributes) {
+                    if (files.size() >= limit) {
+                        truncated[0] = true;
+                        return false;
+                    }
+                    boolean directory = attributes.isDirectory();
+                    files.add(new Views.ArtifactEntry(root.relativize(path).toString().replace('\\', '/'),
+                            directory ? 0L : attributes.size(), directory));
+                    return true;
+                }
+            });
+            return new ArtifactListing(files, truncated[0]);
         }
-        return false;
     }
+
 
     /** Download the run's artifact — the product — as a zip. */
     public void artifactZip(Context ctx) {

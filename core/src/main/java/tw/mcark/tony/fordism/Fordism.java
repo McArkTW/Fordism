@@ -64,7 +64,10 @@ public final class Fordism {
         SessionIdentifierFactory sessions = new SessionIdentifierFactory();
         AgentProfileStore profiles = new AgentProfileStore(Paths.get(configuration.agentProfilesDir));
         ModelRegistry models = new ModelRegistry(configuration, profiles);
-        WorkspaceStager workspaces = new WorkspaceStager(configuration, models);
+        // One store for the runs' artifacts: the stager lays them out, the culler retires them, and
+        // the API reads them — all three must agree on where they are.
+        ArtifactStore artifacts = new ArtifactStore(configuration);
+        WorkspaceStager workspaces = new WorkspaceStager(configuration, models, artifacts);
         TaskResults results = new TaskResults();
         WorkspaceArchive archive = new WorkspaceArchive();
         SkillState skillState = new SkillState(configuration);
@@ -80,7 +83,6 @@ public final class Fordism {
         CredentialScrub scrub = new CredentialScrub(configuration.credentialFiles);
         Collector collector = new Collector(tasks, results, launcher, scrub);
         Reaper reaper = new Reaper(tasks, results, launcher, new CullPolicy(), configuration, scrub);
-        ArtifactStore artifacts = new ArtifactStore(configuration);
         OrphanCuller culler = new OrphanCuller(tasks, runs, launcher, scrub,
                 new ArtifactRetention(artifacts, Duration.ofHours(configuration.artifactRetentionHours)));
         JsonStateStore stateStore = new JsonStateStore(configuration);
@@ -114,7 +116,7 @@ public final class Fordism {
         UsageProxy proxy = new UsageProxy(tasks, models, transcripts,
                 task -> credentials.values(task.credentials).values());
         new App(engine, configuration, templates, results, archive, skills, skillPlugins, profiles, secrets, credentials,
-                accounts, proxy).start();
+                accounts, proxy, artifacts).start();
         Logger.info("fordism-core up version={} gitSha={}", configuration.version, configuration.gitSha);
     }
 

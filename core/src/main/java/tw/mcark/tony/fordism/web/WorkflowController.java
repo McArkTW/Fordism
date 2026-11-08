@@ -9,6 +9,7 @@ import tw.mcark.tony.fordism.model.workflow.Parameter;
 import tw.mcark.tony.fordism.model.workflow.Step;
 import tw.mcark.tony.fordism.model.workflow.Workflow;
 import tw.mcark.tony.fordism.orchestrate.Engine;
+import tw.mcark.tony.fordism.parse.WorkflowLoader;
 import tw.mcark.tony.fordism.workspace.AgentTemplate;
 import tw.mcark.tony.fordism.workspace.ArtifactStore;
 import tw.mcark.tony.fordism.workspace.TemplateStore;
@@ -30,9 +31,6 @@ import java.util.Optional;
 
 /** /api/workflows[...] — list, get, and run a workflow. */
 public final class WorkflowController {
-    /** The run-request field naming the run whose artifact a new run starts from. */
-    static final String ARTIFACT_FROM = "artifactFrom";
-
     private final Engine engine;
     private final FordismConfiguration configuration;
     private final TemplateStore templates;
@@ -41,13 +39,13 @@ public final class WorkflowController {
     private final ArtifactStore artifacts;
 
     public WorkflowController(Engine engine, FordismConfiguration configuration, TemplateStore templates,
-            AgentProfileStore profiles, CredentialStore credentials) {
+            AgentProfileStore profiles, CredentialStore credentials, ArtifactStore artifacts) {
         this.engine = engine;
         this.configuration = configuration;
         this.templates = templates;
         this.profiles = profiles;
         this.credentials = credentials;
-        this.artifacts = new ArtifactStore(configuration);
+        this.artifacts = artifacts;
     }
 
     /** Fast-fail: every step that NAMES a template must resolve, and that template must carry a real Agent Profile. */
@@ -250,7 +248,7 @@ public final class WorkflowController {
         }
         // Not a workflow parameter: which run's artifact/ this one starts from. Taken out of the
         // values so it never reaches a task as ${artifactFrom} text.
-        String artifactFrom = params.remove(ARTIFACT_FROM);
+        String artifactFrom = params.remove(WorkflowLoader.RESERVED_PARAMETER);
         if (artifactFrom != null && !artifactFrom.isBlank() && !artifacts.exists(artifactFrom.trim())) {
             String reason = engine.runs().find(artifactFrom.trim()).isPresent()
                     ? "run \"" + artifactFrom.trim() + "\" has no artifact to continue from — it never staged a task, or its artifact was culled"

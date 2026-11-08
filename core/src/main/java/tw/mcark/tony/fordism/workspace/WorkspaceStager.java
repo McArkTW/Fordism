@@ -33,14 +33,14 @@ public final class WorkspaceStager {
     private final ArtifactStore artifacts;
 
     /** No profiles: config.json carries the step's own model. */
-    public WorkspaceStager(FordismConfiguration configuration) {
-        this(configuration, new ModelRegistry(configuration, name -> Optional.empty(), Optional::empty));
+    public WorkspaceStager(FordismConfiguration configuration, ArtifactStore artifacts) {
+        this(configuration, new ModelRegistry(configuration, name -> Optional.empty(), Optional::empty), artifacts);
     }
 
-    public WorkspaceStager(FordismConfiguration configuration, ModelRegistry models) {
+    public WorkspaceStager(FordismConfiguration configuration, ModelRegistry models, ArtifactStore artifacts) {
         this.configuration = configuration;
         this.models = models;
-        this.artifacts = new ArtifactStore(configuration);
+        this.artifacts = artifacts;
     }
 
     public Path stage(Task task, TemplateStore templates) throws IOException {

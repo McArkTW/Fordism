@@ -8,6 +8,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -85,6 +91,52 @@ class ArtifactStoreTest {
     void a_run_id_cannot_climb_out_of_the_artifacts_folder() {
         assertThrows(IllegalArgumentException.class, () -> store().path("../_credentials"));
         assertFalse(store().exists("../_credentials"));
+    }
+
+    @Test
+    void two_tasks_of_one_run_staged_at_once_get_one_copy() throws Exception {
+        // Map items are staged moments apart; each must find the same artifact, copied once.
+        ArtifactStore store = store();
+        Path source = store.prepare("design", null);
+        Files.writeString(source.resolve("plan.md"), "v1");
+
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        CountDownLatch go = new CountDownLatch(1);
+        try {
+            List<Future<Path>> staged = new ArrayList<>();
+            for (int task = 0; task < 2; task++) {
+                staged.add(pool.submit(() -> {
+                    go.await();
+                    return store.prepare("execute", "design");
+                }));
+            }
+            go.countDown();
+            assertEquals(staged.get(0).get(), staged.get(1).get());
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertEquals("v1", Files.readString(store.path("execute").resolve("plan.md")));
+        try (Stream<Path> entries = Files.list(root.resolve("_artifacts"))) {
+            assertEquals(List.of("design", "execute"),
+                    entries.map(path -> path.getFileName().toString()).sorted().toList(),
+                    "one copy, and no staging folder left behind");
+        }
+    }
+
+    @Test
+    void a_copy_that_loses_the_race_is_discarded_and_the_first_one_kept() throws IOException {
+        // Another core process (or a stager this lock does not cover) renamed its copy in first.
+        Path artifacts = root.resolve("_artifacts");
+        Path installed = Files.createDirectories(artifacts.resolve("execute"));
+        Files.writeString(installed.resolve("work.txt"), "a task is already in here");
+        Path staging = Files.createDirectories(artifacts.resolve(".execute-late"));
+        Files.writeString(staging.resolve("work.txt"), "a second copy");
+
+        assertFalse(ArtifactStore.install(staging, installed));
+
+        assertEquals("a task is already in here", Files.readString(installed.resolve("work.txt")));
+        assertFalse(Files.exists(staging), "the losing copy is deleted");
     }
 
     @Test

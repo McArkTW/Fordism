@@ -43,6 +43,9 @@ public final class WorkflowLoader {
     private static final Set<String> PARAMETER_KEYS = Set.of("name", "label", "type", "required", "default", "help");
     private static final Set<String> PARAMETER_TYPES = Set.of("text", "textarea", "number");
 
+    /** A run-request field, not a parameter: the run whose artifact a new run continues from. */
+    public static final String RESERVED_PARAMETER = "artifactFrom";
+
     /** The step id a {@code when:} predicate reads — same shape ConditionalOrchestrator evaluates. */
     private static final Pattern WHEN_STEP = Pattern.compile("(\\w[\\w-]*)\\.result\\s*==\\s*'([^']*)'");
 
@@ -72,6 +75,15 @@ public final class WorkflowLoader {
                 "unknown strategy \"" + strategyName + "\" — one of " + Strategy.names()));
         List<String> tags = strings(map.get("tags"));
         List<Parameter> parameters = parameters(map.get("parameters"));
+        for (Parameter parameter : parameters) {
+            // The run request reads this field as the run to continue from and takes it out of the
+            // values, so a parameter by this name could be declared but never receive a value.
+            if (RESERVED_PARAMETER.equals(parameter.name())) {
+                throw new IllegalArgumentException("parameter \"" + RESERVED_PARAMETER
+                        + "\" is reserved: on a run request it names the run whose artifact the new run starts from"
+                        + " — rename the parameter");
+            }
+        }
         List<Step> steps = new ArrayList<>();
         if (map.get("steps") instanceof List<?> list) {
             int index = 0;
