@@ -1,6 +1,7 @@
 package tw.mcark.tony.fordism.workspace;
 
 import tw.mcark.tony.fordism.config.FordismConfiguration;
+import tw.mcark.tony.fordism.launch.ModelRegistry;
 import tw.mcark.tony.fordism.launch.Proc;
 import tw.mcark.tony.fordism.launch.ProcessResult;
 import tw.mcark.tony.fordism.model.task.Task;
@@ -12,6 +13,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -26,9 +29,18 @@ import org.tinylog.Logger;
  */
 public final class WorkspaceStager {
     private final FordismConfiguration configuration;
+    private final ModelRegistry models;
+    private final ArtifactStore artifacts;
 
-    public WorkspaceStager(FordismConfiguration configuration) {
+    /** No profiles: config.json carries the step's own model. */
+    public WorkspaceStager(FordismConfiguration configuration, ArtifactStore artifacts) {
+        this(configuration, new ModelRegistry(configuration, name -> Optional.empty(), Optional::empty), artifacts);
+    }
+
+    public WorkspaceStager(FordismConfiguration configuration, ModelRegistry models, ArtifactStore artifacts) {
         this.configuration = configuration;
+        this.models = models;
+        this.artifacts = artifacts;
     }
 
     public Path stage(Task task, TemplateStore templates) throws IOException {
@@ -37,9 +49,13 @@ public final class WorkspaceStager {
         clearResult(workspace.resolve("result"));
         Files.createDirectories(workspace.resolve("result"));
         TaskConfiguration config = task.config;
+        // The model the entrypoint hands the CLI is the one the launcher resolved — the profile's
+        // own model wins — not the step's, which defaults to qwen3 and would reach a claude-code
+        // profile on api.anthropic.com as a model it has never heard of.
+        String model = models.backend(task.agentProfile, config.model()).model();
         Files.writeString(workspace.resolve("config.json"),
                 String.format("{\"model\":\"%s\",\"timeout\":%d,\"network\":\"%s\"}",
-                        config.model(), config.timeoutSeconds(), config.network().name().toLowerCase()));
+                        model, config.timeoutSeconds(), config.network().name().toLowerCase()));
         templates.stageInto(task.template, workspace);
         if (task.taskZipPath != null) {
             unzipInto(Paths.get(task.taskZipPath), workspace.resolve("task"));   // uploaded inputs
@@ -47,18 +63,57 @@ public final class WorkspaceStager {
         // Written after the unzip: the workflow defines the task, and an uploaded file must not be
         // able to replace it by being named task.md.
         Files.writeString(workspace.resolve("task/task.md"), task.taskText == null ? "" : task.taskText);
-        if (task.includePreviousResult && task.previousWorkspace != null) {
-            Path previous = Paths.get(task.previousWorkspace, "result");
-            if (Files.isDirectory(previous)) {
-                Path into = workspace.resolve("task/previous-result");
-                Files.createDirectories(into);
-                TemplateStore.copyDir(previous, into);
-            }
+        if (task.includePreviousResult) {
+            stagePrevious(task, workspace.resolve("task/previous-result"));
         }
         task.workspacePath = workspace.toString();
         task.hostWorkspacePath = Paths.get(configuration.workspacesHost, task.id).toString();
+        stageArtifact(task, workspace);
         groupWritable(workspace);
         return workspace;
+    }
+
+    /**
+     * Lay out the run's artifact if this is its first task, and record where the launcher mounts it.
+     *
+     * <p>The empty {@code artifact/} made inside the workspace is only the mountpoint. Left to docker,
+     * it would be created root-owned inside a workspace the agent is meant to own.
+     */
+    private void stageArtifact(Task task, Path workspace) throws IOException {
+        Path artifact = artifacts.prepare(task.runId, task.artifactFrom);
+        Files.createDirectories(workspace.resolve("artifact"));
+        task.artifactPath = artifact.toString();
+        task.hostArtifactPath = artifacts.hostPath(task.runId);
+    }
+
+    /**
+     * The predecessors' {@code result/} under {@code into}. One predecessor is copied flat, as it
+     * always was. Several (a reduce over its map tasks, a join over its dependencies) each get a
+     * folder named by their label: copying them all flat would let the last overwrite the rest, and
+     * staging only the first is how a reduce came to summarise one item out of three.
+     */
+    static void stagePrevious(Task task, Path into) throws IOException {
+        if (task.fanInWorkspaces != null && !task.fanInWorkspaces.isEmpty()) {
+            for (Map.Entry<String, String> source : task.fanInWorkspaces.entrySet()) {
+                copyResult(source.getValue(), into.resolve(folderName(source.getKey())));
+            }
+        } else if (task.previousWorkspace != null) {
+            copyResult(task.previousWorkspace, into);
+        }
+    }
+
+    private static void copyResult(String workspace, Path into) throws IOException {
+        Path result = Paths.get(workspace, "result");
+        if (Files.isDirectory(result)) {
+            Files.createDirectories(into);
+            TemplateStore.copyDir(result, into);
+        }
+    }
+
+    /** A label as one safe path segment: a map item is free text and must not climb out of task/. */
+    static String folderName(String label) {
+        String safe = label.replaceAll("[^A-Za-z0-9._-]+", "-").replaceAll("^[.-]+|-+$", "");
+        return safe.isEmpty() ? "_" : safe;
     }
 
     /**

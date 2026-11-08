@@ -6,9 +6,9 @@ import { HlmSkeleton } from '@spartan-ng/helm/skeleton';
 import { HlmTableImports } from '@spartan-ng/helm/table';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { apiError } from '../../core/api-error';
-import { RunDetail, RunsService, TaskView } from '../../core/api/runs.service';
+import { ArtifactFiles, RunDetail, RunsService, TaskView } from '../../core/api/runs.service';
 import { Icon } from '../../core/icon';
-import { formatDuration, statusView } from '../../core/status';
+import { formatDuration, formatSize, statusView } from '../../core/status';
 import { Toasts } from '../../core/toast';
 import { Confirm } from '../../shared/confirm';
 
@@ -40,6 +40,11 @@ export class RunDetailPage implements OnDestroy {
   readonly error = signal<string>('');
   readonly showSnapshot = signal<boolean>(false);
   readonly abandoning = signal<boolean>(false);
+  /** The artifact listing, fetched only when asked for — a working tree can be large. */
+  readonly artifactFiles = signal<ArtifactFiles | null>(null);
+  readonly artifactLoading = signal<boolean>(false);
+  readonly artifactError = signal<string>('');
+  protected readonly size = formatSize;
 
   readonly sortedTasks = computed<TaskView[]>(() =>
     [...(this.detail()?.tasks ?? [])].sort((a, b) => a.step - b.step),
@@ -66,6 +71,8 @@ export class RunDetailPage implements OnDestroy {
       }
       this.loaded = id;
       this.detail.set(null);
+      this.artifactFiles.set(null);
+      this.artifactError.set('');
       this.refresh();
     });
     this.timer = setInterval(() => {
@@ -115,6 +122,30 @@ export class RunDetailPage implements OnDestroy {
         this.toasts.error(apiError(e, 'Could not stop the run'));
       },
     });
+  }
+
+  /** Show (or hide) what the run's artifact holds. */
+  toggleArtifact(): void {
+    if (this.artifactFiles()) {
+      this.artifactFiles.set(null);
+      return;
+    }
+    this.artifactLoading.set(true);
+    this.service.artifact(this.id()).subscribe({
+      next: (files) => {
+        this.artifactLoading.set(false);
+        this.artifactError.set('');
+        this.artifactFiles.set(files);
+      },
+      error: (e) => {
+        this.artifactLoading.set(false);
+        this.artifactError.set(apiError(e, 'Could not list the artifact'));
+      },
+    });
+  }
+
+  artifactZip(): string {
+    return this.service.artifactZipUrl(this.id());
   }
 
   copy(text: string): void {

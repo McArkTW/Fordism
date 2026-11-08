@@ -2,6 +2,33 @@
 
 ## Unreleased
 
+### The artifact: the product gets its own folder
+
+- **`artifact/`, one per run.** The product a run is building now lives in its own host folder,
+  `<workspaces>/_artifacts/<run-id>`, mounted at `/workspace/artifact` in every task of the run. The
+  first step clones or scaffolds into it and each later step works on it in place, so no step
+  repeats the setup. The task workspace (`task/`, `result/`, `skills/`, `memory/`, the session store)
+  stays per task, as before, and `result/` stays the step's sign-off. Every run has one; an unused
+  one is just empty.
+- **Fan-out is read-only.** Core decides per step, when the workflow loads, whether it may write the
+  artifact: every step of `linear`, `rework` and `conditional`; the reduce of `map-reduce` (map items
+  read); in a `graph`, only a step every other step is ordered against through `dependsOn`; the
+  `reconciler` generator. A read-only step gets a `:ro` mount and hands its work back through
+  `result/`; the reduce or join merges. The editor outline marks read-only steps beside `network`.
+- **`artifactFrom: <run-id>`** on a run request starts the run from a copy of that run's artifact —
+  picked as *Continue from* in the run dialog. A reconciler's child runs start from a copy of the
+  parent's.
+- **Run page** shows the artifact's path, what it holds, and a zip download
+  (`GET /api/runs/{id}/artifact`, `…/artifact.zip`, the latter under `run.workspace.download`).
+- **Retention.** `FORDISM_ARTIFACT_RETENTION_HOURS` culls an artifact that long after its run ended;
+  `0`, the default, keeps it. An artifact another live run continues from is held until that run ends.
+- **Agent contract.** The skill and doctrine gain the rule: the product is in `artifact/`, the
+  workspace is yours, and if `artifact/` is read-only your output goes in `result/` for a later step
+  to merge. The entrypoint tells the agent which it has (`FORDISM_ARTIFACT`) and marks the artifact a
+  git `safe.directory`.
+- Workspace and artifact zips no longer follow symlinks: a link an agent planted is left out rather
+  than resolved by core, which reads as root.
+
 ### More agent runtimes
 
 - **Three more agent CLIs**: `gemini-cli`, `codex`, and `opencode`, alongside `claude-code` and

@@ -95,6 +95,34 @@
 
     <section class="border-border bg-card rounded-xl border p-4">
       <h2 class="text-muted-foreground text-sm font-semibold tracking-wide uppercase">
+        Continue from
+      </h2>
+      <p class="text-muted-foreground mt-1 text-xs">
+        Every run builds its product in <span class="font-mono">artifact/</span>. Pick a run to
+        start from a copy of its artifact, or start empty.
+      </p>
+      <hlm-select
+        class="mt-3 block"
+        [value]="continueFrom()"
+        (valueChange)="continueFrom.set($any($event) || '')"
+      >
+        <hlm-select-trigger class="w-full" size="sm">
+          <hlm-select-value placeholder="An empty artifact" />
+        </hlm-select-trigger>
+        <hlm-select-content *hlmSelectPortal>
+          <hlm-select-item value="">An empty artifact</hlm-select-item>
+          @if (continueFrom() && !continuable().some((r) => r.id === continueFrom())) {
+            <hlm-select-item [value]="continueFrom()">{{ continueFrom() }}</hlm-select-item>
+          }
+          @for (r of continuable(); track r.id) {
+            <hlm-select-item [value]="r.id">{{ runLabel(r) }}</hlm-select-item>
+          }
+        </hlm-select-content>
+      </hlm-select>
+    </section>
+
+    <section class="border-border bg-card rounded-xl border p-4">
+      <h2 class="text-muted-foreground text-sm font-semibold tracking-wide uppercase">
         Input files
       </h2>
       <p class="text-muted-foreground mt-1 text-xs">
