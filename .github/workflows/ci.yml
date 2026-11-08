@@ -90,6 +90,14 @@ jobs:
       # github.repository (McArkTW/Fordism) cannot be used verbatim.
       - name: Registry name
         run: echo "REGISTRY=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+      # The base first, on its own. Compose builds every service at once, and a tool image's
+      # FROM names the base by its registry tag — so built together, the tool images look for a
+      # base that is not in the daemon yet and fall through to pulling it from GHCR, which refuses
+      # (the package is private: 403). Built first, the tag exists locally and nothing is pulled.
+      - name: Build agent base
+        run: docker compose --profile build-only build fordism-agent-base
+        env:
+          TAG: ci
       - name: Build images
         run: docker compose --profile build-only build
         env:
