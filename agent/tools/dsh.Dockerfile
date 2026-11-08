@@ -9,13 +9,13 @@
 ARG BASE=fordism/fordism-agent-base:local
 FROM ${BASE}
 
-# Pinned: the thinking-replay patch below targets 0.1.5-rc.1's source.
-RUN npm install -g @deepseek-ai/dsh@0.1.5-rc.1
-
-# Patch: a replayed reply is labelled with Bedrock's response model name, fails pi-ai's same-model check,
-# and its signed thinking is dropped. See "Thinking replay" in the README. The build fails if the target moved.
-COPY tools/patches/apply.py tools/patches/dsh-thinking-replay.json /tmp/patch/
-RUN python3 /tmp/patch/apply.py /tmp/patch/dsh-thinking-replay.json && rm -rf /tmp/patch
+# Pinned, and to 0.2.0-rc.2 or later: 0.1.5-rc.1 asked for its ~70 @deepseek-ai/dsh-* parts by caret
+# range, so a fresh install mixed it with newer parts whose plugin tree it could not load (Cordis
+# failed on dsh-sandbox-local). From 0.2.0-rc.2 every part is pinned exactly, so the tree is the one
+# that release was tested with.
+# No thinking-replay patch any more: 0.2.0-rc.2 stores the requested model id as the replay
+# identity, which is what the patch did — a reply Bedrock labels with another name keeps its thinking.
+RUN npm install -g @deepseek-ai/dsh@0.2.0-rc.2
 
 COPY entrypoint.sh /usr/local/bin/fordism-agent
 COPY CLAUDE.md      /doctrine/CLAUDE.md

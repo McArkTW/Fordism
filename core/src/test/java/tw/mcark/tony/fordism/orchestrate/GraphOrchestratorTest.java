@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import tw.mcark.tony.fordism.model.run.WorkflowRun;
 import tw.mcark.tony.fordism.model.run.WorkflowRunState;
 import tw.mcark.tony.fordism.model.task.TaskState;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -68,6 +69,18 @@ class GraphOrchestratorTest {
 
         assertEquals(harness.at(run, 0).workspacePath, harness.at(run, 2).previousWorkspace,
                 "a graph step's previous is its first collected dependency, not the step above it");
+    }
+
+    @Test
+    void a_join_is_fed_every_dependency_by_step_id() {
+        WorkflowRun run = harness.start(FAN_OUT_THEN_JOIN);
+        harness.reconcile(run);
+        harness.collect(run, 0);
+        harness.collect(run, 1);
+        harness.reconcile(run);
+
+        assertEquals(Map.of("fan-a", harness.at(run, 0).workspacePath, "fan-b", harness.at(run, 1).workspacePath),
+                harness.at(run, 2).fanInWorkspaces);
     }
 
     @Test

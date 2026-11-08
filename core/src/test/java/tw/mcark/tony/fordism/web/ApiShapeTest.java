@@ -42,24 +42,26 @@ class ApiShapeTest {
 
     @Test
     void a_run_in_the_list() {
-        assertEquals(expect("id", "workflow", "state", "createdAt", "durationMs", "parentRunId"),
-                fieldsOf(new Views.RunSummary("r1", "qc-linear", "DONE", 1L, 2L, "r0")));
+        assertEquals(expect("id", "workflow", "state", "createdAt", "durationMs", "parentRunId", "artifactFrom"),
+                fieldsOf(new Views.RunSummary("r1", "qc-linear", "DONE", 1L, 2L, "r0", "r-1")));
     }
 
     @Test
     void a_run_nobody_spawned_omits_its_parent_rather_than_saying_null() {
         // Gson drops a null component, so an ordinary run's row is what it was before child runs
         // existed — the app's older `parentRunId?` reading and this one cannot disagree.
-        assertFalse(fieldsOf(new Views.RunSummary("r1", "qc-linear", "DONE", 1L, 2L, null))
+        assertFalse(fieldsOf(new Views.RunSummary("r1", "qc-linear", "DONE", 1L, 2L, null, null))
                 .contains("parentRunId"));
     }
 
     @Test
     void a_run_with_its_tasks() {
         assertEquals(expect("id", "workflow", "strategy", "state", "createdAt", "workflowSnapshot", "tasks",
-                        "parentRunId", "children"),
+                        "parentRunId", "children", "artifact"),
                 fieldsOf(new Views.RunDetail("r1", "qc-linear", "linear", "DONE", 1L, "name: x", List.of(),
-                        "r0", List.of())));
+                        "r0", List.of(), new Views.RunArtifact("/host/_artifacts/r1", true, "r-1"))));
+        assertEquals(expect("path", "present", "from"),
+                fieldsOf(new Views.RunArtifact("/host/_artifacts/r1", true, "r-1")));
     }
 
     @Test
@@ -132,9 +134,9 @@ class ApiShapeTest {
     @Test
     void a_step_and_a_parameter_as_the_editor_reads_them() {
         assertEquals(expect("id", "template", "dependsOn", "forEach", "when",
-                        "includePreviousResult", "timeoutSeconds", "network"),
+                        "includePreviousResult", "timeoutSeconds", "network", "artifact"),
                 fieldsOf(new Views.WorkflowStep("s0", "generic", List.of(), "", "", false, 600,
-                        "fordism-only")));
+                        "fordism-only", "read-only")));
         assertEquals(expect("name", "label", "type", "required", "defaultValue", "help"),
                 fieldsOf(new Views.WorkflowParameter("topic", "Topic", "text", false, "", "")));
     }

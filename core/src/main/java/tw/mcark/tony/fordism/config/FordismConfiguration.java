@@ -24,6 +24,12 @@ public final class FordismConfiguration {
     // that is the whole difference between this and the in-memory rescue vault.
     public final String credentialsDir = env("FORDISM_CREDENTIALS_DIR", workspacesDir + "/_credentials");
 
+    // How long a run's artifact/ (the product, under <workspaces>/_artifacts/<run-id>) outlives the
+    // run, in hours. 0 — the default — keeps it, as workspaces have always been kept: the product is
+    // what the run was for, and deleting it is an operator's call. A run another run continues from
+    // (artifactFrom) is held until that run has ended, whatever the window says.
+    public final long artifactRetentionHours = envLong("FORDISM_ARTIFACT_RETENTION_HOURS", 0);
+
     // The gid the agent image runs as (agent/Dockerfile pins node to 1001). Core runs as root, so
     // this is the only thing the two share — a staged workspace is chgrp'd to it.
     public final long agentGroupId = envLong("FORDISM_AGENT_GID", 1001);
@@ -37,16 +43,18 @@ public final class FordismConfiguration {
     public final String agentImageTag = env("FORDISM_AGENT_IMAGE_TAG", "local");
     public final String dockerCmd = env("FORDISM_DOCKER_CMD", "docker");
 
-    // Core's model proxy, as an agent container reaches it — e.g. http://fordism-core:8080. Set,
-    // every agent on the launcher network sends its model calls through core, which records their
-    // token usage in the task's result/logs/usage.jsonl and swaps the real key in. Empty (the
-    // default), agents call the provider directly and nothing about the old path changes.
-    public final String proxyUrl = env("FORDISM_PROXY_URL", "");
+    // Core's model proxy, as an agent container reaches it. On by default, at the compose service
+    // name: every agent on the launcher network sends its model calls through core, which records
+    // their token usage in the task's result/logs/usage.jsonl and swaps the real key in. "off"
+    // turns it off — a blank value cannot, since blank falls back to the default — and agents then
+    // call the provider directly.
+    public final String proxyUrl = proxyUrl(env("FORDISM_PROXY_URL", "http://fordism-core:8080"));
 
     // With the proxy on, also write every model call's conversation to result/logs/llm.jsonl, one
-    // format for every tool, redacted. Off by default: it stores what the agent read and wrote.
-    // _FILES additionally saves inline images and PDFs to result/logs/llm-files/.
-    public final boolean transcript = env("FORDISM_TRANSCRIPT", "").equalsIgnoreCase("on");
+    // format for every tool, redacted. On by default; "off" turns it off. It stores what the agent
+    // read and wrote. _FILES, which also saves inline images and PDFs to result/logs/llm-files/,
+    // stays opt-in.
+    public final boolean transcript = !env("FORDISM_TRANSCRIPT", "on").equalsIgnoreCase("off");
     public final boolean transcriptFiles = env("FORDISM_TRANSCRIPT_FILES", "").equalsIgnoreCase("on");
 
     // Agent container edge. The agent has full control INSIDE its container — it installs
@@ -81,6 +89,10 @@ public final class FordismConfiguration {
     /** The image that runs this tool. */
     public String agentImage(String toolWireName) {
         return agentImagePrefix + "-" + toolWireName + ":" + agentImageTag;
+    }
+
+    private static String proxyUrl(String value) {
+        return value.equalsIgnoreCase("off") ? "" : value;
     }
 
     private static String env(String key, String fallback) {

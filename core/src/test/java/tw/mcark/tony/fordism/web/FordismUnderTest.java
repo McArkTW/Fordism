@@ -37,6 +37,7 @@ import tw.mcark.tony.fordism.store.InMemoryWorkflowRunRepository;
 import tw.mcark.tony.fordism.store.JsonStateStore;
 import tw.mcark.tony.fordism.store.TaskRepository;
 import tw.mcark.tony.fordism.store.WorkflowRunRepository;
+import tw.mcark.tony.fordism.workspace.ArtifactStore;
 import tw.mcark.tony.fordism.workspace.CredentialScrub;
 import tw.mcark.tony.fordism.workspace.TaskResults;
 import tw.mcark.tony.fordism.workspace.TemplateStore;
@@ -87,8 +88,10 @@ final class FordismUnderTest implements AutoCloseable {
         ContainerLauncher launcher = new DockerContainerLauncher(configuration,
                 new ModelRegistry(configuration, profiles), secrets, credentials);
         CredentialScrub scrub = new CredentialScrub(configuration.credentialFiles);
+        ArtifactStore artifacts = new ArtifactStore(stateDir.resolve("_artifacts"), stateDir.resolve("_artifacts"),
+                configuration.agentGroupId);
         Engine engine = new Engine(configuration, tasks, runs, new SessionIdentifierFactory(),
-                new Dispatcher(tasks, new WorkspaceStager(configuration), templates, launcher,
+                new Dispatcher(tasks, new WorkspaceStager(configuration, artifacts), templates, launcher,
                         new FieldView(tasks, configuration)),
                 new Collector(tasks, results, launcher, scrub),
                 new Reaper(tasks, results, launcher, new CullPolicy(), configuration, scrub),
@@ -103,7 +106,7 @@ final class FordismUnderTest implements AutoCloseable {
 
         this.javalin = new App(engine, configuration, templates, results, new WorkspaceArchive(),
                 skills, skillPlugins, profiles, secrets, credentials, accounts,
-                new UsageProxy(tasks, new ModelRegistry(configuration, profiles))).startOn(0);
+                new UsageProxy(tasks, new ModelRegistry(configuration, profiles)), artifacts).startOn(0);
         this.tasks = tasks;
         this.port = javalin.port();
     }

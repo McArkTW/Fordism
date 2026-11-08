@@ -41,20 +41,32 @@
         </button>
       </span>
       @if (t.usage; as u) {
-        <span
-          class="inline-flex items-center gap-1.5"
-          title="Input, cache write, cache read and output are disjoint: total is the sum of all four."
-        >
-          <app-icon name="cpu" />
-          {{ u.input_tokens }} in
-          @if (u.cache_creation_input_tokens) {
-            · {{ u.cache_creation_input_tokens }} cache write
-          }
-          @if (u.cache_read_input_tokens) {
-            · {{ u.cache_read_input_tokens }} cache read
-          }
-          · {{ u.output_tokens }} out · {{ u.total }} total · {{ u.turns }} turns
-        </span>
+        <!-- The line says what a glance needs; the breakdown is one hover away. -->
+        <hlm-hover-card>
+          <span hlmHoverCardTrigger class="inline-flex cursor-default items-center gap-1.5">
+            <app-icon name="cpu" />
+            {{ tokens(u.total) }} tokens · {{ tokens(u.output_tokens) }} out · {{ u.turns }}
+            {{ u.turns === 1 ? 'turn' : 'turns' }}
+          </span>
+          <hlm-hover-card-content *hlmHoverCardPortal class="w-60 p-3">
+            <div class="text-sm font-medium">Token usage</div>
+            <dl class="mt-2 grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-xs tabular-nums">
+              <dt class="text-muted-foreground">Input</dt>
+              <dd class="text-right">{{ u.input_tokens.toLocaleString() }}</dd>
+              <dt class="text-muted-foreground">Cache write</dt>
+              <dd class="text-right">{{ u.cache_creation_input_tokens.toLocaleString() }}</dd>
+              <dt class="text-muted-foreground">Cache read</dt>
+              <dd class="text-right">{{ u.cache_read_input_tokens.toLocaleString() }}</dd>
+              <dt class="text-muted-foreground">Output</dt>
+              <dd class="text-right">{{ u.output_tokens.toLocaleString() }}</dd>
+              <div class="border-border col-span-2 my-1 border-t"></div>
+              <dt class="font-medium">Total</dt>
+              <dd class="text-right font-medium">{{ u.total.toLocaleString() }}</dd>
+              <dt class="text-muted-foreground">Turns</dt>
+              <dd class="text-right">{{ u.turns }}</dd>
+            </dl>
+          </hlm-hover-card-content>
+        </hlm-hover-card>
       }
     </div>
 
