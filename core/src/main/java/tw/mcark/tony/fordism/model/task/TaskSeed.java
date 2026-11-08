@@ -1,6 +1,8 @@
 package tw.mcark.tony.fordism.model.task;
 
+import tw.mcark.tony.fordism.model.workflow.ArtifactAccess;
 import tw.mcark.tony.fordism.model.workflow.Step;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -10,9 +12,33 @@ import java.util.Map;
  * hand — substitute the template, substitute the task text, find the previous workspace, pass the
  * step's config, pass the attempt — and one transposed pair would have been invisible at the call
  * site. {@link #of} is that assembly, written once.
+ *
+ * <p>{@code artifact} rides along from the step, so the task the engine plants mounts the run's
+ * artifact the way the loader decided — read-only where a sibling could be running beside it.
  */
 public record TaskSeed(int stepIndex, String template, String taskText, boolean includePreviousResult,
-                       String previousWorkspace, TaskConfiguration config, int attempt) {
+                       String previousWorkspace, TaskConfiguration config, int attempt,
+                       Map<String, String> fanIn, ArtifactAccess artifact) {
+
+    public TaskSeed {
+        artifact = artifact == null ? ArtifactAccess.WRITE : artifact;
+    }
+
+    public TaskSeed(int stepIndex, String template, String taskText, boolean includePreviousResult,
+                    String previousWorkspace, TaskConfiguration config, int attempt) {
+        this(stepIndex, template, taskText, includePreviousResult, previousWorkspace, config, attempt, Map.of(),
+                ArtifactAccess.WRITE);
+    }
+
+    /**
+     * The same seed, staging several predecessors instead of one: a reduce over every map task, a
+     * join over every dependency. Each lands in its own {@code task/previous-result/<label>/}, in
+     * this order, so none of them is silently dropped in favour of the first.
+     */
+    public TaskSeed withFanIn(Map<String, String> workspacesByLabel) {
+        return new TaskSeed(stepIndex, template, taskText, includePreviousResult, previousWorkspace, config,
+                attempt, new LinkedHashMap<>(workspacesByLabel), artifact);
+    }
 
     /** Resolve a workflow step against a run's parameter values. */
     public static TaskSeed of(int stepIndex, Step step, Map<String, String> values,
@@ -23,7 +49,9 @@ public record TaskSeed(int stepIndex, String template, String taskText, boolean 
                 step.includePreviousResult(),
                 previousWorkspace,
                 step.config(),
-                attempt);
+                attempt,
+                Map.of(),
+                step.artifact());
     }
 
     /**
@@ -31,7 +59,7 @@ public record TaskSeed(int stepIndex, String template, String taskText, boolean 
      * whose every pass after the first continues from the one before it.
      */
     public TaskSeed includingPreviousResult() {
-        return new TaskSeed(stepIndex, template, taskText, true, previousWorkspace, config, attempt);
+        return new TaskSeed(stepIndex, template, taskText, true, previousWorkspace, config, attempt, fanIn, artifact);
     }
 
     /**

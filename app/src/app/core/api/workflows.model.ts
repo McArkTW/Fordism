@@ -31,6 +31,11 @@ export type WorkflowStep = {
   timeoutSeconds: number;
   /** Egress core will impose: 'none' | 'fordism-only' | 'full'. A step that omits it gets 'fordism-only'. */
   network: string;
+  /**
+   * What the step may do to the run's artifact/: 'write', or 'read-only' where core found a step
+   * that could run beside it. Computed by core from the strategy and dependsOn, never written.
+   */
+  artifact: 'write' | 'read-only';
 };
 
 /**

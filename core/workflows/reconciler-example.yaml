@@ -5,6 +5,7 @@ parameters: [goal]
 maxIterations: 5
 generator:
   template: generic
+  config: {network: full}   # the agent reaches its model provider; the default is none
   task: |
     Work toward this goal, continuing from any prior progress in the
     mounted workspace:
