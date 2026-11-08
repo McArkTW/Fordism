@@ -7,6 +7,7 @@ import tw.mcark.tony.fordism.field.OrphanCuller;
 import tw.mcark.tony.fordism.field.Reaper;
 import tw.mcark.tony.fordism.launch.SessionIdentifierFactory;
 import tw.mcark.tony.fordism.model.run.WorkflowRun;
+import tw.mcark.tony.fordism.model.run.RunRequest;
 import tw.mcark.tony.fordism.model.run.WorkflowRunState;
 import tw.mcark.tony.fordism.secret.SecretVault;
 import tw.mcark.tony.fordism.model.task.ChildRunRequest;
@@ -116,17 +117,34 @@ public final class Engine {
 
     /* ---- run creation ---- */
     public WorkflowRun createRun(String workflowName, Map<String, String> params) {
-        return createRun(workflowName, params, null);
+        return createRun(RunRequest.of(workflowName, params));
     }
 
     public WorkflowRun createRun(String workflowName, Map<String, String> params, String taskZipPath) {
+        return createRun(new RunRequest(workflowName, params, taskZipPath, null));
+    }
+
+    /**
+     * Start a run. {@code artifactFrom} must name a run this instance knows: the copy itself happens
+     * when the first task is staged, and a typo found then would fail a run that had already been
+     * accepted, for a reason the caller could have been told now.
+     */
+    public WorkflowRun createRun(RunRequest request) {
+        String workflowName = request.workflow();
         Workflow workflow = workflow(workflowName)
                 .orElseThrow(() -> new IllegalArgumentException("unknown workflow: " + workflowName));
-        WorkflowRun run = new WorkflowRun(java.util.UUID.randomUUID().toString(), workflowName, workflow.strategy(), params);
-        run.taskZipPath = taskZipPath;
+        if (request.artifactFrom() != null && runs.find(request.artifactFrom()).isEmpty()) {
+            throw new IllegalArgumentException("artifactFrom names run \"" + request.artifactFrom()
+                    + "\", which does not exist");
+        }
+        WorkflowRun run = new WorkflowRun(java.util.UUID.randomUUID().toString(), workflowName, workflow.strategy(),
+                request.parameters());
+        run.taskZipPath = request.taskZipPath();
+        run.artifactFrom = request.artifactFrom();
         run.workflowSnapshot = workflowYaml.get(workflowName);
         runs.save(run);
-        Logger.info("run created {} workflow={} strategy={} zip={}", run.id, workflowName, workflow.strategy(), taskZipPath != null);
+        Logger.info("run created {} workflow={} strategy={} zip={} artifactFrom={}", run.id, workflowName,
+                workflow.strategy(), run.taskZipPath != null, run.artifactFrom);
         return run;
     }
 
@@ -140,7 +158,10 @@ public final class Engine {
      * waiting for children that were never going to exist.
      */
     public WorkflowRun createChildRun(WorkflowRun parent, ChildRunRequest request) {
-        WorkflowRun child = createRun(request.workflow(), request.parameters());
+        // A child works on a copy of what the generator has built so far, never on the parent's own
+        // tree: siblings started by one iteration run side by side, and two of them in one folder is
+        // the merge core refuses to make. The next iteration reads their results and merges.
+        WorkflowRun child = createRun(new RunRequest(request.workflow(), request.parameters(), null, parent.id));
         child.parentRunId = parent.id;
         child.parentIteration = parent.iteration;
         runs.save(child);
@@ -164,6 +185,8 @@ public final class Engine {
         task.previousWorkspace = seed.previousWorkspace();
         task.fanInWorkspaces = seed.fanIn().isEmpty() ? null : seed.fanIn();
         task.config = seed.config();
+        task.artifact = seed.artifact();
+        task.artifactFrom = run.artifactFrom;
         task.attempt = seed.attempt();
         if (seed.stepIndex() == 0 && run.taskZipPath != null) {
             task.taskZipPath = run.taskZipPath;
@@ -221,6 +244,9 @@ public final class Engine {
     }
 
     public void finishRun(WorkflowRun run, WorkflowRunState state) {
+        if (state.isTerminal() && run.endedAt == 0) {
+            run.endedAt = System.currentTimeMillis();   // the artifact's retention window starts here
+        }
         run.state = state;
         runs.save(run);
         // A supplied credential exists to get THIS run moving; past its last task there is nothing

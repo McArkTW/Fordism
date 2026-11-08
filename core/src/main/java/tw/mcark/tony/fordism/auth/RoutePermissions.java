@@ -71,12 +71,16 @@ public final class RoutePermissions {
             // ---- runs, tasks and the questions inbox ----
             new Rule(HandlerType.GET, "/api/runs", Permission.RUN_READ),
             new Rule(HandlerType.GET, "/api/runs/*", Permission.RUN_READ),
+            // The artifact's file NAMES — what the product holds, not what is in it. Its contents come
+            // only as the zip below, under the same permission a workspace download needs.
+            new Rule(HandlerType.GET, "/api/runs/*/artifact", Permission.RUN_READ),
             new Rule(HandlerType.GET, "/api/questions", Permission.RUN_READ),
             new Rule(HandlerType.GET, "/api/tasks/*/result", Permission.RUN_READ),
             new Rule(HandlerType.GET, "/api/tasks/*/transcript", Permission.RUN_READ),
             // A workspace zip carries whatever the agent wrote, secrets included — its own permission.
             new Rule(HandlerType.GET, "/api/tasks/*/result.zip", Permission.RUN_WORKSPACE_DOWNLOAD),
             new Rule(HandlerType.GET, "/api/tasks/*/workspace.zip", Permission.RUN_WORKSPACE_DOWNLOAD),
+            new Rule(HandlerType.GET, "/api/runs/*/artifact.zip", Permission.RUN_WORKSPACE_DOWNLOAD),
             new Rule(HandlerType.POST, "/api/tasks/*/answer", Permission.RUN_ANSWER),
             new Rule(HandlerType.POST, "/api/runs/*/abandon", Permission.RUN_ABANDON),
 

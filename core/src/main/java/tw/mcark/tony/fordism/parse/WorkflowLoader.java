@@ -2,6 +2,7 @@ package tw.mcark.tony.fordism.parse;
 
 import tw.mcark.tony.fordism.model.task.NetworkPolicy;
 import tw.mcark.tony.fordism.model.task.TaskConfiguration;
+import tw.mcark.tony.fordism.model.workflow.ArtifactAccess;
 import tw.mcark.tony.fordism.model.workflow.OnFail;
 import tw.mcark.tony.fordism.model.workflow.Parameter;
 import tw.mcark.tony.fordism.model.workflow.ReworkMode;
@@ -12,7 +13,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +42,9 @@ public final class WorkflowLoader {
     private static final Set<String> ON_FAIL_KEYS = Set.of("retry", "maxAttempts", "mode");
     private static final Set<String> PARAMETER_KEYS = Set.of("name", "label", "type", "required", "default", "help");
     private static final Set<String> PARAMETER_TYPES = Set.of("text", "textarea", "number");
+
+    /** A run-request field, not a parameter: the run whose artifact a new run continues from. */
+    public static final String RESERVED_PARAMETER = "artifactFrom";
 
     /** The step id a {@code when:} predicate reads — same shape ConditionalOrchestrator evaluates. */
     private static final Pattern WHEN_STEP = Pattern.compile("(\\w[\\w-]*)\\.result\\s*==\\s*'([^']*)'");
@@ -68,6 +75,15 @@ public final class WorkflowLoader {
                 "unknown strategy \"" + strategyName + "\" — one of " + Strategy.names()));
         List<String> tags = strings(map.get("tags"));
         List<Parameter> parameters = parameters(map.get("parameters"));
+        for (Parameter parameter : parameters) {
+            // The run request reads this field as the run to continue from and takes it out of the
+            // values, so a parameter by this name could be declared but never receive a value.
+            if (RESERVED_PARAMETER.equals(parameter.name())) {
+                throw new IllegalArgumentException("parameter \"" + RESERVED_PARAMETER
+                        + "\" is reserved: on a run request it names the run whose artifact the new run starts from"
+                        + " — rename the parameter");
+            }
+        }
         List<Step> steps = new ArrayList<>();
         if (map.get("steps") instanceof List<?> list) {
             int index = 0;
@@ -88,6 +104,7 @@ public final class WorkflowLoader {
                     + "\" must have exactly 2 steps (map, then reduce) — found " + steps.size());
         }
         validateStepReferences(steps);
+        steps = withArtifactAccess(strategy, steps);
         return new Workflow(name, description, strategy, tags, parameters, steps, generator, maxIterations);
     }
 
@@ -121,6 +138,80 @@ public final class WorkflowLoader {
                 requireStep(ids, matcher.group(1), "step \"" + step.id() + "\" when");
             }
         }
+    }
+
+
+    /**
+     * Each step with the artifact access the workflow's shape allows it.
+     *
+     * <p>The rule is one sentence: a step may write {@code artifact/} only when nothing else can run
+     * beside it. Core never merges two trees, so the alternative to deciding this here is two agents
+     * writing one working tree at once, and whichever finished last silently winning. A read-only
+     * step still sees the product; it hands its work back through {@code result/}, and the reduce or
+     * join after it — which does get the tree writable — merges on purpose.
+     *
+     * <ul>
+     *   <li>{@code linear}, {@code rework}, {@code conditional}: one step at a time, so every step writes.
+     *   <li>{@code map-reduce}: the map items run together, so they read; the reduce writes.
+     *   <li>{@code graph}: a step writes only if every other step is upstream or downstream of it —
+     *       ordered relative to it through {@code dependsOn}. Anything else could share its moment.
+     *   <li>{@code reconciler}: the generator writes. Its child runs are other runs, and get a copy
+     *       of this one's artifact through {@code artifactFrom}, not this tree.
+     * </ul>
+     */
+    static List<Step> withArtifactAccess(Strategy strategy, List<Step> steps) {
+        Map<String, Set<String>> upstream = strategy == Strategy.GRAPH ? upstream(steps) : Map.of();
+        List<Step> out = new ArrayList<>();
+        for (int index = 0; index < steps.size(); index++) {
+            Step step = steps.get(index);
+            ArtifactAccess access = switch (strategy) {
+                case LINEAR, REWORK, CONDITIONAL, RECONCILER -> ArtifactAccess.WRITE;
+                case MAP_REDUCE -> index == 0 ? ArtifactAccess.READ_ONLY : ArtifactAccess.WRITE;
+                case GRAPH -> orderedAgainstEveryOther(step, steps, upstream)
+                        ? ArtifactAccess.WRITE : ArtifactAccess.READ_ONLY;
+            };
+            out.add(step.withArtifact(access));
+        }
+        return out;
+    }
+
+    /** Whether every other step must finish before this one starts, or cannot start until it has. */
+    private static boolean orderedAgainstEveryOther(Step step, List<Step> steps, Map<String, Set<String>> upstream) {
+        for (Step other : steps) {
+            if (other == step) {
+                continue;
+            }
+            boolean before = upstream.get(step.id()).contains(other.id());
+            boolean after = upstream.get(other.id()).contains(step.id());
+            if (!before && !after) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Every step's transitive {@code dependsOn}: what must collect, directly or not, before it runs.
+     * Cycle-safe — a cycle is a graph that never finishes, which is not this method's to report.
+     */
+    private static Map<String, Set<String>> upstream(List<Step> steps) {
+        Map<String, List<String>> direct = new LinkedHashMap<>();
+        for (Step step : steps) {
+            direct.put(step.id(), step.dependsOn());
+        }
+        Map<String, Set<String>> out = new LinkedHashMap<>();
+        for (Step step : steps) {
+            Set<String> seen = new LinkedHashSet<>();
+            Deque<String> pending = new ArrayDeque<>(step.dependsOn());
+            while (!pending.isEmpty()) {
+                String next = pending.pop();
+                if (seen.add(next)) {
+                    pending.addAll(direct.getOrDefault(next, List.of()));
+                }
+            }
+            out.put(step.id(), seen);
+        }
+        return out;
     }
 
     private static void requireStep(Set<String> ids, String referenced, String what) {
@@ -157,7 +248,7 @@ public final class WorkflowLoader {
                     asInt(c.get("maxAttempts"), config.maximumAttempts()));
         }
         return new Step(id, (String) map.get("template"), (String) map.get("task"), includePreviousResult,
-                dependsOn, onFail, (String) map.get("forEach"), (String) map.get("when"), config);
+                dependsOn, onFail, (String) map.get("forEach"), (String) map.get("when"), config, null);
     }
 
     /** A bare name or a mapping — both declare a parameter; the mapping also describes it. */

@@ -1,5 +1,6 @@
 package tw.mcark.tony.fordism.model.task;
 
+import tw.mcark.tony.fordism.model.workflow.ArtifactAccess;
 import java.util.List;
 import java.util.Map;
 
@@ -34,6 +35,17 @@ public final class Task {
     public int attempt = 1;
     public String workspacePath;              // container-side path core reads (…/result)
     public String hostWorkspacePath;          // host-side path bind-mounted into the agent
+    /**
+     * The run's {@code artifact/} — the product, as opposed to this task's own bench. One folder per
+     * run, mounted at {@code /workspace/artifact} in every task of it; {@code artifact} says whether
+     * this one may write it. {@code artifactFrom} is the run whose artifact the run started from, so
+     * the stager can copy it in the first time the folder is laid out. All null on a task restored
+     * from a snapshot written before artifacts existed, which then simply mounts none.
+     */
+    public ArtifactAccess artifact;
+    public String artifactPath;               // container-side path core lays the artifact out at
+    public String hostArtifactPath;           // host-side path bind-mounted at /workspace/artifact
+    public String artifactFrom;
     public String containerId;
     public String proxyToken;                 // the key a proxied tool holds instead of the profile's; valid only for this task
     public String summary;

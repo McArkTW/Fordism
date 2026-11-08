@@ -62,12 +62,21 @@ export class WorkflowsService {
   /**
    * Start a run. Parameters go as form fields — core reads query and form only, so a JSON body
    * would be accepted and silently ignored. Uploaded files are zipped here and land in `task/`.
+   * `artifactFrom` names a run whose artifact/ this one starts from a copy of; '' starts empty.
    */
-  run(name: string, params: Record<string, string>, files: StagedFile[]): Observable<RunStarted> {
+  run(
+    name: string,
+    params: Record<string, string>,
+    files: StagedFile[],
+    artifactFrom = '',
+  ): Observable<RunStarted> {
     const url = `/api/workflows/${encodeURIComponent(name)}/run`;
     const form = new FormData();
     for (const [key, value] of Object.entries(params)) {
       form.append(key, value);
+    }
+    if (artifactFrom) {
+      form.append('artifactFrom', artifactFrom);
     }
     if (files.length === 0) {
       return this.http.post<RunStarted>(url, form);

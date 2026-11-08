@@ -24,6 +24,12 @@ public final class FordismConfiguration {
     // that is the whole difference between this and the in-memory rescue vault.
     public final String credentialsDir = env("FORDISM_CREDENTIALS_DIR", workspacesDir + "/_credentials");
 
+    // How long a run's artifact/ (the product, under <workspaces>/_artifacts/<run-id>) outlives the
+    // run, in hours. 0 — the default — keeps it, as workspaces have always been kept: the product is
+    // what the run was for, and deleting it is an operator's call. A run another run continues from
+    // (artifactFrom) is held until that run has ended, whatever the window says.
+    public final long artifactRetentionHours = envLong("FORDISM_ARTIFACT_RETENTION_HOURS", 0);
+
     // The gid the agent image runs as (agent/Dockerfile pins node to 1001). Core runs as root, so
     // this is the only thing the two share — a staged workspace is chgrp'd to it.
     public final long agentGroupId = envLong("FORDISM_AGENT_GID", 1001);

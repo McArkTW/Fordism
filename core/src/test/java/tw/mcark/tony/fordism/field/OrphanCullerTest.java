@@ -1,6 +1,7 @@
 package tw.mcark.tony.fordism.field;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import tw.mcark.tony.fordism.launch.ContainerLauncher;
@@ -13,12 +14,17 @@ import tw.mcark.tony.fordism.store.InMemoryTaskRepository;
 import tw.mcark.tony.fordism.store.InMemoryWorkflowRunRepository;
 import tw.mcark.tony.fordism.store.TaskRepository;
 import tw.mcark.tony.fordism.store.WorkflowRunRepository;
+import tw.mcark.tony.fordism.workspace.ArtifactStore;
 import tw.mcark.tony.fordism.workspace.CredentialScrub;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /** No task may still be live under a run that has ended. */
 class OrphanCullerTest {
@@ -157,6 +163,91 @@ class OrphanCullerTest {
         culler.sweep();
 
         assertEquals(1, launcher.killed.size());
+    }
+
+    // ---- artifact retention ----
+
+    private static final Duration WINDOW = Duration.ofHours(24);
+
+    @TempDir
+    Path root;
+
+    private ArtifactStore artifacts() {
+        return new ArtifactStore(root, root, 1001);
+    }
+
+    private OrphanCuller retaining() {
+        return new OrphanCuller(tasks, runs, launcher, new CredentialScrub(List.of()),
+                new ArtifactRetention(artifacts(), WINDOW));
+    }
+
+    /** A run that ended {@code ago} before now, with an artifact on disk. */
+    private WorkflowRun endedWithArtifact(String id, Duration ago) throws IOException {
+        WorkflowRun run = run(id, WorkflowRunState.DONE);
+        run.endedAt = System.currentTimeMillis() - ago.toMillis();
+        artifacts().prepare(id, null);
+        return run;
+    }
+
+    @Test
+    void an_artifact_outlives_its_run_by_the_retention_window() throws IOException {
+        endedWithArtifact("recent", Duration.ofHours(1));
+        endedWithArtifact("old", Duration.ofHours(48));
+
+        retaining().sweep();
+
+        assertTrue(artifacts().exists("recent"), "inside the window: kept");
+        assertFalse(artifacts().exists("old"), "past the window: culled");
+    }
+
+    @Test
+    void a_run_still_going_keeps_its_artifact_however_old_it_is() throws IOException {
+        WorkflowRun live = run("live", WorkflowRunState.ACTIVE);
+        live.endedAt = 0;
+        artifacts().prepare("live", null);
+
+        retaining().cullArtifacts(System.currentTimeMillis() + Duration.ofDays(30).toMillis());
+
+        assertTrue(artifacts().exists("live"));
+    }
+
+    @Test
+    void an_artifact_another_run_continues_from_is_held_until_that_run_ends() throws IOException {
+        // The dependent copies the source when it stages its first task, which can be long after
+        // it was accepted. Culling the source in between would fail a run promised a product.
+        endedWithArtifact("design", Duration.ofHours(48));
+        WorkflowRun execute = run("execute", WorkflowRunState.ACTIVE);
+        execute.artifactFrom = "design";
+
+        retaining().sweep();
+        assertTrue(artifacts().exists("design"), "held while the dependent run is going");
+
+        execute.state = WorkflowRunState.DONE;
+        execute.endedAt = System.currentTimeMillis();
+        retaining().sweep();
+        assertFalse(artifacts().exists("design"), "released once it has ended");
+    }
+
+    @Test
+    void a_parked_dependent_still_holds_its_source() throws IOException {
+        // ASKED is not over: the answer resumes the run, and its next step may be the first to stage.
+        endedWithArtifact("design", Duration.ofHours(48));
+        run("execute", WorkflowRunState.ASKED).artifactFrom = "design";
+
+        retaining().sweep();
+
+        assertTrue(artifacts().exists("design"));
+    }
+
+    @Test
+    void with_no_window_nothing_is_ever_culled() throws IOException {
+        endedWithArtifact("old", Duration.ofDays(365));
+
+        new OrphanCuller(tasks, runs, launcher, new CredentialScrub(List.of()),
+                new ArtifactRetention(artifacts(), Duration.ZERO)).sweep();
+        culler.sweep();
+
+        assertTrue(artifacts().exists("old"));
     }
 
     @Test
