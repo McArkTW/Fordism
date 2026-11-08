@@ -22,11 +22,12 @@ public final class Views {
     /* ---- runs ---- */
 
     /**
-     * One run in the list. {@code parentRunId} is set only on a run a reconciler spawned — Gson
-     * omits a null, so an ordinary run's row is byte-for-byte what it was before child runs existed.
+     * One run in the list. {@code parentRunId} is set only on a run a reconciler spawned, and
+     * {@code artifactFrom} only on a run that continued another's artifact — Gson omits a null, so an
+     * ordinary run's row is byte-for-byte what it was before either existed.
      */
     public record RunSummary(String id, String workflow, String state, long createdAt, long durationMs,
-                             String parentRunId) {}
+                             String parentRunId, String artifactFrom) {}
 
     /**
      * A run with everything its page draws: its tasks, the run that spawned it, and the runs it
@@ -35,7 +36,20 @@ public final class Views {
      */
     public record RunDetail(String id, String workflow, String strategy, String state, long createdAt,
                             String workflowSnapshot, List<TaskDetail> tasks, String parentRunId,
-                            List<RunSummary> children) {}
+                            List<RunSummary> children, RunArtifact artifact) {}
+
+    /**
+     * The run's product folder. {@code present} is false before the first task has laid it out and
+     * after retention has culled it — the run page says which rather than offering an empty zip.
+     * {@code from} is the run it was copied from, when it continued one.
+     */
+    public record RunArtifact(String path, boolean present, String from) {}
+
+    /** What the artifact holds, by name. Contents come only as the zip, under a stronger permission. */
+    public record ArtifactFiles(String runId, String path, boolean present, List<ArtifactEntry> files,
+                                boolean truncated) {}
+
+    public record ArtifactEntry(String path, long size, boolean directory) {}
 
     public record TaskDetail(String taskId, int step, String state, String template, String session,
                              String workspace, String summary, String verdict, long createdAt, int attempt,
@@ -72,10 +86,14 @@ public final class Views {
      * One step in the outline. {@code network} is the egress core would impose, not the text the
      * YAML carried — a step that says nothing about network still reaches core and nothing else,
      * and the outline is the only place that shows it before a run starts.
+     *
+     * <p>{@code artifact} is the same kind of fact: {@code read-only} where the loader found a step
+     * that could run beside a sibling, so its author learns before the run that its work has to come
+     * back through {@code result/}.
      */
     public record WorkflowStep(String id, String template, List<String> dependsOn, String forEach,
                                String when, boolean includePreviousResult, int timeoutSeconds,
-                               String network) {}
+                               String network, String artifact) {}
 
     public record WorkflowParameter(String name, String label, String type, boolean required,
                                     String defaultValue, String help) {}

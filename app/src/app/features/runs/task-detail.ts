@@ -2,6 +2,7 @@ import { Component, OnDestroy, computed, effect, inject, input, signal } from '@
 import { DatePipe } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { HlmButton } from '@spartan-ng/helm/button';
+import { HlmHoverCardImports } from '@spartan-ng/helm/hover-card';
 import { HlmInput } from '@spartan-ng/helm/input';
 import { HlmLabel } from '@spartan-ng/helm/label';
 import { HlmSkeleton } from '@spartan-ng/helm/skeleton';
@@ -10,7 +11,7 @@ import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { apiError } from '../../core/api-error';
 import { ResultFile, RunDetail, RunsService, TaskView } from '../../core/api/runs.service';
 import { Icon } from '../../core/icon';
-import { formatDuration, formatSize, statusView } from '../../core/status';
+import { formatDuration, formatSize, formatTokens, statusView } from '../../core/status';
 import { Toasts } from '../../core/toast';
 import { Markdown } from '../../shared/markdown';
 
@@ -38,6 +39,7 @@ type FileView = { name: string; size: number; binary: boolean; markdown: boolean
     DatePipe,
     Markdown,
     HlmButton,
+    HlmHoverCardImports,
     HlmInput,
     HlmLabel,
     HlmSkeleton,
@@ -250,6 +252,10 @@ export class TaskDetailPage implements OnDestroy {
 
   sizeOf(bytes: number): string {
     return formatSize(bytes);
+  }
+
+  tokens(count: number): string {
+    return formatTokens(count);
   }
 
   clip(text: string): string {

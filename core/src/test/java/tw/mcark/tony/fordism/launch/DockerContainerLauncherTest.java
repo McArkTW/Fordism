@@ -8,6 +8,7 @@ import tw.mcark.tony.fordism.credential.CredentialStore;
 import tw.mcark.tony.fordism.model.task.NetworkPolicy;
 import tw.mcark.tony.fordism.model.task.Task;
 import tw.mcark.tony.fordism.model.task.TaskConfiguration;
+import tw.mcark.tony.fordism.model.workflow.ArtifactAccess;
 import tw.mcark.tony.fordism.secret.SecretVault;
 import java.nio.file.Path;
 import java.util.List;
@@ -75,6 +76,51 @@ class DockerContainerLauncherTest {
         assertEquals(NetworkPolicy.NONE, NetworkPolicy.from("ful"), "a typo fails closed, not open");
         assertEquals(NetworkPolicy.FORDISM_ONLY, NetworkPolicy.from("fordism-only"));
         assertEquals(NetworkPolicy.FULL, NetworkPolicy.from("full"));
+    }
+
+    // ---- the run's artifact ----
+
+    private static Task withArtifact(ArtifactAccess access) {
+        Task task = task(NetworkPolicy.NONE);
+        task.hostArtifactPath = "/var/lib/fordism/workspaces/_artifacts/run-1";
+        task.artifact = access;
+        return task;
+    }
+
+    @Test
+    void a_step_that_may_write_the_artifact_gets_it_mounted_read_write() {
+        List<String> cmd = launcher().runCommand(withArtifact(ArtifactAccess.WRITE), "fd-t1", Path.of("x"));
+
+        assertTrue(adjacent(cmd, "-v", "/var/lib/fordism/workspaces/_artifacts/run-1:/workspace/artifact"),
+                cmd.toString());
+    }
+
+    @Test
+    void a_step_that_could_run_beside_a_sibling_gets_the_artifact_read_only() {
+        // Docker enforces it, not the agent's manners: two agents never write one working tree.
+        List<String> cmd = launcher().runCommand(withArtifact(ArtifactAccess.READ_ONLY), "fd-t1", Path.of("x"));
+
+        assertTrue(adjacent(cmd, "-v", "/var/lib/fordism/workspaces/_artifacts/run-1:/workspace/artifact:ro"),
+                cmd.toString());
+        assertTrue(adjacent(cmd, "-v", "/var/lib/fordism/workspaces/t1:/workspace"),
+                "the workspace itself stays the agent's to write: " + cmd);
+    }
+
+    @Test
+    void the_artifact_is_mounted_after_the_workspace_it_sits_inside() {
+        // Docker applies mounts in order; the nested one has to land on top of the workspace mount.
+        List<String> cmd = launcher().runCommand(withArtifact(ArtifactAccess.WRITE), "fd-t1", Path.of("x"));
+
+        assertTrue(cmd.indexOf("/var/lib/fordism/workspaces/t1:/workspace")
+                < cmd.indexOf("/var/lib/fordism/workspaces/_artifacts/run-1:/workspace/artifact"), cmd.toString());
+    }
+
+    @Test
+    void a_task_staged_before_artifacts_existed_mounts_none() {
+        // Restored from an old snapshot: no artifact path, so no "null:/workspace/artifact" mount.
+        List<String> cmd = launcher().runCommand(task(NetworkPolicy.NONE), "fd-t1", Path.of("x"));
+
+        assertTrue(cmd.stream().noneMatch(argument -> argument.contains("/workspace/artifact")), cmd.toString());
     }
 
     // ---- rescue-secret scoping ----

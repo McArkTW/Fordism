@@ -2,6 +2,7 @@ package tw.mcark.tony.fordism.orchestrate;
 
 import tw.mcark.tony.fordism.field.Dispatcher;
 import tw.mcark.tony.fordism.launch.SessionIdentifierFactory;
+import tw.mcark.tony.fordism.model.run.RunRequest;
 import tw.mcark.tony.fordism.model.run.WorkflowRun;
 import tw.mcark.tony.fordism.model.run.WorkflowRunState;
 import tw.mcark.tony.fordism.model.task.ChildRunRequest;
@@ -58,6 +59,11 @@ final class OrchestratorHarness {
 
     WorkflowRun start(String yaml, Map<String, String> parameters) {
         return engine.createRun(register(yaml), parameters);
+    }
+
+    /** Start a run that continues another run's artifact. */
+    WorkflowRun startFrom(String yaml, String artifactFrom) {
+        return engine.createRun(new RunRequest(register(yaml), Map.of(), null, artifactFrom));
     }
 
     /** Register a workflow without starting it — what a child run's workflow needs to exist. */

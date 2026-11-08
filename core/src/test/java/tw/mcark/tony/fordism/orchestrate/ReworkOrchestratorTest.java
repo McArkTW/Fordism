@@ -92,6 +92,17 @@ class ReworkOrchestratorTest {
     }
 
     @Test
+    void the_retry_is_staged_with_its_last_result_even_when_the_step_never_asked() {
+        WorkflowRun run = runUpToTheGate();
+        harness.collect(run, 1, "fail");
+
+        harness.reconcile(run);
+
+        assertTrue(harness.at(run, 0).includePreviousResult,
+                "a retry that is handed only the path of its last workspace starts from nothing");
+    }
+
+    @Test
     void the_gate_is_re_run_against_the_reworked_output_rather_than_reading_its_old_verdict() {
         WorkflowRun run = runUpToTheGate();
         String firstGate = harness.at(run, 1).id;

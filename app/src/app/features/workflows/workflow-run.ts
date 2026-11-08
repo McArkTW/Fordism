@@ -4,6 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmInput } from '@spartan-ng/helm/input';
 import { HlmLabel } from '@spartan-ng/helm/label';
+import { HlmSelectImports } from '@spartan-ng/helm/select';
 import { HlmSpinner } from '@spartan-ng/helm/spinner';
 import {
   HlmTable,
@@ -17,7 +18,7 @@ import {
 import { HlmTextarea } from '@spartan-ng/helm/textarea';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { apiError } from '../../core/api-error';
-import { RunSummary } from '../../core/api/runs.service';
+import { RunSummary, RunsService } from '../../core/api/runs.service';
 import { Preflight, StagedFile, WorkflowDetail } from '../../core/api/workflows.model';
 import { WorkflowsService } from '../../core/api/workflows.service';
 import { Icon } from '../../core/icon';
@@ -40,6 +41,7 @@ import { Toasts } from '../../core/toast';
     HlmButton,
     HlmInput,
     HlmLabel,
+    HlmSelectImports,
     HlmSpinner,
     HlmTextarea,
     HlmTooltip,
@@ -56,8 +58,11 @@ import { Toasts } from '../../core/toast';
 })
 export class WorkflowRun {
   readonly name = input<string>();
+  /** ?artifactFrom=<run-id> preselects the run to continue from. */
+  readonly artifactFrom = input<string>('');
 
   private service = inject(WorkflowsService);
+  private runsService = inject(RunsService);
   private router = inject(Router);
   private toasts = inject(Toasts);
 
@@ -72,6 +77,13 @@ export class WorkflowRun {
   /** Why the preflight check itself did not answer — distinct from a check that said "not ready". */
   readonly preflightError = signal('');
   readonly recentError = signal('');
+  /**
+   * The run whose artifact/ this one starts from, or '' for an empty one. Any workflow's run will
+   * do: clarify, design and execute are separate workflows working on one product.
+   */
+  readonly continueFrom = signal('');
+  /** Recent runs of any workflow, to pick one to continue from. */
+  readonly continuable = signal<RunSummary[]>([]);
 
   protected readonly sv = statusView;
   protected readonly duration = formatDuration;
@@ -108,6 +120,17 @@ export class WorkflowRun {
   private loadedFor = signal('');
 
   constructor() {
+    effect(() => {
+      const preset = this.artifactFrom();
+      if (preset) {
+        this.continueFrom.set(preset);
+      }
+    });
+    this.runsService.page({ limit: 50 }).subscribe({
+      next: (page) => this.continuable.set(page.runs),
+      // Not worth a banner: without the list the run simply starts from an empty artifact.
+      error: () => this.continuable.set([]),
+    });
     // Routed inputs bind after construction — reading name() here would see undefined and fetch nothing.
     effect(() => {
       const name = this.name() ?? '';
@@ -149,6 +172,11 @@ export class WorkflowRun {
 
   set(name: string, value: string): void {
     this.values.update((v) => ({ ...v, [name]: value }));
+  }
+
+  /** The option text for a run: workflow, short id, when. */
+  runLabel(run: RunSummary): string {
+    return `${run.workflow} · ${run.id.slice(0, 8)} · ${new Date(run.createdAt).toLocaleString()}`;
   }
 
   isTaskMd(name: string): boolean {
@@ -195,16 +223,18 @@ export class WorkflowRun {
 
   start(): void {
     this.busy.set(true);
-    this.service.run(this.name() ?? '', this.values(), this.files()).subscribe({
-      next: (started) => {
-        this.busy.set(false);
-        this.toasts.ok(`Run started: ${started.runId.slice(0, 8)}`);
-        this.router.navigate(['/runs', started.runId]);
-      },
-      error: (e) => {
-        this.busy.set(false);
-        this.toasts.error(apiError(e, 'Could not start the run'));
-      },
-    });
+    this.service
+      .run(this.name() ?? '', this.values(), this.files(), this.continueFrom())
+      .subscribe({
+        next: (started) => {
+          this.busy.set(false);
+          this.toasts.ok(`Run started: ${started.runId.slice(0, 8)}`);
+          this.router.navigate(['/runs', started.runId]);
+        },
+        error: (e) => {
+          this.busy.set(false);
+          this.toasts.error(apiError(e, 'Could not start the run'));
+        },
+      });
   }
 }
