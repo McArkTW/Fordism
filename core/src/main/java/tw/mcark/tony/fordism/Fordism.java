@@ -14,6 +14,7 @@ import tw.mcark.tony.fordism.field.Collector;
 import tw.mcark.tony.fordism.field.CullPolicy;
 import tw.mcark.tony.fordism.field.Dispatcher;
 import tw.mcark.tony.fordism.field.FieldView;
+import tw.mcark.tony.fordism.field.ArtifactRetention;
 import tw.mcark.tony.fordism.field.OrphanCuller;
 import tw.mcark.tony.fordism.field.Reaper;
 import tw.mcark.tony.fordism.launch.ContainerLauncher;
@@ -40,6 +41,7 @@ import tw.mcark.tony.fordism.web.App;
 import tw.mcark.tony.fordism.workspace.CredentialScrub;
 import tw.mcark.tony.fordism.workspace.TemplateStore;
 import tw.mcark.tony.fordism.workspace.TaskResults;
+import tw.mcark.tony.fordism.workspace.ArtifactStore;
 import tw.mcark.tony.fordism.workspace.WorkspaceArchive;
 import tw.mcark.tony.fordism.workspace.WorkspaceStager;
 import tw.mcark.tony.fordism.credential.CredentialStore;
@@ -47,6 +49,7 @@ import tw.mcark.tony.fordism.secret.SecretVault;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.stream.Stream;
 import org.tinylog.Logger;
 
@@ -77,7 +80,9 @@ public final class Fordism {
         CredentialScrub scrub = new CredentialScrub(configuration.credentialFiles);
         Collector collector = new Collector(tasks, results, launcher, scrub);
         Reaper reaper = new Reaper(tasks, results, launcher, new CullPolicy(), configuration, scrub);
-        OrphanCuller culler = new OrphanCuller(tasks, runs, launcher, scrub);
+        ArtifactStore artifacts = new ArtifactStore(configuration);
+        OrphanCuller culler = new OrphanCuller(tasks, runs, launcher, scrub,
+                new ArtifactRetention(artifacts, Duration.ofHours(configuration.artifactRetentionHours)));
         JsonStateStore stateStore = new JsonStateStore(configuration);
         Engine engine = new Engine(configuration, tasks, runs, sessions, dispatcher, collector, reaper,
                 culler, stateStore, secrets);

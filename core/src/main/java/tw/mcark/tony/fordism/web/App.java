@@ -12,6 +12,7 @@ import tw.mcark.tony.fordism.proxy.UsageProxy;
 import tw.mcark.tony.fordism.secret.SecretVault;
 import tw.mcark.tony.fordism.skill.SkillPluginStore;
 import tw.mcark.tony.fordism.skill.SkillStore;
+import tw.mcark.tony.fordism.workspace.ArtifactStore;
 import tw.mcark.tony.fordism.workspace.TemplateStore;
 import tw.mcark.tony.fordism.workspace.TaskResults;
 import tw.mcark.tony.fordism.workspace.WorkspaceArchive;
@@ -63,7 +64,7 @@ public final class App {
      */
     public Javalin startOn(int port) {
         WorkflowController workflows = new WorkflowController(engine, configuration, templates, profiles, credentials);
-        RunController runs = new RunController(engine, results, archive, secrets);
+        RunController runs = new RunController(engine, results, archive, secrets, new ArtifactStore(configuration));
         TemplateController templateApi = new TemplateController(templates);
         SkillController skillApi = new SkillController(skills, skillPlugins);
         SkillPluginController pluginApi = new SkillPluginController(skillPlugins);
@@ -143,6 +144,8 @@ public final class App {
         app.get("/api/runs", runs::list);
         app.get("/api/runs/{id}", runs::get);
         app.post("/api/runs/{id}/abandon", runs::abandon);
+        app.get("/api/runs/{id}/artifact", runs::artifact);
+        app.get("/api/runs/{id}/artifact.zip", runs::artifactZip);
         app.get("/api/tasks/{id}/result", runs::result);
         app.get("/api/tasks/{id}/result.zip", runs::resultZip);
         app.get("/api/tasks/{id}/workspace.zip", runs::workspaceZip);

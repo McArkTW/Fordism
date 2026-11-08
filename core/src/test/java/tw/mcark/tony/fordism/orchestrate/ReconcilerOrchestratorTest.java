@@ -265,4 +265,19 @@ class ReconcilerOrchestratorTest {
         assertEquals(WorkflowRunState.FAILED, run.state);
         assertEquals(0, harness.plantedCount(run));
     }
+
+    @Test
+    void a_child_run_starts_from_a_copy_of_the_parents_artifact() {
+        // Siblings run side by side, so each gets its own copy of what the generator has built,
+        // never the parent's own tree.
+        WorkflowRun run = runWaitingOnTwoChildren();
+
+        for (WorkflowRun child : harness.childrenOf(run)) {
+            assertEquals(run.id, child.artifactFrom);
+        }
+        WorkflowRun first = harness.childrenOf(run).get(0);
+        harness.reconcile(first);
+        assertEquals(run.id, harness.at(first, 0).artifactFrom,
+                "the task carries it, so the stager knows what to copy");
+    }
 }

@@ -1,12 +1,18 @@
 package tw.mcark.tony.fordism.field;
 
 import tw.mcark.tony.fordism.launch.ContainerLauncher;
+import tw.mcark.tony.fordism.model.run.WorkflowRun;
 import tw.mcark.tony.fordism.model.task.Task;
 import tw.mcark.tony.fordism.model.task.TaskState;
 import tw.mcark.tony.fordism.store.TaskRepository;
 import tw.mcark.tony.fordism.store.WorkflowRunRepository;
+import tw.mcark.tony.fordism.workspace.ArtifactStore;
 import tw.mcark.tony.fordism.workspace.CredentialScrub;
+import java.io.IOException;
+import java.time.Duration;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.tinylog.Logger;
 
 /**
@@ -34,13 +40,20 @@ public final class OrphanCuller {
     private final WorkflowRunRepository runs;
     private final ContainerLauncher launcher;
     private final CredentialScrub scrub;
+    private final ArtifactRetention retention;
 
     public OrphanCuller(TaskRepository tasks, WorkflowRunRepository runs, ContainerLauncher launcher,
             CredentialScrub scrub) {
+        this(tasks, runs, launcher, scrub, ArtifactRetention.keepForever());
+    }
+
+    public OrphanCuller(TaskRepository tasks, WorkflowRunRepository runs, ContainerLauncher launcher,
+            CredentialScrub scrub, ArtifactRetention retention) {
         this.tasks = tasks;
         this.runs = runs;
         this.launcher = launcher;
         this.scrub = scrub;
+        this.retention = retention;
     }
 
     public void sweep() {
@@ -49,6 +62,41 @@ public final class OrphanCuller {
                 runs.find(task.runId)
                         .filter(run -> run.state.isTerminal())
                         .ifPresent(run -> cull(task, run.state.name().toLowerCase()));
+            }
+        }
+        if (retention.culls()) {
+            cullArtifacts(System.currentTimeMillis());
+        }
+    }
+
+    /**
+     * Remove the artifact of every run that ended longer ago than the retention window.
+     *
+     * <p>Except one that a run still going was started from. The copy is made when that run stages
+     * its first task, which may be well after it was accepted — a run queued behind a full launcher,
+     * or parked on a question before its first step — so culling the source in between would fail a
+     * run that had been promised a product to continue.
+     */
+    void cullArtifacts(long now) {
+        List<WorkflowRun> all = runs.all();
+        Set<String> held = new HashSet<>();
+        for (WorkflowRun run : all) {
+            if (!run.state.isTerminal() && run.artifactFrom != null) {
+                held.add(run.artifactFrom);
+            }
+        }
+        ArtifactStore store = retention.store();
+        for (WorkflowRun run : all) {
+            long ended = run.endedAt > 0 ? run.endedAt : run.createdAt;
+            boolean expired = run.state.isTerminal() && now - ended >= retention.window().toMillis();
+            if (!expired || held.contains(run.id) || !store.exists(run.id)) {
+                continue;
+            }
+            try {
+                store.delete(run.id);
+                Logger.info("cull artifact of run {} — ended {} ago", run.id, Duration.ofMillis(now - ended));
+            } catch (IOException e) {
+                Logger.warn("could not cull the artifact of run {}: {}", run.id, e.getMessage());
             }
         }
     }

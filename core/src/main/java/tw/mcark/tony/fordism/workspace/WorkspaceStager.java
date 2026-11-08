@@ -30,6 +30,7 @@ import org.tinylog.Logger;
 public final class WorkspaceStager {
     private final FordismConfiguration configuration;
     private final ModelRegistry models;
+    private final ArtifactStore artifacts;
 
     /** No profiles: config.json carries the step's own model. */
     public WorkspaceStager(FordismConfiguration configuration) {
@@ -39,6 +40,7 @@ public final class WorkspaceStager {
     public WorkspaceStager(FordismConfiguration configuration, ModelRegistry models) {
         this.configuration = configuration;
         this.models = models;
+        this.artifacts = new ArtifactStore(configuration);
     }
 
     public Path stage(Task task, TemplateStore templates) throws IOException {
@@ -66,8 +68,22 @@ public final class WorkspaceStager {
         }
         task.workspacePath = workspace.toString();
         task.hostWorkspacePath = Paths.get(configuration.workspacesHost, task.id).toString();
+        stageArtifact(task, workspace);
         groupWritable(workspace);
         return workspace;
+    }
+
+    /**
+     * Lay out the run's artifact if this is its first task, and record where the launcher mounts it.
+     *
+     * <p>The empty {@code artifact/} made inside the workspace is only the mountpoint. Left to docker,
+     * it would be created root-owned inside a workspace the agent is meant to own.
+     */
+    private void stageArtifact(Task task, Path workspace) throws IOException {
+        Path artifact = artifacts.prepare(task.runId, task.artifactFrom);
+        Files.createDirectories(workspace.resolve("artifact"));
+        task.artifactPath = artifact.toString();
+        task.hostArtifactPath = artifacts.hostPath(task.runId);
     }
 
     /**

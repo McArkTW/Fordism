@@ -3,12 +3,14 @@ package tw.mcark.tony.fordism.web;
 import tw.mcark.tony.fordism.agentprofile.AgentProfileStore;
 import tw.mcark.tony.fordism.config.FordismConfiguration;
 import tw.mcark.tony.fordism.credential.CredentialStore;
+import tw.mcark.tony.fordism.model.run.RunRequest;
 import tw.mcark.tony.fordism.model.run.WorkflowRun;
 import tw.mcark.tony.fordism.model.workflow.Parameter;
 import tw.mcark.tony.fordism.model.workflow.Step;
 import tw.mcark.tony.fordism.model.workflow.Workflow;
 import tw.mcark.tony.fordism.orchestrate.Engine;
 import tw.mcark.tony.fordism.workspace.AgentTemplate;
+import tw.mcark.tony.fordism.workspace.ArtifactStore;
 import tw.mcark.tony.fordism.workspace.TemplateStore;
 import io.javalin.http.Context;
 import io.javalin.http.UploadedFile;
@@ -28,11 +30,15 @@ import java.util.Optional;
 
 /** /api/workflows[...] — list, get, and run a workflow. */
 public final class WorkflowController {
+    /** The run-request field naming the run whose artifact a new run starts from. */
+    static final String ARTIFACT_FROM = "artifactFrom";
+
     private final Engine engine;
     private final FordismConfiguration configuration;
     private final TemplateStore templates;
     private final AgentProfileStore profiles;
     private final CredentialStore credentials;
+    private final ArtifactStore artifacts;
 
     public WorkflowController(Engine engine, FordismConfiguration configuration, TemplateStore templates,
             AgentProfileStore profiles, CredentialStore credentials) {
@@ -41,6 +47,7 @@ public final class WorkflowController {
         this.templates = templates;
         this.profiles = profiles;
         this.credentials = credentials;
+        this.artifacts = new ArtifactStore(configuration);
     }
 
     /** Fast-fail: every step that NAMES a template must resolve, and that template must carry a real Agent Profile. */
@@ -172,7 +179,8 @@ public final class WorkflowController {
         for (Step step : workflow.steps()) {
             steps.add(new Views.WorkflowStep(step.id(), nz(step.template()), step.dependsOn(),
                     nz(step.forEach()), nz(step.when()), step.includePreviousResult(),
-                    step.config().timeoutSeconds(), step.config().network().wireName()));
+                    step.config().timeoutSeconds(), step.config().network().wireName(),
+                    step.artifact().wireName()));
         }
         List<Views.WorkflowParameter> parameters = new ArrayList<>();
         for (Parameter parameter : workflow.parameters()) {
@@ -240,6 +248,16 @@ public final class WorkflowController {
                 params.put(entry.getKey(), entry.getValue().get(0));
             }
         }
+        // Not a workflow parameter: which run's artifact/ this one starts from. Taken out of the
+        // values so it never reaches a task as ${artifactFrom} text.
+        String artifactFrom = params.remove(ARTIFACT_FROM);
+        if (artifactFrom != null && !artifactFrom.isBlank() && !artifacts.exists(artifactFrom.trim())) {
+            String reason = engine.runs().find(artifactFrom.trim()).isPresent()
+                    ? "run \"" + artifactFrom.trim() + "\" has no artifact to continue from — it never staged a task, or its artifact was culled"
+                    : "artifactFrom names run \"" + artifactFrom.trim() + "\", which does not exist";
+            ctx.status(400).contentType("application/json").result("{\"error\":\"" + escape(reason) + "\"}");
+            return;
+        }
         try {
             String zipPath = null;
             UploadedFile upload = ctx.uploadedFile("taskZip");
@@ -252,7 +270,7 @@ public final class WorkflowController {
                 }
                 zipPath = zip.toString();
             }
-            WorkflowRun run = engine.createRun(name, params, zipPath);
+            WorkflowRun run = engine.createRun(new RunRequest(name, params, zipPath, artifactFrom));
             ctx.status(202).contentType("application/json")
                     .result(Json.write(new Views.RunStarted(run.id, name, run.state.toString())));
         } catch (IllegalArgumentException e) {

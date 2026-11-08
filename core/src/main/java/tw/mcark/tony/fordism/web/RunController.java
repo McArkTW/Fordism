@@ -8,10 +8,16 @@ import tw.mcark.tony.fordism.model.task.TaskMode;
 import tw.mcark.tony.fordism.model.task.TaskState;
 import tw.mcark.tony.fordism.orchestrate.Engine;
 import tw.mcark.tony.fordism.secret.SecretVault;
+import tw.mcark.tony.fordism.workspace.ArtifactStore;
 import tw.mcark.tony.fordism.workspace.TaskResults;
 import tw.mcark.tony.fordism.workspace.WorkspaceArchive;
 import io.javalin.http.Context;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.stream.Stream;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -26,16 +32,21 @@ import java.util.Set;
 /** /api/runs[...] — list runs, get a run with its tasks, preview + download a task's result. */
 public final class RunController {
     private static final Gson GSON = new Gson();
+    /** The most entries the artifact view lists; a dependency tree can hold hundreds of thousands. */
+    private static final int ARTIFACT_LISTING_LIMIT = 2000;
     private final Engine engine;
     private final TaskResults results;
     private final WorkspaceArchive archive;
     private final SecretVault secrets;
+    private final ArtifactStore artifacts;
 
-    public RunController(Engine engine, TaskResults results, WorkspaceArchive archive, SecretVault secrets) {
+    public RunController(Engine engine, TaskResults results, WorkspaceArchive archive, SecretVault secrets,
+            ArtifactStore artifacts) {
         this.engine = engine;
         this.results = results;
         this.archive = archive;
         this.secrets = secrets;
+        this.artifacts = artifacts;
     }
 
     /**
@@ -123,13 +134,82 @@ public final class RunController {
         children.sort(Comparator.comparingLong(Views.RunSummary::createdAt)
                 .thenComparing(Views.RunSummary::id));
         Api.json(ctx, new Views.RunDetail(run.id, run.workflowName, run.strategy.wireName(), run.state.toString(),
-                run.createdAt, run.workflowSnapshot, taskViews, run.parentRunId, children));
+                run.createdAt, run.workflowSnapshot, taskViews, run.parentRunId, children, artifactOf(run)));
+    }
+
+    /** Where the run's artifact is, as docker mounts it, and whether there is one there now. */
+    private Views.RunArtifact artifactOf(WorkflowRun run) {
+        return new Views.RunArtifact(artifacts.hostPath(run.id), artifacts.exists(run.id), run.artifactFrom);
+    }
+
+    /**
+     * What the run's artifact holds, by name and size — the run page's view of the product.
+     *
+     * <p>{@code .git} and {@code node_modules} are listed as one entry and not entered: they are
+     * the bulk of a working tree by count and none of what a person opens the page to see.
+     */
+    public void artifact(Context ctx) {
+        WorkflowRun run = pathRun(ctx).orElse(null);
+        if (run == null) {
+            return;
+        }
+        Path root = artifacts.path(run.id);
+        List<Views.ArtifactEntry> files = new ArrayList<>();
+        boolean truncated = false;
+        if (Files.isDirectory(root)) {
+            try (Stream<Path> walk = Files.walk(root)) {
+                for (Path path : (Iterable<Path>) walk.skip(1).filter(entry -> !insideBulk(root, entry))::iterator) {
+                    if (files.size() >= ARTIFACT_LISTING_LIMIT) {
+                        truncated = true;
+                        break;
+                    }
+                    BasicFileAttributes attributes =
+                            Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+                    boolean directory = attributes.isDirectory();
+                    long size = directory ? 0L : attributes.size();
+                    files.add(new Views.ArtifactEntry(root.relativize(path).toString().replace('\\', '/'),
+                            size, directory));
+                }
+            } catch (IOException e) {
+                Api.fail(ctx, 500, "could not read the artifact: " + e.getMessage());
+                return;
+            }
+        }
+        Api.json(ctx, new Views.ArtifactFiles(run.id, artifacts.hostPath(run.id), Files.isDirectory(root),
+                files, truncated));
+    }
+
+    /** Below a .git or node_modules folder — the folder itself is listed, its contents are not. */
+    private static boolean insideBulk(Path root, Path path) {
+        Path relative = root.relativize(path);
+        for (int index = 0; index < relative.getNameCount() - 1; index++) {
+            String name = relative.getName(index).toString();
+            if (name.equals(".git") || name.equals("node_modules")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Download the run's artifact — the product — as a zip. */
+    public void artifactZip(Context ctx) {
+        WorkflowRun run = pathRun(ctx).orElse(null);
+        if (run == null) {
+            return;
+        }
+        ctx.contentType("application/zip");
+        ctx.header("Content-Disposition", "attachment; filename=\"" + run.id + "-artifact.zip\"");
+        try {
+            archive.zipArtifact(artifacts.path(run.id), ctx.outputStream());
+        } catch (IOException e) {
+            ctx.status(500);
+        }
     }
 
     /** One row of the run list — and of the children a reconciler's page lists under it. */
     private Views.RunSummary summaryOf(WorkflowRun run) {
         return new Views.RunSummary(run.id, run.workflowName, run.state.toString(),
-                run.createdAt, durationOf(run), run.parentRunId);
+                run.createdAt, durationOf(run), run.parentRunId, run.artifactFrom);
     }
 
     private Views.TaskDetail detailOf(Task task) {
