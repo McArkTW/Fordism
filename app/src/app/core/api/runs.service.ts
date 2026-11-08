@@ -10,6 +10,32 @@ export type RunSummary = {
   durationMs: number;
   /** Set only on a run a reconciler spawned; core omits the field entirely for every other run. */
   parentRunId?: string;
+  /** Set only on a run that started from a copy of another run's artifact. */
+  artifactFrom?: string;
+};
+
+/**
+ * The run's artifact/ — the product it is building, one folder per run. `present` is false before
+ * the first task has laid it out and after retention culled it.
+ */
+export type RunArtifact = {
+  /** Host path, as docker mounts it. */
+  path: string;
+  present: boolean;
+  /** The run it was copied from, when it continued one. */
+  from?: string;
+};
+
+/** One entry of the artifact, by name — contents come only as the zip. */
+export type ArtifactEntry = { path: string; size: number; directory: boolean };
+
+export type ArtifactFiles = {
+  runId: string;
+  path: string;
+  present: boolean;
+  files: ArtifactEntry[];
+  /** True when the listing stopped at core's cap. */
+  truncated: boolean;
 };
 
 /** What History asks for. Every field is optional; omitting all of them is "everything, newest first". */
@@ -85,6 +111,8 @@ export type RunDetail = {
    * only ever say "I delegated this" — without these the page cannot show what actually happened.
    */
   children: RunSummary[];
+  /** The run's product folder. Absent from a core older than artifacts. */
+  artifact?: RunArtifact;
 };
 
 /** One file in a task's result bundle. `content` is "" when `binary` is true. */
@@ -161,6 +189,15 @@ export class RunsService {
 
   resultZipUrl(taskId: string): string {
     return `/api/tasks/${encodeURIComponent(taskId)}/result.zip`;
+  }
+
+  /** What the run's artifact holds, by name and size. */
+  artifact(runId: string): Observable<ArtifactFiles> {
+    return this.http.get<ArtifactFiles>(`/api/runs/${encodeURIComponent(runId)}/artifact`);
+  }
+
+  artifactZipUrl(runId: string): string {
+    return `/api/runs/${encodeURIComponent(runId)}/artifact.zip`;
   }
 
   workspaceZipUrl(taskId: string): string {
