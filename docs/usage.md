@@ -93,7 +93,7 @@ steps:
 | `id` | Names the step so other steps can reference it. |
 | `template` | The Agent Template that supplies skills, credentials, and standing instructions. |
 | `task` | The instruction written to `task/task.md`. Use a block scalar for anything multi-line. |
-| `includePreviousResult` | Mounts the previous step's `result/` at `task/previous-result/`. A step fed by several (a `map-reduce` reduce, a `graph` step with more than one `dependsOn`) gets one folder each: `task/previous-result/<n>-<item>/` or `task/previous-result/<step-id>/`. |
+| `includePreviousResult` | Copies the previous step's `result/` into `task/previous-result/`. The product itself is in `artifact/`, which every step sees without asking. A step fed by several (a `map-reduce` reduce, a `graph` step with more than one `dependsOn`) gets one folder each: `task/previous-result/<n>-<item>/` or `task/previous-result/<step-id>/`. |
 | `dependsOn` | `graph` only — the step ids that must collect first. |
 | `when` | `conditional` only — a predicate, e.g. `classify.result == 'yes'`. |
 | `forEach` | `map-reduce` only — fans out over a list parameter; each task sees `${item}`. |
@@ -192,7 +192,46 @@ agents already know it — it is here so you know it too.
 | `task/previous-result/` | The previous step's output, when `includePreviousResult` is set; one sub-folder per predecessor when there are several. |
 | `skills/` | Reusable capabilities the template selected. |
 | `memory/` | Presets the agent treats as ground truth. |
-| `result/` | Everything the agent produces, including its result file. |
+| `artifact/` | The product the run is building — one folder per run, shared by every task of it, and outliving each. Read-only (`:ro`) for a step that could run beside another; see [The artifact](#the-artifact). |
+| `result/` | The step's sign-off: its result file, and any report or file the task hands back. Not the product. |
+
+### The artifact
+
+**The product is in `artifact/`; the workspace is the agent's.** Every run has one artifact folder —
+nothing to enable, and an unused one is just empty. It is mounted at `/workspace/artifact` in every
+task of the run, so the first step clones or scaffolds into it and each later step works on what the
+last one left: no step repeats the setup, and uncommitted work is not lost between them. The rest of
+the workspace (`task/`, `result/`, scratch, the CLI's session store) stays per task and is thrown
+away with it. `result/` stays the step's sign-off — a verdict, a summary, a report — not a copy of
+the product.
+
+**Fan-out is read-only.** A step may write the artifact only when no other step can run beside it.
+Core works this out from the strategy and `dependsOn` when the workflow loads, and the editor outline
+marks every read-only step:
+
+| Strategy | Who writes `artifact/` |
+|---|---|
+| `linear`, `rework`, `conditional` | Every step — they run one at a time. |
+| `map-reduce` | The reduce. Map items get it read-only. |
+| `graph` | A step that every other step is upstream or downstream of. In a diamond, the first and the join write and the two branches read; two independent chains read throughout. |
+| `reconciler` | The generator. Its child runs each start from a copy (`artifactFrom`), never the parent's tree. |
+
+A read-only step's mount is `:ro` — docker refuses the write, not the agent's good manners. **If
+`artifact/` is read-only, the agent's output goes in `result/` and a later step merges**: give the
+reduce or join `includePreviousResult: true` so it sees each predecessor's `result/` and the
+writable artifact together. Core never merges two trees; one agent does, on purpose.
+
+**Continuing a run.** Start a run with `artifactFrom: <run-id>` (a form or query field on
+`POST /api/workflows/{name}/run`, or *Continue from* in the run dialog) and it begins with a copy of
+that run's artifact — so clarify, design and execute dispatched as separate runs work on one product.
+It is a copy: the new run cannot change the old one's. The copy is made when the new run stages its
+first task.
+
+**Where it lives and how long.** `<workspaces>/_artifacts/<run-id>` on the host. The run page shows
+the path, lists what the artifact holds, and downloads it as a zip (the same permission a workspace
+download needs). It is kept for as long as the run plus `FORDISM_ARTIFACT_RETENTION_HOURS` after the
+run ends — `0`, the default, keeps it, as workspaces are kept — and an artifact another run is still
+continuing from is held until that run has ended.
 
 ### How a task ends
 
