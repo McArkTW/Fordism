@@ -8,10 +8,16 @@ import tw.mcark.tony.fordism.model.task.TaskMode;
 import tw.mcark.tony.fordism.model.task.TaskState;
 import tw.mcark.tony.fordism.orchestrate.Engine;
 import tw.mcark.tony.fordism.secret.SecretVault;
+import tw.mcark.tony.fordism.workspace.ArtifactStore;
 import tw.mcark.tony.fordism.workspace.TaskResults;
 import tw.mcark.tony.fordism.workspace.WorkspaceArchive;
 import io.javalin.http.Context;
 import java.io.IOException;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -26,16 +32,21 @@ import java.util.Set;
 /** /api/runs[...] — list runs, get a run with its tasks, preview + download a task's result. */
 public final class RunController {
     private static final Gson GSON = new Gson();
+    /** The most entries the artifact view lists; a dependency tree can hold hundreds of thousands. */
+    private static final int ARTIFACT_LISTING_LIMIT = 2000;
     private final Engine engine;
     private final TaskResults results;
     private final WorkspaceArchive archive;
     private final SecretVault secrets;
+    private final ArtifactStore artifacts;
 
-    public RunController(Engine engine, TaskResults results, WorkspaceArchive archive, SecretVault secrets) {
+    public RunController(Engine engine, TaskResults results, WorkspaceArchive archive, SecretVault secrets,
+            ArtifactStore artifacts) {
         this.engine = engine;
         this.results = results;
         this.archive = archive;
         this.secrets = secrets;
+        this.artifacts = artifacts;
     }
 
     /**
@@ -123,13 +134,113 @@ public final class RunController {
         children.sort(Comparator.comparingLong(Views.RunSummary::createdAt)
                 .thenComparing(Views.RunSummary::id));
         Api.json(ctx, new Views.RunDetail(run.id, run.workflowName, run.strategy.wireName(), run.state.toString(),
-                run.createdAt, run.workflowSnapshot, taskViews, run.parentRunId, children));
+                run.createdAt, run.workflowSnapshot, taskViews, run.parentRunId, children, artifactOf(run)));
+    }
+
+    /** Where the run's artifact is, as docker mounts it, and whether there is one there now. */
+    private Views.RunArtifact artifactOf(WorkflowRun run) {
+        return new Views.RunArtifact(artifacts.hostPath(run.id), artifacts.exists(run.id), run.artifactFrom);
+    }
+
+    /**
+     * What the run's artifact holds, by name and size — the run page's view of the product.
+     *
+     * <p>{@code .git} and {@code node_modules} are listed as one entry and not entered: they are
+     * the bulk of a working tree by count and none of what a person opens the page to see.
+     */
+    public void artifact(Context ctx) {
+        WorkflowRun run = pathRun(ctx).orElse(null);
+        if (run == null) {
+            return;
+        }
+        Path root = artifacts.path(run.id);
+        ArtifactListing listing;
+        try {
+            listing = ArtifactListing.of(root, ARTIFACT_LISTING_LIMIT);
+        } catch (IOException e) {
+            Api.fail(ctx, 500, "could not read the artifact: " + e.getMessage());
+            return;
+        }
+        Api.json(ctx, new Views.ArtifactFiles(run.id, artifacts.hostPath(run.id), Files.isDirectory(root),
+                listing.files(), listing.truncated()));
+    }
+
+    /**
+     * An artifact's entries, at most {@code limit} of them.
+     *
+     * <p>A file-tree visit, not a stream and a filter: {@code Files.walk} would still descend every
+     * entry under {@code node_modules} only to have them dropped, and walk on past the cap. Here a
+     * bulk folder is listed and its subtree skipped, and the visit stops as soon as the cap is hit.
+     */
+    record ArtifactListing(List<Views.ArtifactEntry> files, boolean truncated) {
+
+        private static final Set<String> BULK = Set.of(".git", "node_modules");
+
+        static ArtifactListing of(Path root, int limit) throws IOException {
+            List<Views.ArtifactEntry> files = new ArrayList<>();
+            boolean[] truncated = {false};
+            if (!Files.isDirectory(root)) {
+                return new ArtifactListing(files, false);
+            }
+            Files.walkFileTree(root, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) {
+                    if (directory.equals(root)) {
+                        return FileVisitResult.CONTINUE;
+                    }
+                    if (!add(directory, attributes)) {
+                        return FileVisitResult.TERMINATE;
+                    }
+                    return BULK.contains(directory.getFileName().toString())
+                            ? FileVisitResult.SKIP_SUBTREE : FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
+                    return add(file, attributes) ? FileVisitResult.CONTINUE : FileVisitResult.TERMINATE;
+                }
+
+                @Override
+                public FileVisitResult visitFileFailed(Path file, IOException failure) {
+                    return FileVisitResult.CONTINUE;   // unreadable is not worth failing the listing for
+                }
+
+                /** False once the cap is reached: the entry is not listed and the visit stops. */
+                private boolean add(Path path, BasicFileAttributes attributes) {
+                    if (files.size() >= limit) {
+                        truncated[0] = true;
+                        return false;
+                    }
+                    boolean directory = attributes.isDirectory();
+                    files.add(new Views.ArtifactEntry(root.relativize(path).toString().replace('\\', '/'),
+                            directory ? 0L : attributes.size(), directory));
+                    return true;
+                }
+            });
+            return new ArtifactListing(files, truncated[0]);
+        }
+    }
+
+
+    /** Download the run's artifact — the product — as a zip. */
+    public void artifactZip(Context ctx) {
+        WorkflowRun run = pathRun(ctx).orElse(null);
+        if (run == null) {
+            return;
+        }
+        ctx.contentType("application/zip");
+        ctx.header("Content-Disposition", "attachment; filename=\"" + run.id + "-artifact.zip\"");
+        try {
+            archive.zipArtifact(artifacts.path(run.id), ctx.outputStream());
+        } catch (IOException e) {
+            ctx.status(500);
+        }
     }
 
     /** One row of the run list — and of the children a reconciler's page lists under it. */
     private Views.RunSummary summaryOf(WorkflowRun run) {
         return new Views.RunSummary(run.id, run.workflowName, run.state.toString(),
-                run.createdAt, durationOf(run), run.parentRunId);
+                run.createdAt, durationOf(run), run.parentRunId, run.artifactFrom);
     }
 
     private Views.TaskDetail detailOf(Task task) {
@@ -241,7 +352,9 @@ public final class RunController {
             ctx.status(404).contentType("application/json").result("{\"error\":\"no transcript\"}");
             return;
         }
-        ctx.contentType("application/x-ndjson").result(transcript);
+        // The charset is not optional: Jetty encodes a String body for a type it does not know as text
+        // in ISO-8859-1, so every em dash and middle dot reached the browser as a lone, undecodable byte.
+        ctx.contentType("application/x-ndjson; charset=utf-8").result(transcript);
     }
 
     /**

@@ -86,10 +86,10 @@ optional usage proxy below is core itself, not another container to run), no mes
 filesystem is the protocol). Each of those is a dependency someone would have to operate, and none
 of them is needed to run a backlog honestly.
 
-### The usage proxy (optional, off by default)
+### The usage proxy (on by default)
 
-Set `FORDISM_PROXY_URL` and an agent's model calls go through core instead of straight to the
-provider. Core forwards each call to the profile's real endpoint, streams the response back
+An agent's model calls go through core instead of straight to the provider, at `FORDISM_PROXY_URL`
+(`http://fordism-core:8080` unless set; `off` turns the proxy off). Core forwards each call to the profile's real endpoint, streams the response back
 byte-for-byte, and records what it cost. It buys three things that cannot be had otherwise:
 
 - **Token usage in one format for every tool.** Read off the wire, not out of each CLI's own log,
@@ -99,8 +99,8 @@ byte-for-byte, and records what it cost. It buys three things that cannot be had
   attempt was billed too.
 - **The agent never holds the real key.** A proxied task is handed a token core minted for that
   one task; core swaps it for the provider key on the way out and refuses the token anywhere else.
-- **One transcript shape across tools**, with `FORDISM_TRANSCRIPT=on` — `result/logs/llm.jsonl`,
-  credential values redacted. Off by default, because it stores what the agent read and wrote.
+- **One transcript shape across tools** — `result/logs/llm.jsonl`, credential values redacted. On
+  by default; `FORDISM_TRANSCRIPT=off` turns it off, since it stores what the agent read and wrote.
 
 The usage tap cannot affect the bytes a tool receives: the tool is written to first and handed a
 copy, and nothing thrown while reading it escapes — a response core cannot parse loses its metric,

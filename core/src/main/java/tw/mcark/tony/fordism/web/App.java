@@ -12,6 +12,7 @@ import tw.mcark.tony.fordism.proxy.UsageProxy;
 import tw.mcark.tony.fordism.secret.SecretVault;
 import tw.mcark.tony.fordism.skill.SkillPluginStore;
 import tw.mcark.tony.fordism.skill.SkillStore;
+import tw.mcark.tony.fordism.workspace.ArtifactStore;
 import tw.mcark.tony.fordism.workspace.TemplateStore;
 import tw.mcark.tony.fordism.workspace.TaskResults;
 import tw.mcark.tony.fordism.workspace.WorkspaceArchive;
@@ -33,13 +34,15 @@ public final class App {
     private final CredentialStore credentials;
     private final Accounts accounts;
     private final UsageProxy proxy;
+    private final ArtifactStore artifacts;
 
     public App(Engine engine, FordismConfiguration configuration, TemplateStore templates, TaskResults results,
             WorkspaceArchive archive,
             SkillStore skills, SkillPluginStore skillPlugins, AgentProfileStore profiles,
             SecretVault secrets, CredentialStore credentials,
-            Accounts accounts, UsageProxy proxy) {
+            Accounts accounts, UsageProxy proxy, ArtifactStore artifacts) {
         this.proxy = proxy;
+        this.artifacts = artifacts;
         this.engine = engine;
         this.configuration = configuration;
         this.templates = templates;
@@ -62,8 +65,8 @@ public final class App {
      * suite that fails on whichever machine already has 8080.
      */
     public Javalin startOn(int port) {
-        WorkflowController workflows = new WorkflowController(engine, configuration, templates, profiles, credentials);
-        RunController runs = new RunController(engine, results, archive, secrets);
+        WorkflowController workflows = new WorkflowController(engine, configuration, templates, profiles, credentials, artifacts);
+        RunController runs = new RunController(engine, results, archive, secrets, artifacts);
         TemplateController templateApi = new TemplateController(templates);
         SkillController skillApi = new SkillController(skills, skillPlugins);
         SkillPluginController pluginApi = new SkillPluginController(skillPlugins);
@@ -143,6 +146,8 @@ public final class App {
         app.get("/api/runs", runs::list);
         app.get("/api/runs/{id}", runs::get);
         app.post("/api/runs/{id}/abandon", runs::abandon);
+        app.get("/api/runs/{id}/artifact", runs::artifact);
+        app.get("/api/runs/{id}/artifact.zip", runs::artifactZip);
         app.get("/api/tasks/{id}/result", runs::result);
         app.get("/api/tasks/{id}/result.zip", runs::resultZip);
         app.get("/api/tasks/{id}/workspace.zip", runs::workspaceZip);
