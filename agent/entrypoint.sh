@@ -112,15 +112,32 @@ BRIEF="$(cat "$DOCTRINE" 2>/dev/null)"
 # so they apply whichever CLI drives the task.
 INSTRUCTIONS="$(cat "$WS/instructions.md" 2>/dev/null)"
 TASK="$(cat "$WS/task/task.md" 2>/dev/null)"
-PROMPT="${BRIEF}"
-[ -n "$INSTRUCTIONS" ] && PROMPT="${PROMPT}"$'\n\n---\nStanding instructions for this agent (authoritative):\n'"${INSTRUCTIONS}"
-PROMPT="${PROMPT}"$'\n\n---\nYour task (task/task.md):\n'"${TASK}"
+# Everything after the doctrine is this STEP's: its template's instructions, its task, its artifact
+# access. Kept apart from the doctrine so a continuing step (below) can hand its resumed session
+# just this part — the session already holds the doctrine, and not the new step's instructions.
+STEP_PROMPT=""
+[ -n "$INSTRUCTIONS" ] && STEP_PROMPT=$'\n\n---\nStanding instructions for this agent (authoritative):\n'"${INSTRUCTIONS}"
+STEP_PROMPT="${STEP_PROMPT}"$'\n\n---\nYour task (task/task.md):\n'"${TASK}"
 # Where the product is, and whether this step may change it. The mount already enforces read-only;
 # saying so up front is what makes the agent plan to hand its work back through result/ instead.
 case "${FORDISM_ARTIFACT:-}" in
-  read-only) PROMPT="${PROMPT}"$'\n\n---\nThe product this run is building is in artifact/, and it is READ-ONLY for this step: another step may be running beside you. Read it as you need, but put your work in result/ — a later step merges it into artifact/.' ;;
-  write)     PROMPT="${PROMPT}"$'\n\n---\nThe product this run is building is in artifact/. Work on it in place — it is what the next step receives. result/ is your sign-off (summary, verdict, what changed), not the product.' ;;
+  read-only) STEP_PROMPT="${STEP_PROMPT}"$'\n\n---\nThe product this run is building is in artifact/, and it is READ-ONLY for this step: another step may be running beside you. Read it as you need, but put your work in result/ — a later step merges it into artifact/.' ;;
+  write)     STEP_PROMPT="${STEP_PROMPT}"$'\n\n---\nThe product this run is building is in artifact/. Work on it in place — it is what the next step receives. result/ is your sign-off (summary, verdict, what changed), not the product.' ;;
 esac
+PROMPT="${BRIEF}${STEP_PROMPT}"
+
+# --- a step that continues the previous step's agent -----------------------------------------
+# Core sets FORDISM_CONTINUES on a task that runs as an earlier step's agent: same workspace, same
+# session id, resume mode, a new task/task.md. Core moved the earlier step's task/ and result/ to
+# steps/<index>/ before this container started. RESUME_PROMPT wins: an answered question of a
+# continuing task is an ordinary resume, not a second hand-over.
+CONTINUING=""
+if [ "$MODE" = "resume" ] && [ -z "${RESUME_PROMPT:-}" ] && [ -n "${FORDISM_CONTINUES:-}" ]; then
+  CONTINUING=1
+fi
+STEPS_DIR="${FORDISM_CONTINUES:-steps}"
+CONTINUE_NOTE=$'The previous step of this workflow is finished, and you are now the next step. This is the same workspace and the same session: your files and scratch are where you left them. The previous step\'s task/ and result/ were moved to '"$STEPS_DIR"$'/<step index>/ — read them as you need, but leave them as they are. task/task.md is now this step\'s task, and result/ is empty: it is this step\'s sign-off, so write a new result/result.json when this step is done.'
+FRESH_NOTE=$'\n\n---\nThis step continues an earlier step\'s agent. This tool keeps no session, so the conversation starts fresh, but the workspace is the one that step worked in: its files are where it left them, and the earlier steps\' task/ and result/ are under '"$STEPS_DIR"$'/<step index>/. Read them as you need, leave them as they are, and write this step\'s own result/result.json.'
 
 # The step's whole wall-clock budget, shared by the first run and every self-resume below.
 EPOCH_DEADLINE=$(( $(date +%s) + TIMEOUT ))
@@ -539,7 +556,14 @@ agent_resume() {  # $1 = prompt   $2 = seconds of budget
   esac
 }
 
-if [ "$MODE" = "resume" ]; then
+if [ -n "$CONTINUING" ]; then
+  set_state running "\"phase\":\"continuing\",\"tool\":\"$ATYPE\""
+  if sessioned; then
+    agent_resume "${CONTINUE_NOTE}${STEP_PROMPT}" "$TIMEOUT" >"$WS/result/logs/output.log" 2>"$WS/result/logs/errors.log"; rc=$?
+  else
+    agent_start "${PROMPT}${FRESH_NOTE}" "$TIMEOUT" >"$WS/result/logs/output.log" 2>"$WS/result/logs/errors.log"; rc=$?
+  fi
+elif [ "$MODE" = "resume" ]; then
   set_state running "\"phase\":\"resuming\",\"tool\":\"$ATYPE\""
   Q="${RESUME_PROMPT:-You are resuming an earlier session in a brand-new container. Continue the task from where you left off.}"
   agent_resume "$Q" "$TIMEOUT" >"$WS/result/logs/output.log" 2>"$WS/result/logs/errors.log"; rc=$?
