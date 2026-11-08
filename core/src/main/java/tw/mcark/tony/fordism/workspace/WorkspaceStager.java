@@ -174,7 +174,7 @@ public final class WorkspaceStager {
      * folder named by their label: copying them all flat would let the last overwrite the rest, and
      * staging only the first is how a reduce came to summarise one item out of three.
      */
-    public static void stagePrevious(Task task, Path into) throws IOException {
+    static void stagePrevious(Task task, Path into) throws IOException {
         if (task.fanInWorkspaces != null && !task.fanInWorkspaces.isEmpty()) {
             for (Map.Entry<String, String> source : task.fanInWorkspaces.entrySet()) {
                 copyResult(source.getValue(), into.resolve(folderName(source.getKey())));

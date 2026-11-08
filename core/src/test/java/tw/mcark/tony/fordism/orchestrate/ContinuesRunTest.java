@@ -178,12 +178,12 @@ class ContinuesRunTest {
         reconcile(run);   // seed step 2
         Task third = engine.currentTask(run, 2).orElseThrow();
         assertNull(third.continuesTaskId);
-        Path into = directory.resolve("third/task/previous-result");
-        WorkspaceStager.stagePrevious(third, into);
+        // The stager copies <previousWorkspace>/result into task/previous-result.
+        Path handedOver = Path.of(third.previousWorkspace).resolve("result");
 
         assertEquals(second.signOffPath(), third.previousWorkspace);
-        assertEquals("applied", Files.readString(into.resolve("applied.md")), "step 1's result, not step 0's");
-        assertFalse(Files.exists(into.resolve("proposal.md")));
+        assertEquals("applied", Files.readString(handedOver.resolve("applied.md")), "step 1's result, not step 0's");
+        assertFalse(Files.exists(handedOver.resolve("proposal.md")));
     }
 
     @Test

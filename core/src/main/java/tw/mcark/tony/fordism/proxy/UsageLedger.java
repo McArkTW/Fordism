@@ -8,7 +8,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.util.Optional;
@@ -31,8 +30,9 @@ final class UsageLedger {
     private UsageLedger() {
     }
 
+    /** Through {@link Task#resultDirectory()}, like every reader: under steps/ once the sign-off moved. */
     static Path path(Task task) {
-        return Paths.get(task.workspacePath, "result", "logs", FILE);
+        return task.resultDirectory().resolve("logs").resolve(FILE);
     }
 
     static void append(Task task, String method, String path, int status, long millis, String format,
