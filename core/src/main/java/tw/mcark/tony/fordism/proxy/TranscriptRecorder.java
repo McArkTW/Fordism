@@ -13,7 +13,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -185,7 +184,7 @@ public final class TranscriptRecorder {
     }
 
     private void write(Task task, Call call) {
-        Path logs = Paths.get(task.workspacePath, "result", "logs");
+        Path logs = task.resultDirectory().resolve("logs");   // under steps/ once the sign-off moved
         TaskLog log;
         synchronized (this.logs) {
             log = this.logs.computeIfAbsent(task.id, id -> fresh(logs));

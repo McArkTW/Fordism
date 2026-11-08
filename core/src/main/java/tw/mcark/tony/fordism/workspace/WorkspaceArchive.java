@@ -14,14 +14,17 @@ import java.util.zip.ZipOutputStream;
 /** Streams a task's workspace, just its results, or a run's artifact to the browser as a zip. */
 public final class WorkspaceArchive {
 
-    /** The task's ENTIRE workspace: task + result + logs + the agent's session store. */
+    /**
+     * The task's ENTIRE workspace: task + result + logs + the agent's session store. A continued
+     * agent's workspace is shared by its steps, so this is the same bench, steps/ and all, for each.
+     */
     public void zipWorkspace(Task task, OutputStream out) throws IOException {
         zip(task.workspacePath == null ? null : Paths.get(task.workspacePath), out);
     }
 
-    /** Just the task's result/ dir. */
+    /** Just the task's result/ dir — under steps/ once a later step continued its agent. */
     public void zipResult(Task task, OutputStream out) throws IOException {
-        zip(task.workspacePath == null ? null : Paths.get(task.workspacePath, "result"), out);
+        zip(task.resultDirectory(), out);
     }
 
     /** A run's artifact/ — the product, which no single task's workspace holds. */

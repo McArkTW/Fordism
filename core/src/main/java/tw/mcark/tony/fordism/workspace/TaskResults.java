@@ -28,6 +28,10 @@ import java.util.stream.Stream;
  * Reads back what an agent left in its workspace: the result contract, the files it produced, the
  * session transcript, and the token usage inside it.
  *
+ * <p>Always through {@link Task#resultDirectory()}, never {@code <workspace>/result}: once a later
+ * step continues this task's agent, its sign-off lives under {@code steps/<index>/} and the top of
+ * the workspace belongs to the step that took over.
+ *
  * <p>Everything here is a sensor — it only ever reads, and an absent or half-written file is a
  * normal answer (the agent is mid-run), not a failure.
  */
@@ -51,7 +55,7 @@ public final class TaskResults {
             if (task.workspacePath == null) {
                 return Optional.empty();
             }
-            Path resultJson = Paths.get(task.workspacePath, "result", "result.json");
+            Path resultJson = task.resultDirectory().resolve("result.json");
             if (!Files.exists(resultJson)) {
                 return Optional.empty();
             }
@@ -146,7 +150,7 @@ public final class TaskResults {
         if (task.workspacePath == null) {
             return out;
         }
-        Path resultDir = Paths.get(task.workspacePath, "result");
+        Path resultDir = task.resultDirectory();
         if (!Files.isDirectory(resultDir)) {
             return out;
         }
@@ -234,7 +238,7 @@ public final class TaskResults {
         if (task.workspacePath == null) {
             return null;
         }
-        Path ledger = Paths.get(task.workspacePath, "result", "logs", "usage.jsonl");
+        Path ledger = task.resultDirectory().resolve("logs").resolve("usage.jsonl");
         if (!Files.isRegularFile(ledger)) {
             return null;
         }
@@ -355,7 +359,7 @@ public final class TaskResults {
     }
 
     private static Path proxyTranscriptPath(Task task) {
-        return Paths.get(task.workspacePath, "result", "logs", "llm.jsonl");
+        return task.resultDirectory().resolve("logs").resolve("llm.jsonl");
     }
 
     private static long sumMatches(String text, String regex) {
@@ -386,7 +390,7 @@ public final class TaskResults {
             if (task.workspacePath == null) {
                 return Optional.empty();
             }
-            Path logsCopy = Paths.get(task.workspacePath, "result", "logs", "transcript.jsonl");
+            Path logsCopy = task.resultDirectory().resolve("logs").resolve("transcript.jsonl");
             if (Files.exists(logsCopy) && Files.size(logsCopy) > 0) {
                 return Optional.of(Files.readString(logsCopy));
             }

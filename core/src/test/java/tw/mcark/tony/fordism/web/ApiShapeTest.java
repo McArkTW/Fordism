@@ -68,22 +68,27 @@ class ApiShapeTest {
     void a_task_carries_everything_the_run_page_renders() {
         Views.TaskDetail task = new Views.TaskDetail("t1", 0, "COLLECTED", "probe-rw", "s1", "/ws",
                 "did it", "pass", 1L, 1, "boom", "which one?", List.of("GITHUB_TOKEN"),
-                List.of("HP_PASSWORD"), 42L, TokenUsage.of(new TokenUsage.Counts(1, 2, 3, 4), 5));
+                List.of("HP_PASSWORD"), 42L, TokenUsage.of(new TokenUsage.Counts(1, 2, 3, 4), 5),
+                new Views.Continuation("t0", 0, false), "steps/1");
         assertEquals(expect("taskId", "step", "state", "template", "session", "workspace", "summary",
                 "verdict", "createdAt", "attempt", "error", "question", "secretsRequested",
-                "secretsHeld", "durationMs", "usage"), fieldsOf(task));
+                "secretsHeld", "durationMs", "usage", "continuation", "signOff"), fieldsOf(task));
+        assertEquals(expect("taskId", "step", "conversationKept"),
+                fieldsOf(new Views.Continuation("t0", 0, false)));
     }
 
     @Test
     void an_absent_optional_field_is_omitted_not_null() {
         // Gson drops nulls, which is what the hand-built maps did — the app checks for absence.
         Views.TaskDetail running = new Views.TaskDetail("t1", 0, "RUNNING", "probe-rw", "s1", "/ws",
-                null, null, 1L, 1, null, null, List.of(), List.of(), 0L, null);
+                null, null, 1L, 1, null, null, List.of(), List.of(), 0L, null, null, null);
         Set<String> fields = fieldsOf(running);
         assertFalse(fields.contains("summary"), fields.toString());
         assertFalse(fields.contains("verdict"), fields.toString());
         assertFalse(fields.contains("error"), fields.toString());
         assertFalse(fields.contains("usage"), fields.toString());
+        assertFalse(fields.contains("continuation"), fields.toString());
+        assertFalse(fields.contains("signOff"), fields.toString());
     }
 
     @Test
@@ -134,9 +139,9 @@ class ApiShapeTest {
     @Test
     void a_step_and_a_parameter_as_the_editor_reads_them() {
         assertEquals(expect("id", "template", "dependsOn", "forEach", "when",
-                        "includePreviousResult", "timeoutSeconds", "network", "artifact"),
+                        "includePreviousResult", "timeoutSeconds", "network", "artifact", "continues"),
                 fieldsOf(new Views.WorkflowStep("s0", "generic", List.of(), "", "", false, 600,
-                        "fordism-only", "read-only")));
+                        "fordism-only", "read-only", "s-1")));
         assertEquals(expect("name", "label", "type", "required", "defaultValue", "help"),
                 fieldsOf(new Views.WorkflowParameter("topic", "Topic", "text", false, "", "")));
     }

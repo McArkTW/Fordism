@@ -243,12 +243,22 @@ public final class RunController {
                 run.createdAt, durationOf(run), run.parentRunId, run.artifactFrom);
     }
 
-    private Views.TaskDetail detailOf(Task task) {
+    Views.TaskDetail detailOf(Task task) {
         return new Views.TaskDetail(task.id, task.stepIndex, task.state.toString(), task.template,
                 task.sessionId, task.hostWorkspacePath, task.summary, task.verdict, task.createdAt,
                 task.attempt, task.error, task.question,
                 task.secretsRequested == null ? List.of() : task.secretsRequested,
-                secrets.namesFor(task.runId), elapsedOf(task), results.usage(task));
+                secrets.namesFor(task.runId), elapsedOf(task), results.usage(task), continuationOf(task),
+                task.signOff);
+    }
+
+    /** The task this one continued, as the run page names it; null for a task with its own agent. */
+    private Views.Continuation continuationOf(Task task) {
+        if (task.continuesTaskId == null) {
+            return null;
+        }
+        int step = engine.tasks().find(task.continuesTaskId).map(continued -> continued.stepIndex).orElse(-1);
+        return new Views.Continuation(task.continuesTaskId, step, task.conversationKept);
     }
 
     /** Live while it runs; frozen once it ended, even when nothing recorded a finish time. */

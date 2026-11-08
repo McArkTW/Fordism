@@ -8,6 +8,9 @@ import tw.mcark.tony.fordism.store.TaskRepository;
 import tw.mcark.tony.fordism.workspace.AgentTemplate;
 import tw.mcark.tony.fordism.workspace.TemplateStore;
 import tw.mcark.tony.fordism.workspace.WorkspaceStager;
+import java.io.IOException;
+import java.util.Map;
+import java.util.Objects;
 import org.tinylog.Logger;
 
 /** Plants PENDING tasks: stage the workspace, launch the agent container, move to RUNNING. */
@@ -33,7 +36,10 @@ public final class Dispatcher {
                 break;
             }
             try {
-                if (!task.mode.isResume()) {
+                if (task.continuesTaskId != null && task.workspacePath == null) {
+                    applyTemplate(task);
+                    continueBench(task);                 // first dispatch: take over the continued workspace
+                } else if (!task.mode.isResume()) {
                     applyTemplate(task);
                     workspaces.stage(task, templates);   // resume reuses the existing workspace + session
                 }
@@ -49,6 +55,58 @@ public final class Dispatcher {
                 task.finishedAt = System.currentTimeMillis();
                 tasks.save(task);
                 Logger.error("dispatch failed for task {}: {}", task.id, e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Hand a continuing task the workspace of the task it continues.
+     *
+     * <p>Whatever holds the top of that workspace now — the continued task, or in a rework that came
+     * round again, whichever task last took the bench — is set aside to {@code steps/} first, so it
+     * keeps its sign-off. A task already queued to read that sign-off from the top (a sibling whose
+     * {@code previous-result} it is, or this task itself) is pointed at the new place before it is
+     * staged; otherwise it would copy this task's empty {@code result/} instead.
+     */
+    private void continueBench(Task task) throws IOException {
+        Task continued = tasks.find(task.continuesTaskId).orElseThrow(() -> new IOException(
+                "task " + task.id + " continues task " + task.continuesTaskId + ", which no longer exists"));
+        if (continued.workspacePath != null) {
+            for (Task holder : tasks.byRun(task.runId)) {
+                boolean atTop = holder != task && holder.signOff == null
+                        && continued.workspacePath.equals(holder.workspacePath);
+                if (atTop) {
+                    String moved = workspaces.setAside(holder).toString();
+                    tasks.save(holder);
+                    redirectReaders(task.runId, continued.workspacePath, moved);
+                    Logger.info("task {} set aside to {} for continuing task {}", holder.id, holder.signOff, task.id);
+                }
+            }
+        }
+        workspaces.continueInto(task, continued, templates);
+    }
+
+    /** Every queued task of the run that would read {@code from}'s result reads {@code to}'s instead. */
+    private void redirectReaders(String runId, String from, String to) {
+        for (Task reader : tasks.byRun(runId)) {
+            if (reader.state != TaskState.PENDING) {
+                continue;
+            }
+            boolean changed = false;
+            if (from.equals(reader.previousWorkspace)) {
+                reader.previousWorkspace = to;
+                changed = true;
+            }
+            if (reader.fanInWorkspaces != null) {
+                for (Map.Entry<String, String> source : reader.fanInWorkspaces.entrySet()) {
+                    if (Objects.equals(from, source.getValue())) {
+                        source.setValue(to);
+                        changed = true;
+                    }
+                }
+            }
+            if (changed) {
+                tasks.save(reader);
             }
         }
     }

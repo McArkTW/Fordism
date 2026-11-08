@@ -83,6 +83,19 @@ public enum AgentTool {
         return formats.get(0);
     }
 
+    /**
+     * Whether a later container can pick this tool's session back up — the entrypoint's
+     * {@code sessioned()}, which is the list that acts on it; keep the two in step. A step that
+     * continues another one-shot tool's step still gets its workspace, but a fresh conversation,
+     * and the run page says so from this.
+     */
+    public boolean keepsSession() {
+        return switch (this) {
+            case CLAUDE_CODE, QWEN_CODE, GEMINI_CLI, CODEX, OPENCODE -> true;
+            default -> false;
+        };
+    }
+
     public boolean speaks(ApiFormat format) {
         return formats.contains(format);
     }

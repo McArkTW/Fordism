@@ -15,6 +15,7 @@ You are a Fordism agent running autonomously in a disposable container. Your onl
 | `memory/` | Authoritative presets / knowledge. Treat as ground truth. |
 | `artifact/` | **The product this run is building** — the repo, the project, the document. Shared by every step of the run; it outlives your task. Read-only for some steps (see below). |
 | `result/` | **Your sign-off**: `result.json`, and any report, summary or file the task asks you to hand back. |
+| `steps/<index>/` | Only when this step **continues** an earlier one: that step's `task/` and `result/`, moved aside. |
 
 ## The product and the bench
 
@@ -23,8 +24,8 @@ You are a Fordism agent running autonomously in a disposable container. Your onl
 - `artifact/` is one folder for the whole run. The first step creates the product there (clones the
   repo, scaffolds the project); each later step finds it as the last one left it and works on it in
   place. Do not re-clone or re-scaffold what is already there. An unused `artifact/` is just empty.
-- Everything else — `task/`, `result/`, scratch files, the CLI's session store — is your bench. It is
-  thrown away with your task and nothing in it reaches the next step except `result/`.
+- Everything else — `task/`, `result/`, scratch files, the CLI's session store — is your bench.
+  Nothing in it reaches the next step except `result/` — unless the next step **continues** you (below).
 - **If `artifact/` is read-only, your output goes in `result/` and a later step merges.** A step that
   could run beside another (a map item, a parallel graph branch) gets `artifact/` mounted read-only,
   so two agents never write one tree. Read it as you need, put your changes in `result/` (a patch, the
@@ -33,6 +34,20 @@ You are a Fordism agent running autonomously in a disposable container. Your onl
   tells you which you have.
 - `result/` is the sign-off, not the product: your verdict, a summary of what you changed, a report.
   Do not copy the whole product into it.
+
+## When a step continues you
+
+A workflow step may run as the previous step's agent (`continues: true`). Then you are the same
+agent on the same bench, with a new task: the prompt says so.
+
+- Your files and scratch are where you left them, and a CLI that keeps a session resumes your own
+  conversation. A one-shot tool starts a fresh conversation in the same workspace; the prompt says
+  which.
+- The earlier step's `task/` and `result/` were moved to `steps/<index>/`. Read them as you need —
+  they are what you signed off last time — but **leave them as they are**: core reads that result
+  from there.
+- `task/task.md` is now **this** step's task and `result/` is empty. Write a new `result/result.json`
+  for this step; the earlier one is not carried over.
 
 ## How to do the work and report the result
 

@@ -28,6 +28,9 @@ import org.tinylog.Logger;
  * has to cope with a directory a previous attempt already wrote to (see {@link #clearResult}).
  */
 public final class WorkspaceStager {
+    /** Where the earlier steps of a continued agent keep their sign-offs, inside its workspace. */
+    public static final String STEPS = "steps";
+
     private final FordismConfiguration configuration;
     private final ModelRegistry models;
     private final ArtifactStore artifacts;
@@ -48,29 +51,108 @@ public final class WorkspaceStager {
         Files.createDirectories(workspace.resolve("task"));
         clearResult(workspace.resolve("result"));
         Files.createDirectories(workspace.resolve("result"));
-        TaskConfiguration config = task.config;
-        // The model the entrypoint hands the CLI is the one the launcher resolved — the profile's
-        // own model wins — not the step's, which defaults to qwen3 and would reach a claude-code
-        // profile on api.anthropic.com as a model it has never heard of.
-        String model = models.backend(task.agentProfile, config.model()).model();
-        Files.writeString(workspace.resolve("config.json"),
-                String.format("{\"model\":\"%s\",\"timeout\":%d,\"network\":\"%s\"}",
-                        model, config.timeoutSeconds(), config.network().name().toLowerCase()));
+        writeConfig(task, workspace);
         templates.stageInto(task.template, workspace);
         if (task.taskZipPath != null) {
             unzipInto(Paths.get(task.taskZipPath), workspace.resolve("task"));   // uploaded inputs
         }
-        // Written after the unzip: the workflow defines the task, and an uploaded file must not be
-        // able to replace it by being named task.md.
-        Files.writeString(workspace.resolve("task/task.md"), task.taskText == null ? "" : task.taskText);
-        if (task.includePreviousResult) {
-            stagePrevious(task, workspace.resolve("task/previous-result"));
-        }
+        writeTask(task, workspace);
         task.workspacePath = workspace.toString();
         task.hostWorkspacePath = Paths.get(configuration.workspacesHost, task.id).toString();
         stageArtifact(task, workspace);
         groupWritable(workspace);
         return workspace;
+    }
+
+    /**
+     * Stage a continuing task into the workspace of the task it continues: the same bench, and so
+     * the same session store, with this step's own task, config and template.
+     *
+     * <p>Whatever held the top of the workspace must already have been {@link #setAside set aside};
+     * this lays out a fresh {@code task/} and an empty {@code result/} over the space it left. The
+     * old template's skills, memory and instructions go first: the template is this step's, and a
+     * skill only the last step's template granted must not linger for this one to find.
+     *
+     * <p>Whether the conversation carries over is the tool's to say, and is recorded here, where the
+     * profile the task will run on is known: a one-shot tool gets the bench and a fresh session.
+     */
+    public Path continueInto(Task task, Task continued, TemplateStore templates) throws IOException {
+        if (continued.workspacePath == null || continued.hostWorkspacePath == null) {
+            throw new IOException("task " + task.id + " continues task " + continued.id
+                    + ", which was never staged: there is no workspace to continue in");
+        }
+        Path workspace = Paths.get(continued.workspacePath);
+        for (String inherited : new String[]{"skills", "memory"}) {
+            deleteTree(workspace.resolve(inherited));
+        }
+        Files.deleteIfExists(workspace.resolve("instructions.md"));
+        deleteTree(workspace.resolve("task"));   // set aside already; anything left is nobody's
+        Files.createDirectories(workspace.resolve("task"));
+        clearResult(workspace.resolve("result"));
+        Files.createDirectories(workspace.resolve("result"));
+        writeConfig(task, workspace);
+        templates.stageInto(task.template, workspace);
+        writeTask(task, workspace);
+        task.workspacePath = continued.workspacePath;
+        task.hostWorkspacePath = continued.hostWorkspacePath;
+        task.conversationKept = models.backend(task.agentProfile, task.config.model()).tool().keepsSession();
+        stageArtifact(task, workspace);
+        groupWritable(workspace);
+        return workspace;
+    }
+
+    /**
+     * Move a task's {@code task/} and {@code result/} out of the top of its workspace, into
+     * {@code steps/<index>/}, so a continuing task can take the bench and this one keeps its sign-off.
+     *
+     * <p>{@code <index>} is the step's. A second sign-off of the same step in one workspace — a
+     * rework that came round again — goes beside the first as {@code steps/<index>-2/}, never over
+     * it: the earlier task still points there. The task is told where its sign-off went, and the
+     * folder holding it is returned for anything that was going to read it from the old place.
+     */
+    public Path setAside(Task owner) throws IOException {
+        Path workspace = Paths.get(owner.workspacePath);
+        String folder = STEPS + "/" + owner.stepIndex;
+        for (int copy = 2; Files.exists(workspace.resolve(folder)); copy++) {
+            folder = STEPS + "/" + owner.stepIndex + "-" + copy;
+        }
+        Path target = workspace.resolve(folder);
+        Files.createDirectories(target);
+        for (String part : new String[]{"task", "result"}) {
+            if (Files.exists(workspace.resolve(part))) {
+                Files.move(workspace.resolve(part), target.resolve(part));
+            }
+        }
+        owner.signOff = folder;
+        return target;
+    }
+
+    /**
+     * {@code config.json}: the model, timeout and network this task runs under.
+     *
+     * <p>The model the entrypoint hands the CLI is the one the launcher resolved — the profile's own
+     * model wins — not the step's, which defaults to qwen3 and would reach a claude-code profile on
+     * api.anthropic.com as a model it has never heard of.
+     */
+    private void writeConfig(Task task, Path workspace) throws IOException {
+        TaskConfiguration config = task.config;
+        String model = models.backend(task.agentProfile, config.model()).model();
+        Files.writeString(workspace.resolve("config.json"),
+                String.format("{\"model\":\"%s\",\"timeout\":%d,\"network\":\"%s\"}",
+                        model, config.timeoutSeconds(), config.network().name().toLowerCase()));
+    }
+
+    /**
+     * {@code task/task.md}, and the predecessors' results when the step asked for them.
+     *
+     * <p>Written after any unzip: the workflow defines the task, and an uploaded file must not be
+     * able to replace it by being named task.md.
+     */
+    private static void writeTask(Task task, Path workspace) throws IOException {
+        Files.writeString(workspace.resolve("task/task.md"), task.taskText == null ? "" : task.taskText);
+        if (task.includePreviousResult) {
+            stagePrevious(task, workspace.resolve("task/previous-result"));
+        }
     }
 
     /**
@@ -152,10 +234,14 @@ public final class WorkspaceStager {
      * task detail view would show the previous attempt's transcript beside the new result.
      */
     private static void clearResult(Path result) throws IOException {
-        if (!Files.isDirectory(result)) {
+        deleteTree(result);
+    }
+
+    private static void deleteTree(Path root) throws IOException {
+        if (!Files.isDirectory(root)) {
             return;
         }
-        try (Stream<Path> walk = Files.walk(result)) {
+        try (Stream<Path> walk = Files.walk(root)) {
             for (Path path : (Iterable<Path>) walk.sorted(Comparator.reverseOrder())::iterator) {
                 Files.deleteIfExists(path);
             }

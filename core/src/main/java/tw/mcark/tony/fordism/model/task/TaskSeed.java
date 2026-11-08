@@ -15,10 +15,13 @@ import java.util.Map;
  *
  * <p>{@code artifact} rides along from the step, so the task the engine plants mounts the run's
  * artifact the way the loader decided — read-only where a sibling could be running beside it.
+ *
+ * <p>{@code continues} rides along the same way: the engine plants such a seed as the continued
+ * step's agent — its session id, resume mode — instead of a new one.
  */
 public record TaskSeed(int stepIndex, String template, String taskText, boolean includePreviousResult,
                        String previousWorkspace, TaskConfiguration config, int attempt,
-                       Map<String, String> fanIn, ArtifactAccess artifact) {
+                       Map<String, String> fanIn, ArtifactAccess artifact, boolean continues) {
 
     public TaskSeed {
         artifact = artifact == null ? ArtifactAccess.WRITE : artifact;
@@ -27,7 +30,7 @@ public record TaskSeed(int stepIndex, String template, String taskText, boolean 
     public TaskSeed(int stepIndex, String template, String taskText, boolean includePreviousResult,
                     String previousWorkspace, TaskConfiguration config, int attempt) {
         this(stepIndex, template, taskText, includePreviousResult, previousWorkspace, config, attempt, Map.of(),
-                ArtifactAccess.WRITE);
+                ArtifactAccess.WRITE, false);
     }
 
     /**
@@ -37,7 +40,7 @@ public record TaskSeed(int stepIndex, String template, String taskText, boolean 
      */
     public TaskSeed withFanIn(Map<String, String> workspacesByLabel) {
         return new TaskSeed(stepIndex, template, taskText, includePreviousResult, previousWorkspace, config,
-                attempt, new LinkedHashMap<>(workspacesByLabel), artifact);
+                attempt, new LinkedHashMap<>(workspacesByLabel), artifact, continues);
     }
 
     /** Resolve a workflow step against a run's parameter values. */
@@ -51,7 +54,8 @@ public record TaskSeed(int stepIndex, String template, String taskText, boolean 
                 step.config(),
                 attempt,
                 Map.of(),
-                step.artifact());
+                step.artifact(),
+                step.continues());
     }
 
     /**
@@ -59,7 +63,8 @@ public record TaskSeed(int stepIndex, String template, String taskText, boolean 
      * whose every pass after the first continues from the one before it.
      */
     public TaskSeed includingPreviousResult() {
-        return new TaskSeed(stepIndex, template, taskText, true, previousWorkspace, config, attempt, fanIn, artifact);
+        return new TaskSeed(stepIndex, template, taskText, true, previousWorkspace, config, attempt, fanIn, artifact,
+                continues);
     }
 
     /**

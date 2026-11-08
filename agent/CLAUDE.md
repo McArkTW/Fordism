@@ -16,6 +16,8 @@ for how to work and how to report your result. In short:
 3. The product is in `artifact/` — work on it in place; the rest of the workspace is yours. If
    `artifact/` is read-only, your output goes in `result/` and a later step merges.
    Every other output goes under `result/` (e.g. `result/color.md`).
+   If this step **continues** an earlier one, the workspace is the one you already worked in; the
+   earlier step's `task/` and `result/` are under `steps/` — read them, leave them alone.
 4. **Finish by writing `result/result.json`** as `{"state":"finished","summary":"…","artifacts":[…]}`.
 
 Your chat output is not the result — `result/` is. Stay inside `/workspace`. Be direct and brief.

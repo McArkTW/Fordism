@@ -16,6 +16,7 @@ import tw.mcark.tony.fordism.model.task.TaskMode;
 import tw.mcark.tony.fordism.model.task.TaskSeed;
 import tw.mcark.tony.fordism.model.workflow.Step;
 import tw.mcark.tony.fordism.model.workflow.Workflow;
+import tw.mcark.tony.fordism.parse.StepAgents;
 import tw.mcark.tony.fordism.parse.WorkflowLoader;
 import tw.mcark.tony.fordism.store.JsonStateStore;
 import tw.mcark.tony.fordism.store.TaskRepository;
@@ -27,6 +28,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import org.tinylog.Logger;
@@ -50,6 +52,7 @@ public final class Engine {
     private final Map<String, String> workflowYaml = new HashMap<>();
     private final WorkflowLoader loader = new WorkflowLoader();
     private final AtomicLong seq = new AtomicLong();
+    private StepAgents agents = StepAgents.NONE;
 
     public Engine(FordismConfiguration configuration, TaskRepository tasks, WorkflowRunRepository runs,
                   SessionIdentifierFactory sessions, Dispatcher dispatcher, Collector collector, Reaper reaper,
@@ -66,8 +69,25 @@ public final class Engine {
         this.secrets = secrets;
     }
 
+    /**
+     * How a step's template resolves to an agent profile and tool, for the {@code continues} check.
+     * Set once at boot; left unset (in tests, mostly) nothing resolves and nothing is refused on it.
+     */
+    public void useAgents(StepAgents resolver) {
+        this.agents = resolver == null ? StepAgents.NONE : resolver;
+    }
+
     /* ---- workflow registry ---- */
-    public void register(Workflow workflow) { workflows.put(workflow.name(), workflow); }
+
+    /**
+     * Register a parsed workflow. The continued-agent check runs here as well as in {@link #parse},
+     * so a workflow file loaded at boot is refused for a profile mismatch exactly as one saved
+     * through the API would be.
+     */
+    public void register(Workflow workflow) {
+        WorkflowLoader.checkContinuedAgents(workflow, agents, null);
+        workflows.put(workflow.name(), workflow);
+    }
     public Optional<Workflow> workflow(String name) { return Optional.ofNullable(workflows.get(name)); }
 
     /**
@@ -87,11 +107,13 @@ public final class Engine {
 
     /** Parse without registering or writing — used to check a definition before it is stored. */
     public Workflow parse(String yaml) {
-        return loader.parse(yaml);
+        Workflow workflow = loader.parse(yaml);
+        WorkflowLoader.checkContinuedAgents(workflow, agents, null);
+        return workflow;
     }
 
     public Workflow upsert(String yaml) throws IOException {
-        Workflow workflow = loader.parse(yaml);
+        Workflow workflow = parse(yaml);
         if (workflow.name() == null || workflow.name().isBlank()) {
             throw new IllegalArgumentException("workflow needs a name");
         }
@@ -137,6 +159,10 @@ public final class Engine {
             throw new IllegalArgumentException("artifactFrom names run \"" + request.artifactFrom()
                     + "\", which does not exist");
         }
+        // The half of the continues check load time could not do: templates named by a parameter,
+        // or created since. Refused now, before a run exists, rather than at the step's dispatch.
+        WorkflowLoader.checkContinuedAgents(workflow, agents,
+                request.parameters() == null ? Map.of() : request.parameters());
         WorkflowRun run = new WorkflowRun(java.util.UUID.randomUUID().toString(), workflowName, workflow.strategy(),
                 request.parameters());
         run.taskZipPath = request.taskZipPath();
@@ -176,9 +202,28 @@ public final class Engine {
         return tasks.byRunStep(run.id, stepIndex);
     }
 
-    /** Plant a task for a resolved step. Always in work mode — resume is re-arming an existing task. */
+    /**
+     * Plant a task for a resolved step. In work mode — resume is re-arming an existing task — unless
+     * the step continues another one's agent.
+     *
+     * <p>A continuing task is a new task with an old agent: the session id is the continued task's,
+     * the mode is resume, and it remembers which task it continues so the dispatcher can hand it
+     * that workspace. Its own step's template, config, credentials and artifact access are planted
+     * as for any task. When there is no task to continue (a conditional step whose predecessor was
+     * skipped) it starts its own agent: there is nothing else it could do.
+     */
     public Task seedTask(WorkflowRun run, TaskSeed seed) {
-        Task task = new Task(UUID.randomUUID().toString(), run.id, seed.stepIndex(), sessions.newSessionId());
+        Optional<Task> continued = seed.continues() ? continuedTask(run, seed.stepIndex()) : Optional.empty();
+        if (seed.continues() && continued.isEmpty()) {
+            Logger.warn("run {} step {} continues a step that has no task; it starts its own agent",
+                    run.id, seed.stepIndex());
+        }
+        Task task = new Task(UUID.randomUUID().toString(), run.id, seed.stepIndex(),
+                continued.map(earlier -> earlier.sessionId).orElseGet(sessions::newSessionId));
+        continued.ifPresent(earlier -> {
+            task.continuesTaskId = earlier.id;
+            task.mode = TaskMode.RESUME;
+        });
         task.template = seed.template();
         task.taskText = seed.taskText();
         task.includePreviousResult = seed.includePreviousResult();
@@ -195,9 +240,15 @@ public final class Engine {
         // template after this moment must not change what this already-queued task receives.
         dispatcher.captureCredentials(task);
         tasks.save(task);
-        Logger.info("seed run {} step {} template={} attempt={}",
-                run.id, seed.stepIndex(), seed.template(), seed.attempt());
+        Logger.info("seed run {} step {} template={} attempt={} continues={}",
+                run.id, seed.stepIndex(), seed.template(), seed.attempt(), task.continuesTaskId);
         return task;
+    }
+
+    /** The latest task at the step whose agent the step at {@code stepIndex} continues. */
+    private Optional<Task> continuedTask(WorkflowRun run, int stepIndex) {
+        OptionalInt step = workflowFor(run).continuedStep(stepIndex);
+        return step.isPresent() ? currentTask(run, step.getAsInt()) : Optional.empty();
     }
 
     /**
@@ -238,7 +289,7 @@ public final class Engine {
         int stepIndex = run.currentStepIndex;
         String previousWorkspace = null;
         if (step.includePreviousResult() && stepIndex > 0) {
-            previousWorkspace = currentTask(run, stepIndex - 1).map(previous -> previous.workspacePath).orElse(null);
+            previousWorkspace = currentTask(run, stepIndex - 1).map(Task::signOffPath).orElse(null);
         }
         return seedTask(run, TaskSeed.of(stepIndex, step, run.parameterValues, previousWorkspace, attempt));
     }

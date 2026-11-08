@@ -174,11 +174,15 @@ public final class WorkflowController {
     /** The shape the engine parsed — the editor draws its outline from this, never from its own parse. */
     private Views.WorkflowDetail parsed(Workflow workflow) {
         List<Views.WorkflowStep> steps = new ArrayList<>();
-        for (Step step : workflow.steps()) {
+        for (int index = 0; index < workflow.steps().size(); index++) {
+            Step step = workflow.steps().get(index);
+            // The id of the step whose agent this one continues, as the outline marks it.
+            String continues = workflow.continuedStep(index).isPresent()
+                    ? workflow.steps().get(workflow.continuedStep(index).getAsInt()).id() : null;
             steps.add(new Views.WorkflowStep(step.id(), nz(step.template()), step.dependsOn(),
                     nz(step.forEach()), nz(step.when()), step.includePreviousResult(),
                     step.config().timeoutSeconds(), step.config().network().wireName(),
-                    step.artifact().wireName()));
+                    step.artifact().wireName(), continues));
         }
         List<Views.WorkflowParameter> parameters = new ArrayList<>();
         for (Parameter parameter : workflow.parameters()) {

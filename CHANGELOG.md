@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+### Continue: a step can run as the previous step's agent
+
+- **`continues: true`** on a step runs it as the agent of the step it continues: the same
+  workspace, the same session id, resume mode, and a new `task/task.md`. It is the mechanism that
+  resumes a task after a question is answered, now available between steps. A `graph` step
+  continues its one `dependsOn`; `linear`, `conditional` and `rework` continue the step before.
+- **Each step keeps its sign-off.** Before the continuing task starts, the previous step's `task/`
+  and `result/` move to `steps/<index>/` in the same workspace. Core reads that result from there
+  (run page, result zip, `includePreviousResult` of later steps), and the agent can read it too.
+- **The new step's own** timeout, network, credentials and template. Its agent profile and tool
+  must match the continued step's: refused at load when both templates exist, else at run creation.
+- **Refused** on the first step, any `map-reduce` step, a `graph` step with no or several
+  `dependsOn`, the `reconciler` generator, and two steps continuing the same one.
+- **One-shot tools** get the same workspace and a fresh conversation; the task page says so. The run
+  page names the task a continued task continued; the editor outline marks a continuing step.
+- A `rework` with `mode: resume` whose retry step has been continued re-seeds it instead of
+  resuming over the later step's sign-off.
+
 ### The artifact: the product gets its own folder
 
 - **`artifact/`, one per run.** The product a run is building now lives in its own host folder,

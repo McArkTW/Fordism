@@ -1,6 +1,7 @@
 package tw.mcark.tony.fordism.launch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import tw.mcark.tony.fordism.config.FordismConfiguration;
@@ -51,6 +52,24 @@ class DockerContainerLauncherTest {
         assertTrue(adjacent(cmd, "--cap-drop", "ALL"), cmd.toString());
         assertTrue(cmd.contains("--security-opt") && cmd.contains("no-new-privileges"), cmd.toString());
         assertTrue(adjacent(cmd, "-v", "/var/lib/fordism/workspaces/t1:/workspace"), cmd.toString());
+    }
+
+    @Test
+    void only_the_first_launch_of_a_continuing_task_carries_the_hand_over() {
+        Task task = task(NetworkPolicy.NONE);
+        task.continuesTaskId = "t0";
+
+        assertEquals("steps", launcher().environment(task).get("FORDISM_CONTINUES"),
+                "the first launch is the hand-over: the entrypoint words the prompt for a new step");
+
+        task.dispatchedAt = System.currentTimeMillis();   // launched once; the reaper put it back
+        assertFalse(launcher().environment(task).containsKey("FORDISM_CONTINUES"),
+                "a retry is an ordinary resume, not a second hand-over");
+    }
+
+    @Test
+    void a_task_that_continues_nothing_never_carries_the_hand_over() {
+        assertFalse(launcher().environment(task(NetworkPolicy.NONE)).containsKey("FORDISM_CONTINUES"));
     }
 
     @Test

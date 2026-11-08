@@ -7,6 +7,7 @@ import tw.mcark.tony.fordism.model.task.Task;
 import tw.mcark.tony.fordism.model.workflow.ArtifactAccess;
 import tw.mcark.tony.fordism.proxy.UsageProxy;
 import tw.mcark.tony.fordism.secret.SecretVault;
+import tw.mcark.tony.fordism.workspace.WorkspaceStager;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -145,7 +146,7 @@ public final class DockerContainerLauncher implements ContainerLauncher {
      * the agent's question is applied last and wins, because the usual reason for answering one is
      * that the stored value is dead.
      */
-    private Map<String, String> environment(Task task) {
+    Map<String, String> environment(Task task) {
         AgentBackend backend = models.backend(task.agentProfile, task.config.model());
 
         Map<String, String> env = new LinkedHashMap<>();
@@ -164,6 +165,15 @@ public final class DockerContainerLauncher implements ContainerLauncher {
         if (task.hostArtifactPath != null && !task.hostArtifactPath.isBlank()) {
             env.put("FORDISM_ARTIFACT", ArtifactAccess.readOnly(task.artifact)
                     ? ArtifactAccess.READ_ONLY.wireName() : ArtifactAccess.WRITE.wireName());
+        }
+        // A continuing task resumes the session of the step it continues, with a new task rather
+        // than an answer: the entrypoint words the prompt for that, and tells the agent where its
+        // earlier steps' sign-offs went. FIRST launch only (dispatchedAt is set after a launch and
+        // never reset): a reaper retry of the same task is an ordinary resume in a new container,
+        // and replaying the hand-over note into the session would tell the agent it changed step
+        // twice. An answered question carries RESUME_PROMPT, which the entrypoint reads first anyway.
+        if (task.continuesTaskId != null && task.dispatchedAt == 0) {
+            env.put("FORDISM_CONTINUES", WorkspaceStager.STEPS);
         }
         if (task.resumeMessage != null && !task.resumeMessage.isBlank()) {
             env.put("RESUME_PROMPT", task.resumeMessage);

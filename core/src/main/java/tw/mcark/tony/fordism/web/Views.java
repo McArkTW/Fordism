@@ -51,10 +51,23 @@ public final class Views {
 
     public record ArtifactEntry(String path, long size, boolean directory) {}
 
+    /**
+     * One task on the run page. {@code continuation} is set only on a task that continued another
+     * step's agent; {@code signOff} only on a task whose {@code task/} and {@code result/} a later
+     * continuing step moved under {@code steps/}, relative to {@code workspace}.
+     */
     public record TaskDetail(String taskId, int step, String state, String template, String session,
                              String workspace, String summary, String verdict, long createdAt, int attempt,
                              String error, String question, List<String> secretsRequested,
-                             Iterable<String> secretsHeld, long durationMs, TokenUsage usage) {}
+                             Iterable<String> secretsHeld, long durationMs, TokenUsage usage,
+                             Continuation continuation, String signOff) {}
+
+    /**
+     * Which task this one continued, and whether the conversation came with the workspace.
+     * {@code conversationKept} is null until the task has been dispatched, and false for a one-shot
+     * tool, which got the same workspace but a fresh session.
+     */
+    public record Continuation(String taskId, int step, Boolean conversationKept) {}
 
     /** One task waiting on an answer — the Questions inbox row. */
     public record Question(String taskId, String runId, String workflow, int step, String template,
@@ -93,7 +106,7 @@ public final class Views {
      */
     public record WorkflowStep(String id, String template, List<String> dependsOn, String forEach,
                                String when, boolean includePreviousResult, int timeoutSeconds,
-                               String network, String artifact) {}
+                               String network, String artifact, String continues) {}
 
     public record WorkflowParameter(String name, String label, String type, boolean required,
                                     String defaultValue, String help) {}

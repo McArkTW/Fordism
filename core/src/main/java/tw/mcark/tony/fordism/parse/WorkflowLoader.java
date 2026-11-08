@@ -20,6 +20,8 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -37,7 +39,8 @@ public final class WorkflowLoader {
     private static final Set<String> WORKFLOW_KEYS =
             Set.of("name", "description", "strategy", "tags", "parameters", "steps", "generator", "maxIterations");
     private static final Set<String> STEP_KEYS =
-            Set.of("id", "template", "task", "includePreviousResult", "dependsOn", "onFail", "forEach", "when", "config");
+            Set.of("id", "template", "task", "includePreviousResult", "dependsOn", "onFail", "forEach", "when", "config",
+                    "continues");
     private static final Set<String> CONFIG_KEYS = Set.of("model", "timeoutSeconds", "network", "maxAttempts");
     private static final Set<String> ON_FAIL_KEYS = Set.of("retry", "maxAttempts", "mode");
     private static final Set<String> PARAMETER_KEYS = Set.of("name", "label", "type", "required", "default", "help");
@@ -105,7 +108,123 @@ public final class WorkflowLoader {
         }
         validateStepReferences(steps);
         steps = withArtifactAccess(strategy, steps);
-        return new Workflow(name, description, strategy, tags, parameters, steps, generator, maxIterations);
+        Workflow workflow = new Workflow(name, description, strategy, tags, parameters, steps, generator, maxIterations);
+        validateContinuation(workflow);
+        return workflow;
+    }
+
+    /**
+     * Every {@code continues} must name exactly one step whose agent it can take over.
+     *
+     * <p>A continuing step runs in its predecessor's workspace, in its predecessor's session. That
+     * needs one predecessor, and it needs the bench to be free: so not the first step (nothing to
+     * continue), not a {@code map-reduce} step (the map is many agents, and the reduce would have
+     * many to choose from), not a {@code graph} step with no dependency or several, and not the
+     * reconciler's generator, whose iterations are each a new agent reading the last one's result.
+     * Two steps continuing the same one would be two agents on one bench, which is the merge core
+     * refuses everywhere else too.
+     */
+    private static void validateContinuation(Workflow workflow) {
+        if (workflow.generator() != null && workflow.generator().continues()) {
+            throw new IllegalArgumentException("the generator cannot continue: a reconciler has no step before it,"
+                    + " and each iteration is a new agent that reads the last one's result");
+        }
+        Map<Integer, String> continuedBy = new LinkedHashMap<>();
+        List<Step> steps = workflow.steps();
+        for (int index = 0; index < steps.size(); index++) {
+            Step step = steps.get(index);
+            if (!step.continues()) {
+                continue;
+            }
+            String what = "step \"" + step.id() + "\" continues";
+            switch (workflow.strategy()) {
+                case MAP_REDUCE -> throw new IllegalArgumentException(what + ", but a map-reduce step cannot:"
+                        + " the map is one agent per item, so there is no single agent to continue or be continued");
+                case RECONCILER -> throw new IllegalArgumentException(what + ", but a reconciler runs only its"
+                        + " generator, which cannot continue");
+                case GRAPH -> {
+                    if (step.dependsOn().isEmpty()) {
+                        throw new IllegalArgumentException(what + " but has no dependsOn: a graph step continues"
+                                + " its one dependency, and this one has none");
+                    }
+                    if (step.dependsOn().size() > 1) {
+                        throw new IllegalArgumentException(what + " but dependsOn " + step.dependsOn()
+                                + ": a graph step continues its one dependency, and a join has several agents"
+                                + " to choose from");
+                    }
+                }
+                default -> {
+                    if (index == 0) {
+                        throw new IllegalArgumentException(what + ", but it is the first step: there is no"
+                                + " agent before it to continue");
+                    }
+                }
+            }
+            OptionalInt continued = workflow.continuedStep(index);
+            if (continued.isPresent()) {
+                String earlier = continuedBy.putIfAbsent(continued.getAsInt(), step.id());
+                if (earlier != null) {
+                    throw new IllegalArgumentException("steps \"" + earlier + "\" and \"" + step.id()
+                            + "\" both continue \"" + steps.get(continued.getAsInt()).id()
+                            + "\": one agent's workspace cannot hold two agents at once");
+                }
+            }
+        }
+    }
+
+    /**
+     * A continuing step must run the same Agent Profile and tool as the step it continues: the
+     * session it resumes belongs to one CLI, and another would start a silent new one in its store.
+     *
+     * <p>Run twice. At load time, with no parameter values, a template that names a parameter or
+     * does not exist yet cannot be resolved, and the pair is left for later rather than refused on a
+     * guess. At run creation the values are in and the templates are what they are: one that still
+     * does not exist runs bare on the default backend, and that is what is compared.
+     *
+     * @param values the run's parameter values, or null at load time
+     */
+    public static void checkContinuedAgents(Workflow workflow, StepAgents agents, Map<String, String> values) {
+        for (int index = 0; index < workflow.steps().size(); index++) {
+            OptionalInt continued = workflow.continuedStep(index);
+            if (continued.isEmpty()) {
+                continue;
+            }
+            Step step = workflow.steps().get(index);
+            Step earlier = workflow.steps().get(continued.getAsInt());
+            Optional<StepAgent> mine = agentOf(step, agents, values);
+            Optional<StepAgent> theirs = agentOf(earlier, agents, values);
+            if (mine.isEmpty() || theirs.isEmpty()) {
+                continue;   // not resolvable yet; run creation checks again
+            }
+            if (!mine.get().equals(theirs.get())) {
+                throw new IllegalArgumentException("step \"" + step.id() + "\" continues \"" + earlier.id()
+                        + "\" but runs as " + describe(mine.get()) + " where \"" + earlier.id() + "\" runs as "
+                        + describe(theirs.get()) + ": a session belongs to one agent profile and tool,"
+                        + " so give both templates the same agent profile");
+            }
+        }
+    }
+
+    private static Optional<StepAgent> agentOf(Step step, StepAgents agents, Map<String, String> values) {
+        if (values == null) {
+            if (step.template() != null && step.template().contains("${")) {
+                return Optional.empty();
+            }
+            return agents.of(step.template());
+        }
+        String template = step.template();
+        if (template != null) {
+            for (Map.Entry<String, String> entry : values.entrySet()) {
+                template = template.replace("${" + entry.getKey() + "}",
+                        entry.getValue() == null ? "" : entry.getValue());
+            }
+        }
+        return agents.of(template).or(agents::bare);
+    }
+
+    private static String describe(StepAgent agent) {
+        return (agent.profile().isBlank() ? "the default profile" : "profile \"" + agent.profile() + "\"")
+                + " (" + agent.tool().wireName() + ")";
     }
 
     /**
@@ -248,7 +367,8 @@ public final class WorkflowLoader {
                     asInt(c.get("maxAttempts"), config.maximumAttempts()));
         }
         return new Step(id, (String) map.get("template"), (String) map.get("task"), includePreviousResult,
-                dependsOn, onFail, (String) map.get("forEach"), (String) map.get("when"), config, null);
+                dependsOn, onFail, (String) map.get("forEach"), (String) map.get("when"), config, null,
+                Boolean.TRUE.equals(map.get("continues")));
     }
 
     /** A bare name or a mapping — both declare a parameter; the mapping also describes it. */
