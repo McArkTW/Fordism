@@ -30,7 +30,21 @@ jobs:
           distribution: temurin
           java-version: '25'
       # banVar + banStyle + all tests ride inside `build`
-      - run: chmod +x gradlew && ./gradlew build --no-daemon
+      # The wrapper's distribution download is the one step that fails for reasons that have
+      # nothing to do with the code — services.gradle.org answering 504 to the runners took a
+      # whole afternoon of PR checks down once. Fetched on its own and retried, as core/Dockerfile
+      # does; the build itself is not retried, because a failing suite must fail once and stay failed.
+      - name: Gradle wrapper
+        run: |
+          chmod +x gradlew
+          for attempt in 1 2 3 4 5; do
+            ./gradlew --no-daemon --version && exit 0
+            echo "gradle wrapper download attempt ${attempt} failed; retrying in 60s" >&2
+            sleep 60
+          done
+          ./gradlew --no-daemon --version
+        working-directory: core
+      - run: ./gradlew build --no-daemon
         working-directory: core
       - uses: actions/setup-node@v4
         with:

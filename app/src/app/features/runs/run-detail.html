@@ -56,6 +56,66 @@
       </div>
     }
 
+    @if (d.artifact; as a) {
+      <!-- The product this run built: one folder per run, shared by every step of it. -->
+      <section class="border-border bg-card mt-3 rounded-xl border p-3">
+        <div class="flex flex-wrap items-center gap-2 text-xs">
+          <app-icon name="folder" class="text-muted-foreground" />
+          <span class="font-medium">Artifact</span>
+          <span class="text-muted-foreground font-mono break-all">{{ a.path }}</span>
+          <button hlmBtn variant="ghost" size="icon-xs" type="button" hlmTooltip="Copy path" (click)="copy(a.path)">
+            <app-icon name="copy" />
+          </button>
+          @if (a.from) {
+            <span class="text-muted-foreground">
+              continued from
+              <a class="text-primary font-mono hover:underline" [routerLink]="['/runs', a.from]">{{
+                a.from.slice(0, 8)
+              }}</a>
+            </span>
+          }
+          <span class="flex-auto"></span>
+          @if (a.present) {
+            <button hlmBtn variant="ghost" size="sm" type="button" [disabled]="artifactLoading()" (click)="toggleArtifact()">
+              <app-icon [name]="artifactFiles() ? 'chevron-down' : 'chevron-right'" />
+              {{ artifactFiles() ? 'Hide' : 'Browse' }}
+            </button>
+            <a hlmBtn variant="outline" size="sm" [href]="artifactZip()" download>
+              <app-icon name="download" />
+              Download
+            </a>
+          } @else {
+            <span class="text-muted-foreground">
+              {{ isLive() ? 'not laid out yet — the first step creates it' : 'none on disk (never created, or culled)' }}
+            </span>
+          }
+        </div>
+        @if (artifactError()) {
+          <p class="text-destructive mt-2 text-xs">{{ artifactError() }}</p>
+        }
+        @if (artifactFiles(); as listing) {
+          @if (listing.files.length === 0) {
+            <p class="text-muted-foreground mt-2 text-xs">Empty — no step put anything here.</p>
+          } @else {
+            <ul class="mt-2 max-h-72 overflow-auto font-mono text-[11px]">
+              @for (entry of listing.files; track entry.path) {
+                <li class="flex gap-2">
+                  <app-icon [name]="entry.directory ? 'folder' : 'file'" class="text-muted-foreground shrink-0" />
+                  <span class="flex-auto break-all">{{ entry.path }}</span>
+                  @if (!entry.directory) {
+                    <span class="text-muted-foreground">{{ size(entry.size) }}</span>
+                  }
+                </li>
+              }
+            </ul>
+            @if (listing.truncated) {
+              <p class="text-muted-foreground mt-1 text-xs">Listing stopped at {{ listing.files.length }} entries — download for the rest.</p>
+            }
+          }
+        }
+      </section>
+    }
+
     @if (showSnapshot() && d.workflowSnapshot) {
       <pre
         class="border-border bg-card text-muted-foreground mt-3 max-h-72 overflow-auto rounded-xl border p-3 font-mono text-xs whitespace-pre-wrap"

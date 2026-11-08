@@ -13,7 +13,7 @@ class TaskSeedTest {
 
     private static Step step(String template, String task, boolean includePrevious) {
         return new Step("s0", template, task, includePrevious, List.of(), null, null, null,
-                TaskConfiguration.defaults());
+                TaskConfiguration.defaults(), null);
     }
 
     @Test

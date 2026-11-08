@@ -30,6 +30,7 @@
       "@spartan-ng/helm/table": ["./src/app/ui/table/src/index.ts"],
       "@spartan-ng/helm/separator": ["./src/app/ui/separator/src/index.ts"],
       "@spartan-ng/helm/skeleton": ["./src/app/ui/skeleton/src/index.ts"],
+      "@spartan-ng/helm/hover-card": ["./src/app/ui/hover-card/src/index.ts"]
     }
   },
   "angularCompilerOptions": {
