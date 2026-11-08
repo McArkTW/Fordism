@@ -111,6 +111,13 @@
                     >artifact read-only</span
                   >
                 }
+                @if (s.continues) {
+                  <span
+                    class="badge-warn"
+                    title="Runs as that step's agent: the same workspace and session, with this step's own task. That step's task/ and result/ are moved to steps/ first."
+                    >continues {{ s.continues }}</span
+                  >
+                }
               </div>
             </div>
           }

@@ -25,6 +25,29 @@
       </span>
     </div>
 
+    <!-- A step that ran as an earlier step's agent, or one whose sign-off a later step moved. -->
+    @if (t.continuation; as c) {
+      <p class="text-muted-foreground mt-1.5 text-xs">
+        Continued
+        <a class="underline" [routerLink]="['/runs', id(), 'tasks', c.taskId]"
+          >step {{ c.step }}'s task</a
+        >:
+        @if (c.conversationKept === false) {
+          the same workspace, but a fresh conversation. This tool keeps no session, so it picked up
+          from the files that step left.
+        } @else {
+          the same workspace and session.
+        }
+        That step's task/ and result/ are under steps/ in the workspace.
+      </p>
+    }
+    @if (t.signOff) {
+      <p class="text-muted-foreground mt-1.5 text-xs">
+        A later step continued this agent, so this task's task/ and result/ are now at
+        <span class="font-mono">{{ t.signOff }}/</span> in the workspace.
+      </p>
+    }
+
     <!-- Usage strip: identity and cost of this task at a glance. -->
     <div class="text-muted-foreground mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
       <span class="flex items-center gap-1.5 font-mono text-[11px]">

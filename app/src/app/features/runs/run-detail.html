@@ -163,7 +163,14 @@
                   {{ tv.label }}
                 </span>
               </td>
-              <td hlmTd class="px-3 font-mono text-xs">{{ t.template }}</td>
+              <td hlmTd class="px-3 font-mono text-xs">
+                {{ t.template }}
+                @if (t.continuation; as c) {
+                  <span class="text-muted-foreground block font-sans" title="Ran as that step's agent: same workspace and session">
+                    continues step {{ c.step }}{{ c.conversationKept === false ? ' · fresh conversation' : '' }}
+                  </span>
+                }
+              </td>
               <td hlmTd class="text-muted-foreground px-3">{{ t.attempt }}</td>
               <td hlmTd class="text-muted-foreground px-3">{{ dur(t.durationMs) }}</td>
               <td hlmTd class="text-muted-foreground px-3">{{ t.usage?.total ?? '—' }}</td>

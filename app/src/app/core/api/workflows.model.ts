@@ -36,6 +36,8 @@ export type WorkflowStep = {
    * that could run beside it. Computed by core from the strategy and dependsOn, never written.
    */
   artifact: 'write' | 'read-only';
+  /** The id of the step whose agent this one continues (`continues: true`); absent otherwise. */
+  continues?: string;
 };
 
 /**

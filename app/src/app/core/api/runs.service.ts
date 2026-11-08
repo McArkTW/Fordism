@@ -94,6 +94,21 @@ export type TaskView = {
   question: string | null; // what the agent asked when it stopped (state ASKED)
   secretsRequested: string[]; // environment variables this question wants supplied — names only
   secretsHeld: string[]; // names this run already holds from an earlier answer
+  /** Set when this task ran as an earlier step's agent (`continues: true`). */
+  continuation?: TaskContinuation;
+  /**
+   * Where this task's task/ and result/ live now, relative to its workspace (`steps/<index>`):
+   * set once a later step continued its agent and took the top of the workspace.
+   */
+  signOff?: string;
+};
+
+/** The task a continuing task continued, and whether the conversation came with the workspace. */
+export type TaskContinuation = {
+  taskId: string;
+  step: number;
+  /** Absent until dispatched; false for a one-shot tool: same workspace, fresh conversation. */
+  conversationKept?: boolean;
 };
 
 export type RunDetail = {
