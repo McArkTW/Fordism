@@ -4,6 +4,7 @@ import tw.mcark.tony.fordism.config.FordismConfiguration;
 import tw.mcark.tony.fordism.credential.CredentialStore;
 import tw.mcark.tony.fordism.model.task.NetworkPolicy;
 import tw.mcark.tony.fordism.model.task.Task;
+import tw.mcark.tony.fordism.model.workflow.ArtifactAccess;
 import tw.mcark.tony.fordism.proxy.UsageProxy;
 import tw.mcark.tony.fordism.secret.SecretVault;
 import java.io.IOException;
@@ -22,6 +23,9 @@ import java.util.List;
  * Mounts the HOST workspace path, sets the model backend + session env, joins the launcher network.
  */
 public final class DockerContainerLauncher implements ContainerLauncher {
+    /** Where the run's artifact appears inside the agent container. */
+    static final String ARTIFACT_MOUNT = "/workspace/artifact";
+
     private final FordismConfiguration configuration;
     private final ModelRegistry models;
     private final SecretVault secrets;
@@ -113,6 +117,16 @@ public final class DockerContainerLauncher implements ContainerLauncher {
         }
         cmd.add("-v");
         cmd.add(task.hostWorkspacePath + ":/workspace");
+        // The run's product, over the workspace's empty artifact/. Nested under /workspace so the
+        // agent's world is still one tree, but a separate mount: it outlives this task, and every
+        // task of the run gets the same folder. :ro where the loader decided a sibling could be
+        // running beside this step — docker, not the agent's good manners, is what keeps two
+        // agents out of one working tree.
+        if (task.hostArtifactPath != null && !task.hostArtifactPath.isBlank()) {
+            cmd.add("-v");
+            cmd.add(task.hostArtifactPath + ":" + ARTIFACT_MOUNT
+                    + (ArtifactAccess.readOnly(task.artifact) ? ":ro" : ""));
+        }
         // The image is chosen by the tool, not fixed: each tool has its own, holding only its CLI.
         cmd.add(configuration.agentImage(models.backend(task.agentProfile, task.config.model()).tool().wireName()));
         return cmd;
@@ -145,6 +159,12 @@ public final class DockerContainerLauncher implements ContainerLauncher {
         env.put("AGENT_FORMAT", backend.format().wireName());
         env.put("AGENT_MODE", task.mode.wireName());
         env.put("FORDISM_SESSION_ID", task.sessionId);
+        // Whether artifact/ is this step's to change. The mount already enforces it; this is so the
+        // agent is told before it tries, and plans to hand its work back through result/ instead.
+        if (task.hostArtifactPath != null && !task.hostArtifactPath.isBlank()) {
+            env.put("FORDISM_ARTIFACT", ArtifactAccess.readOnly(task.artifact)
+                    ? ArtifactAccess.READ_ONLY.wireName() : ArtifactAccess.WRITE.wireName());
+        }
         if (task.resumeMessage != null && !task.resumeMessage.isBlank()) {
             env.put("RESUME_PROMPT", task.resumeMessage);
         }

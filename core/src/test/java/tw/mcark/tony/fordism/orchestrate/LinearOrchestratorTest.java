@@ -1,11 +1,13 @@
 package tw.mcark.tony.fordism.orchestrate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import tw.mcark.tony.fordism.model.run.WorkflowRun;
 import tw.mcark.tony.fordism.model.run.WorkflowRunState;
 import tw.mcark.tony.fordism.model.task.TaskState;
+import tw.mcark.tony.fordism.model.workflow.ArtifactAccess;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -97,5 +99,30 @@ class LinearOrchestratorTest {
         assertTrue(harness.at(run, 1).includePreviousResult);
         assertEquals(harness.at(run, 0).workspacePath, harness.at(run, 1).previousWorkspace,
                 "includePreviousResult means the previous step's workspace, not a fresh one");
+    }
+
+    @Test
+    void a_run_continuing_an_unknown_run_is_refused_when_it_is_asked_for() {
+        // The copy happens at the first staging; a typo found then would fail an accepted run.
+        IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class,
+                () -> harness.startFrom(TWO_STEPS, "no-such-run"));
+        assertTrue(thrown.getMessage().contains("no-such-run"), thrown.getMessage());
+    }
+
+    @Test
+    void a_run_continuing_another_carries_it_to_every_task_and_every_step_writes() {
+        WorkflowRun design = harness.start(TWO_STEPS);
+        WorkflowRun execute = harness.startFrom(TWO_STEPS, design.id);
+
+        harness.reconcile(execute);
+        harness.collect(execute, 0);
+        harness.reconcile(execute);             // advances the index
+        harness.reconcile(execute);
+
+        assertEquals(design.id, execute.artifactFrom);
+        for (int step = 0; step < 2; step++) {
+            assertEquals(design.id, harness.at(execute, step).artifactFrom);
+            assertEquals(ArtifactAccess.WRITE, harness.at(execute, step).artifact);
+        }
     }
 }

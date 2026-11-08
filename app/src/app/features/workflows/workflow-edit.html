@@ -104,6 +104,13 @@
                 } @else {
                   <span>network {{ s.network }}</span>
                 }
+                @if (s.artifact === 'read-only') {
+                  <span
+                    class="badge-warn"
+                    title="Could run beside another step, so artifact/ is mounted read-only: its work comes back through result/ for a later step to merge. A read-only first step cannot create the product, so such a workflow starts from an earlier run (artifactFrom) or needs a single root step."
+                    >artifact read-only</span
+                  >
+                }
               </div>
             </div>
           }

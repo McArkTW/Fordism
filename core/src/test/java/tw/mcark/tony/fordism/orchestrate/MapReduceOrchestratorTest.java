@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import tw.mcark.tony.fordism.model.run.WorkflowRun;
 import tw.mcark.tony.fordism.model.run.WorkflowRunState;
 import tw.mcark.tony.fordism.model.task.TaskState;
+import tw.mcark.tony.fordism.model.workflow.ArtifactAccess;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -121,5 +122,18 @@ class MapReduceOrchestratorTest {
 
         assertEquals(WorkflowRunState.FAILED, run.state);
         assertTrue(harness.find(run, 3).isEmpty(), "a reduce over an incomplete fan-out is not a reduce");
+    }
+
+    @Test
+    void the_map_tasks_mount_the_artifact_read_only_and_the_reduce_writes_it() {
+        WorkflowRun run = threeItems();
+        harness.reconcile(run);
+        for (int item = 0; item < 3; item++) {
+            assertEquals(ArtifactAccess.READ_ONLY, harness.at(run, item).artifact, "map item " + item);
+            harness.collect(run, item);
+        }
+        harness.reconcile(run);
+
+        assertEquals(ArtifactAccess.WRITE, harness.at(run, 3).artifact);
     }
 }

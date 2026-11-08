@@ -56,6 +56,20 @@ if [ -n "${GITHUB_TOKEN:-}" ]; then
 fi
 
 mkdir -p "$WS/result" "$WS/result/logs" "$WS/skills"
+
+# --- the run's artifact ----------------------------------------------------
+# artifact/ is the product the run is building: one host folder per run, mounted by core over
+# $WS/artifact in every task of it, read-only (FORDISM_ARTIFACT=read-only) for a step a sibling could
+# be running beside. Core creates it, and copies it in when a run continues another, so its files
+# are not this user's: without safe.directory git refuses a checkout there as "dubious ownership".
+# The trailing /* covers a repo cloned one level down (git 2.46+; the base image ships newer).
+if [ -d "$WS/artifact" ]; then
+  for dir in "$WS/artifact" "$WS/artifact/*"; do
+    git config --global --get-all safe.directory 2>/dev/null | grep -qxF "$dir" \
+      || git config --global --add safe.directory "$dir"
+  done
+fi
+
 # Always stage the built-in fordism-agent skill (the result contract) alongside the task's skills.
 cp -r /doctrine/skills/* "$WS/skills/" 2>/dev/null || true
 # NB: token usage + the session transcript are NOT written here — the Collector can reap this
@@ -101,6 +115,12 @@ TASK="$(cat "$WS/task/task.md" 2>/dev/null)"
 PROMPT="${BRIEF}"
 [ -n "$INSTRUCTIONS" ] && PROMPT="${PROMPT}"$'\n\n---\nStanding instructions for this agent (authoritative):\n'"${INSTRUCTIONS}"
 PROMPT="${PROMPT}"$'\n\n---\nYour task (task/task.md):\n'"${TASK}"
+# Where the product is, and whether this step may change it. The mount already enforces read-only;
+# saying so up front is what makes the agent plan to hand its work back through result/ instead.
+case "${FORDISM_ARTIFACT:-}" in
+  read-only) PROMPT="${PROMPT}"$'\n\n---\nThe product this run is building is in artifact/, and it is READ-ONLY for this step: another step may be running beside you. Read it as you need, but put your work in result/ — a later step merges it into artifact/.' ;;
+  write)     PROMPT="${PROMPT}"$'\n\n---\nThe product this run is building is in artifact/. Work on it in place — it is what the next step receives. result/ is your sign-off (summary, verdict, what changed), not the product.' ;;
+esac
 
 # The step's whole wall-clock budget, shared by the first run and every self-resume below.
 EPOCH_DEADLINE=$(( $(date +%s) + TIMEOUT ))
