@@ -94,6 +94,7 @@ steps:
 | `template` | The Agent Template that supplies skills, credentials, and standing instructions. |
 | `task` | The instruction written to `task/task.md`. Use a block scalar for anything multi-line. |
 | `includePreviousResult` | Hands the previous step's `result/` to this one, copied into `task/previous-result/`. One of two ways work reaches a step — the other is `artifact/`, the shared product every step sees without asking; a step may use either or both, see [Two ways to pass work on](#two-ways-to-pass-work-on). A step fed by several (a `map-reduce` reduce, a `graph` step with more than one `dependsOn`) gets one folder each: `task/previous-result/<n>-<item>/` or `task/previous-result/<step-id>/`. |
+| `continues` | `true` runs this step as the agent of the step before it (in a `graph`, its one `dependsOn`): the same workspace and session, with this step's own task. Not on the first step, a `map-reduce` step, a `graph` step with no or several `dependsOn`, or the `reconciler` generator. See [Continuing an agent](#continuing-an-agent). |
 | `dependsOn` | `graph` only — the step ids that must collect first. |
 | `when` | `conditional` only — a predicate, e.g. `classify.result == 'yes'`. |
 | `forEach` | `map-reduce` only — fans out over a list parameter; each task sees `${item}`. |
@@ -194,6 +195,7 @@ agents already know it — it is here so you know it too.
 | `memory/` | Presets the agent treats as ground truth. |
 | `artifact/` | The product the run is building — one folder per run, shared by every task of it, and outliving each. Read-only (`:ro`) for a step that could run beside another; see [The artifact](#the-artifact). |
 | `result/` | The step's sign-off: its result file, and any report or file the task hands back. Not the product. |
+| `steps/<index>/` | Only in a step that `continues` another: the earlier steps' `task/` and `result/`, moved aside so each keeps its sign-off. |
 
 ### The artifact
 
@@ -255,6 +257,53 @@ the path, lists what the artifact holds, and downloads it as a zip (the same per
 download needs). It is kept for as long as the run plus `FORDISM_ARTIFACT_RETENTION_HOURS` after the
 run ends — `0`, the default, keeps it, as workspaces are kept — and an artifact another run is still
 continuing from is held until that run has ended.
+
+### Continuing an agent
+
+Every step normally starts a new agent with an empty memory. That is right when the steps are
+different specialists. It is wrong when one agent's job is split into steps for control: a human gate
+between "propose" and "apply", a write step and a revise step, a long task cut into checkpoints.
+`continues: true` makes a step run as the previous step's agent:
+
+```yaml
+steps:
+  - id: propose
+    template: coder
+    task: Propose the change in result/plan.md. Do not apply it.
+  - id: apply
+    template: coder
+    task: Apply the plan you proposed.
+    continues: true
+```
+
+- **Same workspace, same session.** The step runs in the continued step's workspace, with its
+  session id, in resume mode: the CLI picks up its own conversation, and the files and scratch are
+  where it left them. It is the mechanism that resumes a task after a question is answered, used
+  between steps.
+- **Each step keeps its own sign-off.** Before the continuing task starts, core moves the previous
+  step's `task/` and `result/` to `steps/<index>/task/` and `steps/<index>/result/`, and the new step
+  gets a fresh `task/` and an empty `result/`. Core reads the earlier result from its new place (the
+  run page, the result zip, `includePreviousResult` for later steps), and the agent can read it there
+  too. A second sign-off of the same step, after a rework, goes beside the first as `steps/<index>-2/`.
+- **Everything else is the new step's**: timeout, network, credentials, template (its skills, memory
+  and instructions replace the old ones). The template may differ, but its agent profile and tool must
+  match the continued step's, because a session belongs to one CLI. A mismatch is refused when the
+  workflow loads if both templates exist then, and otherwise when the run is created.
+- **Which step.** In `linear`, `conditional` and `rework`, the step before it in list order (a
+  `conditional` step whose predecessor was skipped has nothing to continue and starts its own agent).
+  In a `graph`, its one `dependsOn`. Not allowed on the first step, on any `map-reduce` step, on a
+  `graph` step with no or several `dependsOn`, on the `reconciler` generator, or on two steps that
+  would continue the same one.
+- **One-shot tools.** A tool that keeps no session (anything but claude-code, qwen-code, gemini-cli,
+  codex and opencode) still gets the same workspace, but its conversation starts fresh. The task page
+  says so.
+- **The artifact is unaffected.** A continuing step mounts `artifact/` exactly as any step does, with
+  the access its own position gives it.
+- **Rework.** An `onFail` with `mode: resume` whose retry step has been continued by a later step
+  re-seeds it instead, since resuming it would write over the later step's sign-off.
+
+The run page marks a continued task with the task it continued, and the editor outline marks a
+continuing step. A conversation is never carried between runs; `artifactFrom` carries the product.
 
 ### How a task ends
 
