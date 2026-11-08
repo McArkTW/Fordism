@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import tw.mcark.tony.fordism.model.run.WorkflowRun;
 import tw.mcark.tony.fordism.model.run.WorkflowRunState;
+import tw.mcark.tony.fordism.model.task.Task;
 import tw.mcark.tony.fordism.model.task.TaskMode;
 import tw.mcark.tony.fordism.model.task.TaskState;
 import org.junit.jupiter.api.Test;
@@ -145,6 +146,22 @@ class ReworkOrchestratorTest {
         harness.reconcile(run);
         harness.reconcile(run);
         return run;
+    }
+
+    @Test
+    void resume_mode_seeds_afresh_when_a_continuing_step_set_the_work_aside() {
+        // The gate continued the work step's agent, so the work step's sign-off is under steps/ and
+        // the top of the workspace is the gate's. Resuming the work task there would write over it.
+        WorkflowRun run = runUpToTheResumingGate();
+        Task work = harness.at(run, 0);
+        work.signOff = "steps/0";
+        harness.collect(run, 1, "fail");
+        harness.reconcile(run);
+
+        assertNotEquals(work.id, harness.at(run, 0).id, "a fresh task, not a resume over another's sign-off");
+        assertEquals(TaskMode.WORK, harness.at(run, 0).mode);
+        assertEquals(work.signOffPath(), harness.at(run, 0).previousWorkspace,
+                "the retry is handed its own last result, from where it now lives");
     }
 
     @Test

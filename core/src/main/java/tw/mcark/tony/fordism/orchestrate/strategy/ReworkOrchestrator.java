@@ -113,11 +113,17 @@ public final class ReworkOrchestrator implements Orchestrator {
          * what {@code onFail} did before this mode existed rather than a run that fails on a
          * technicality.
          *
+         * <p>It falls back the same way when a later step continued the retry step's agent: that
+         * step's sign-off now holds the top of the workspace and the retry step's was set aside to
+         * {@code steps/}, so resuming there would write over the other step's result. A fresh seed
+         * gets its last result staged, and the continuing step continues the new task next time.
+         *
          * <p>Either way the input is the RETRY STEP'S own last workspace, not the gate's: it is
          * continuing its own work, so {@code seedStep}'s "the step before me" is the wrong one here.
          */
         void apply(Engine engine) {
-            boolean resumable = retryTask != null && retryTask.hostWorkspacePath != null;
+            boolean resumable = retryTask != null && retryTask.hostWorkspacePath != null
+                    && retryTask.signOff == null;
             if (onFail.mode() == ReworkMode.RESUME && resumable) {
                 engine.resumeTask(retryTask, nextAttempt, correction);
             } else {
@@ -125,7 +131,7 @@ public final class ReworkOrchestrator implements Orchestrator {
                 // and without this the retry got its last workspace's path but not its contents,
                 // so every attempt started from nothing.
                 engine.seedTask(run, TaskSeed.of(retryIndex, retryStep, run.parameterValues,
-                        retryTask == null ? null : retryTask.workspacePath, nextAttempt).includingPreviousResult());
+                        retryTask == null ? null : retryTask.signOffPath(), nextAttempt).includingPreviousResult());
             }
             run.currentStepIndex = retryIndex;
             engine.saveRun(run);

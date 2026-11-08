@@ -37,9 +37,9 @@ public final class GraphOrchestrator implements Orchestrator {
                     depsReady = false;
                 } else {
                     if (firstDepWorkspace == null) {
-                        firstDepWorkspace = dependencyTask.get().workspacePath;
+                        firstDepWorkspace = dependencyTask.get().signOffPath();
                     }
-                    dependencies.put(dependency, dependencyTask.get().workspacePath);
+                    dependencies.put(dependency, dependencyTask.get().signOffPath());
                 }
             }
             if (planted.isEmpty() && depsReady) {

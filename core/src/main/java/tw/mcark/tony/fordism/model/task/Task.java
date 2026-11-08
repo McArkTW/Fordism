@@ -1,6 +1,8 @@
 package tw.mcark.tony.fordism.model.task;
 
 import tw.mcark.tony.fordism.model.workflow.ArtifactAccess;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 
@@ -56,6 +58,23 @@ public final class Task {
     public List<String> grantedSecretNames;   // rescue-secret keys answered TO THIS task; scopes vault injection
     public List<ChildRunRequest> childRuns;   // runs the agent asked for; only the reconciler acts on them
     public String resumeMessage;              // the human's answer, injected on resume
+    /**
+     * The task whose agent this one continues ({@code continues: true}): its workspace and session
+     * are this task's. Null for a task that started its own agent.
+     */
+    public String continuesTaskId;
+    /**
+     * Where this task's {@code task/} and {@code result/} live now, relative to its workspace. Null
+     * while they are at the top, which is every task nobody has continued; {@code steps/<index>}
+     * once a continuing task set them aside to take the bench.
+     */
+    public String signOff;
+    /**
+     * Whether the continuing agent kept its conversation. Null until the task is dispatched (and on
+     * every task that continues nothing); false for a one-shot tool, which gets the workspace but a
+     * fresh session.
+     */
+    public Boolean conversationKept;
     public volatile long lastHeartbeatAt;
     public long dispatchedAt;
     public long finishedAt;
@@ -65,6 +84,25 @@ public final class Task {
         this.runId = runId;
         this.stepIndex = stepIndex;
         this.sessionId = sessionId;
+    }
+
+    /**
+     * The folder holding this task's {@code task/} and {@code result/}: the workspace itself, or the
+     * place a continuing task moved them to. What "the previous workspace" means to the stager,
+     * which copies {@code result/} out of it — so a predecessor whose sign-off was set aside still
+     * hands its own result on, not the result of the task that now holds the bench.
+     */
+    public String signOffPath() {
+        if (workspacePath == null) {
+            return null;
+        }
+        return signOff == null ? workspacePath : Paths.get(workspacePath, signOff).toString();
+    }
+
+    /** This task's {@code result/}, wherever its sign-off lives now; null before it was staged. */
+    public Path resultDirectory() {
+        String folder = signOffPath();
+        return folder == null ? null : Paths.get(folder, "result");
     }
 
     /**

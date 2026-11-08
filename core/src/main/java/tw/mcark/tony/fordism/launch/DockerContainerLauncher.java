@@ -7,6 +7,7 @@ import tw.mcark.tony.fordism.model.task.Task;
 import tw.mcark.tony.fordism.model.workflow.ArtifactAccess;
 import tw.mcark.tony.fordism.proxy.UsageProxy;
 import tw.mcark.tony.fordism.secret.SecretVault;
+import tw.mcark.tony.fordism.workspace.WorkspaceStager;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -164,6 +165,13 @@ public final class DockerContainerLauncher implements ContainerLauncher {
         if (task.hostArtifactPath != null && !task.hostArtifactPath.isBlank()) {
             env.put("FORDISM_ARTIFACT", ArtifactAccess.readOnly(task.artifact)
                     ? ArtifactAccess.READ_ONLY.wireName() : ArtifactAccess.WRITE.wireName());
+        }
+        // A continuing task resumes the session of the step it continues, with a new task rather
+        // than an answer: the entrypoint words the prompt for that, and tells the agent where its
+        // earlier steps' sign-offs went. Set on every launch of such a task; an answered question
+        // also carries RESUME_PROMPT, which the entrypoint reads first.
+        if (task.continuesTaskId != null) {
+            env.put("FORDISM_CONTINUES", WorkspaceStager.STEPS);
         }
         if (task.resumeMessage != null && !task.resumeMessage.isBlank()) {
             env.put("RESUME_PROMPT", task.resumeMessage);

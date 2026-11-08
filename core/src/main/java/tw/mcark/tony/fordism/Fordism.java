@@ -39,6 +39,7 @@ import tw.mcark.tony.fordism.store.TaskRepository;
 import tw.mcark.tony.fordism.store.WorkflowRunRepository;
 import tw.mcark.tony.fordism.web.App;
 import tw.mcark.tony.fordism.workspace.CredentialScrub;
+import tw.mcark.tony.fordism.workspace.TemplateAgents;
 import tw.mcark.tony.fordism.workspace.TemplateStore;
 import tw.mcark.tony.fordism.workspace.TaskResults;
 import tw.mcark.tony.fordism.workspace.ArtifactStore;
@@ -98,6 +99,9 @@ public final class Fordism {
         Accounts accounts = new Accounts(authConfiguration, new UserStore(authState), groups,
                 new SessionStore(authState), new ApiTokenStore(authState), new AuditLog(authState));
 
+        // Before the workflows load: a continuing step whose template runs another profile than the
+        // step it continues is refused at load, and that needs the templates resolvable.
+        engine.useAgents(new TemplateAgents(templates, profiles, models));
         loadWorkflows(engine, configuration);
         restoreState(stateStore, tasks, runs);
 
