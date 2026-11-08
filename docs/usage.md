@@ -221,11 +221,19 @@ A read-only step's mount is `:ro` — docker refuses the write, not the agent's 
 reduce or join `includePreviousResult: true` so it sees each predecessor's `result/` and the
 writable artifact together. Core never merges two trees; one agent does, on purpose.
 
+**A read-only root cannot create the product.** In a `map-reduce` workflow the map is the first
+step, and it is read-only — so no step of the run can clone or scaffold before the fan-out. The same
+holds for a `graph` whose root steps can run in parallel: each is read-only, and nothing writes until
+the first join. Such a workflow gets its product one of two ways: start it with `artifactFrom` naming
+an earlier run that built it (a linear "set up" workflow, say), or give the graph a single root step
+that every other step depends on, which then writes the artifact before anything fans out.
+
 **Continuing a run.** Start a run with `artifactFrom: <run-id>` (a form or query field on
 `POST /api/workflows/{name}/run`, or *Continue from* in the run dialog) and it begins with a copy of
 that run's artifact — so clarify, design and execute dispatched as separate runs work on one product.
 It is a copy: the new run cannot change the old one's. The copy is made when the new run stages its
-first task.
+first task. `artifactFrom` is therefore reserved: a workflow that declares a parameter by that name is
+refused when it is loaded.
 
 **Where it lives and how long.** `<workspaces>/_artifacts/<run-id>` on the host. The run page shows
 the path, lists what the artifact holds, and downloads it as a zip (the same permission a workspace
