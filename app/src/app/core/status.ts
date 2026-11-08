@@ -59,6 +59,20 @@ export function formatDuration(ms: number | null | undefined): string {
   return min ? `${hr}h ${min}m` : `${hr}h`;
 }
 
+/** Compact token count: "458", "56.4k", "1.2M". */
+export function formatTokens(count: number | null | undefined): string {
+  if (count == null || count < 0) {
+    return '';
+  }
+  if (count < 1000) {
+    return `${count}`;
+  }
+  if (count < 1_000_000) {
+    return `${(count / 1000).toFixed(1)}k`;
+  }
+  return `${(count / 1_000_000).toFixed(1)}M`;
+}
+
 /** Compact byte size: "820 B", "4.1 KB", "2.3 MB". */
 export function formatSize(bytes: number | null | undefined): string {
   if (bytes == null || bytes < 0) {

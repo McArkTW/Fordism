@@ -13,7 +13,9 @@ for how to work and how to report your result. In short:
 
 1. Read `task/task.md` — that is your task.
 2. Treat `skills/` and `memory/` as authoritative presets.
-3. Write every output/artifact under `result/` (e.g. `result/color.md`).
+3. The product is in `artifact/` — work on it in place; the rest of the workspace is yours. If
+   `artifact/` is read-only, your output goes in `result/` and a later step merges.
+   Every other output goes under `result/` (e.g. `result/color.md`).
 4. **Finish by writing `result/result.json`** as `{"state":"finished","summary":"…","artifacts":[…]}`.
 
 Your chat output is not the result — `result/` is. Stay inside `/workspace`. Be direct and brief.

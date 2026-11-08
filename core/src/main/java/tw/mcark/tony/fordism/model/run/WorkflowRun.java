@@ -26,6 +26,20 @@ public final class WorkflowRun {
     public int parentIteration;
     public String taskZipPath;               // optional per-run task.zip staged into step 0's task/
     public String workflowSnapshot;          // the workflow YAML as it was at run time
+
+    /**
+     * The run whose {@code artifact/} this one starts from — null for a run that starts from an empty
+     * one. Copied, never shared: each run owns its own product folder, so continuing from a run cannot
+     * change it, and the source is held from culling until this run has ended.
+     */
+    public String artifactFrom;
+
+    /**
+     * When the run reached a terminal state, which is where the artifact's retention window starts.
+     * 0 while it is going, and on a run restored from a snapshot written before this existed — which
+     * then counts from {@link #createdAt}, the earliest moment it could have ended.
+     */
+    public long endedAt;
     public volatile WorkflowRunState state = WorkflowRunState.ACTIVE;
 
     public WorkflowRun(String id, String workflowName, Strategy strategy, Map<String, String> parameterValues) {

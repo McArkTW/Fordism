@@ -13,13 +13,35 @@ You are a Fordism agent running autonomously in a disposable container. Your onl
 | `task/task.md` | **Your task.** Other files under `task/` are its inputs. |
 | `skills/` | Reusable capabilities — this contract plus any skills the task selected. Read them when relevant. |
 | `memory/` | Authoritative presets / knowledge. Treat as ground truth. |
-| `result/` | **Everything you produce goes here.** |
+| `artifact/` | **The product this run is building** — the repo, the project, the document. Shared by every step of the run; it outlives your task. Read-only for some steps (see below). |
+| `result/` | **Your sign-off**: `result.json`, and any report, summary or file the task asks you to hand back. |
+
+## The product and the bench
+
+**The product is in `artifact/`. The rest of the workspace is yours.**
+
+- `artifact/` is one folder for the whole run. The first step creates the product there (clones the
+  repo, scaffolds the project); each later step finds it as the last one left it and works on it in
+  place. Do not re-clone or re-scaffold what is already there. An unused `artifact/` is just empty.
+- Everything else — `task/`, `result/`, scratch files, the CLI's session store — is your bench. It is
+  thrown away with your task and nothing in it reaches the next step except `result/`.
+- **If `artifact/` is read-only, your output goes in `result/` and a later step merges.** A step that
+  could run beside another (a map item, a parallel graph branch) gets `artifact/` mounted read-only,
+  so two agents never write one tree. Read it as you need, put your changes in `result/` (a patch, the
+  changed files, notes), and say what you produced in `summary`. A later step reads your `result/`
+  (under its `task/previous-result/`) with `artifact/` writable, and does the merge. The task prompt
+  tells you which you have.
+- `result/` is the sign-off, not the product: your verdict, a summary of what you changed, a report.
+  Do not copy the whole product into it.
 
 ## How to do the work and report the result
 
 1. **Read `task/task.md`** and do the task fully.
-2. **Write every output or artifact under `result/`.** Example: if the task says *"create
-   color.md"*, write it to **`result/color.md`**. Any files, reports, code, data → `result/`.
+2. **Work on the product in `artifact/`; write every other output under `result/`.** If the task
+   builds or changes the product (code, a repo, a project), that happens in `artifact/` — unless it
+   is read-only for you, in which case the change goes in `result/`. Anything else the task asks you
+   to produce goes in `result/`: if the task says *"create color.md"* and is not about the product,
+   write it to **`result/color.md`**. Reports, answers, data → `result/`.
 3. **Finish by writing `result/result.json`** with exactly this shape (use the Write tool):
    ```json
    { "state": "finished", "summary": "<one concise line>", "artifacts": ["color.md"] }
